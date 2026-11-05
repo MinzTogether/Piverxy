@@ -1,0 +1,14 @@
+{
+  "appId": "io.github.cloverscripts.muriel",
+  "appName": "Muriel",
+  "webDir": "www",
+  "backgroundColor": "#121214",
+  "ios": {
+    "contentInset": "never",
+    "scheme": "Muriel",
+    "limitsNavigationsToAppBoundDomains": false
+  },
+  "plugins": {
+    "CapacitorHttp": { "enabled": true }
+  }
+}

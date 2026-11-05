@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Link to Muriel</title>
+  <meta name="robots" content="noindex">
+  <meta name="color-scheme" content="light">
+  <link rel="icon" href="icon.png">
+  <style>
+    :root { --bg: #f5f5f7; --ink: #1d1d1f; --muted: #6e6e73; --card: #fff; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; background: var(--bg); color: var(--ink); font: 17px/1.47 -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, 'Segoe UI', system-ui, sans-serif; letter-spacing: -0.022em; -webkit-font-smoothing: antialiased; }
+    main { width: 100%; max-width: 420px; padding: 40px 28px 32px; border-radius: 28px; background: var(--card); text-align: center; }
+    img { width: 72px; height: 72px; margin: 0 auto; border-radius: 16px; box-shadow: 0 12px 28px rgba(0, 0, 0, 0.16); }
+    h1 { margin: 20px 0 6px; font-size: 28px; line-height: 1.14; font-weight: 600; letter-spacing: 0.007em; }
+    p { margin: 0 0 18px; color: var(--muted); }
+    .code { margin: 8px 0 24px; font: 600 34px/1 ui-monospace, 'SF Mono', Menlo, Consolas, monospace; letter-spacing: .08em; user-select: all; }
+    a.btn { display: inline-flex; align-items: center; min-height: 44px; padding: 11px 24px; border-radius: 980px; background: var(--ink); color: #fff; text-decoration: none; }
+    a.btn:hover { background: #000; }
+    .small { margin: 18px 0 0; font-size: 14px; }
+    .small a { color: #0066cc; }
+  </style>
+</head>
+<body>
+  <main>
+    <img src="icon.png" alt="">
+    <h1>Link to Muriel</h1>
+    <p id="lead">Opening Muriel…</p>
+    <div class="code" id="code"></div>
+    <a class="btn" id="open" href="#">Open Muriel</a>
+    <p class="small">If Muriel doesn't open: in Muriel go to <b>Settings → Sync → Enter a code</b> and type the code above. It works for 5 minutes.</p>
+    <p class="small">No Muriel yet? <a href="./">Get it here</a>.</p>
+  </main>
+  <script>
+    // the code comes after the # so it never reaches a server
+    var raw = (location.hash.slice(1) || new URLSearchParams(location.search).get('c') || '').toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 8);
+    var codeEl = document.getElementById('code'), open = document.getElementById('open');
+    if (raw.length === 8) {
+      codeEl.textContent = raw.slice(0, 4) + '-' + raw.slice(4);
+      open.href = 'muriel://link?code=' + raw;
+      setTimeout(function () { location.href = open.href; }, 300);
+    } else {
+      document.getElementById('lead').textContent = 'This link has no code. Show a new one in Muriel: Settings → Sync → Link a device.';
+      open.style.display = 'none';
+    }
+  </script>
+</body>
+</html>

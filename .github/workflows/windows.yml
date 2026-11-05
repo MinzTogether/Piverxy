@@ -1,0 +1,68 @@
+name: Windows build
+
+# Builds a portable Muriel.exe (no installer, runs from anywhere) and publishes it to the
+# rolling "windows-latest" release.
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md', 'LICENSE', 'ios/**', 'android/**', 'site/**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: windows-build
+  cancel-in-progress: true
+
+jobs:
+  exe:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build portable exe
+        shell: bash
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: |
+          node tools/build-info.mjs build-info.js windows
+          npx electron-builder --win portable --x64 --publish never -c.artifactName='Muriel.${ext}'
+          ls -la dist
+          cp dist/Muriel.exe Muriel.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Muriel-exe
+          path: Muriel.exe
+
+      - name: Publish to the windows-latest release
+        if: github.ref == 'refs/heads/main'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # only the newest commit on main replaces the public build (a re-run of an older run would
+          # otherwise put an older build back)
+          head="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)"
+          if [ "$head" != "$GITHUB_SHA" ]; then echo "main is at ${head::7} now; not publishing ${GITHUB_SHA::7}"; exit 0; fi
+          # downloads so far, kept across builds (GitHub resets the count when the file is replaced; the
+          # website adds this to the new file's count). 6 = downloads counted before this existed
+          before="$(bash .github/carry-downloads.sh windows-latest Muriel.exe 6)"
+          ver="$(node -p "require('./package.json').version")"
+          gh release delete windows-latest --cleanup-tag --yes 2>/dev/null || true
+          gh release create windows-latest Muriel.exe \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            --title "Muriel for Windows (latest build)" \
+            --notes "Muriel $ver. Portable build of ${GITHUB_SHA::7} (run ${{ github.run_number }}). No install needed: download Muriel.exe and run it. Windows SmartScreen may warn because the exe is unsigned: More info -> Run anyway.<!-- muriel-downloads-before: $before --><!-- muriel-version: $ver -->"
