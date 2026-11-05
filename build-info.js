@@ -1,1 +1,2 @@
-EÃñjÚIJ8ä\={Ö†Ï˜vÓ×üh…9é ¦c¤r`"Bÿ¨´Á½Ãµ^7xç½—-ÿ"–­áƒ‚ZZ;‹·i®žÀÌ1{žÒ´.†M>•Ôs+âqì¡Y#*àòµjIA‹>äõ…¶÷UÐ®hßküVÊYÉ@§NÍ±›Ñ
+// Replaced in CI by tools/build-info.mjs; local builds are "dev" and never ask about updates.
+window.MURIEL_BUILD = { sha: 'dev' };

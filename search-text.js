@@ -1,5 +1,16 @@
-YDËÓÿ™£Æˆ<<L3nßìfv@fÝ$~sªáùÓ'¸ºã¸2±†'v­ÍFú˜^e‡#[’T©ÄïûH›¹š×ÈéumvŽÎ?•.›'
-¤ u4±WÐ«;ì‚mzG²òðüàÌå‹ESo0°Ïe/EÞ]P©øŽÚª	W:–Ý¿h¨ÈÈÍ7BsŸÔâ&‡KhÕu}êpê÷Q",¶ú³<A@)6å£·ñØ¯n‰cýPœXÏ¯
-C•ùkÜB9â
-5œ}€ŽÎž ÛÖª`„?¿! 5¬sftCùþ¼ÇëË´Xapæ»Á%þ$Kž¬^é	…ÔR[‹Ï{EÄ)*P³ŒµÚÞVz]ÆÉðæ”÷å‘1ho*c®.S1¤:±M¤;öös›£îì¼ÒoMŽÔKÁ‚*^‡9x`’NÝÿõ¸ —ƒ2Å½'l`"­×2äì|{fÇPEs°õÚù§9Y^¿¦Óåí˜Æ’HL)€Á?ŠK„Ø!^ó}¾ÔH/]t7Âþ¦eüëÑÀcaj’¥ Á¢:ªzð¿U›5¶x•ãçXMÙ
-/èF€”ºÊÂÛU‰y‰kœ,ôµ~¶àfˆ<[4¶),‘)£—Ãïâ<óph‡¡N}ðÑ÷KV2WN­Ý¥“ÈÒ¹BiëYDË
+function normalizeSearch(value) {
+  if (typeof value !== 'string') return '';
+  return value
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f\u0591-\u05c7\u0610-\u061a\u064b-\u065f\u0670\u06d6-\u06ed]/g, '')
+    .replace(/\u0640/g, '')
+    .replace(/[\u06cc\u0649]/g, '\u064a')
+    .replace(/\u06a9/g, '\u0643')
+    .replace(/\u0629/g, '\u0647')
+    .replace(/\u06c1/g, '\u0647')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+if (typeof module !== 'undefined') module.exports = { normalizeSearch };

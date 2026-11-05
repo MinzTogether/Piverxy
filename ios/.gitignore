@@ -1,2 +1,13 @@
-!¯~_¾%Å€0²¨º	úü\âcç°]…Â+GN€w›Ä;%¥ÑL€:[÷ÒÙû¢ÊFq˜xdn=çîÕokmƒôç8\ÊòOùUxô«¶Ø¡³)RáGmDˆÍÖNŒ}&ÑÆtï±Ñp™
-ƒ“9_›³äÉ2¦“l­,(>*¡>®µ+…ü‹>òY´I÷h§AV‹ĞäÉk¶@À†Ê{Ô®ßq1U·#Òõâ;MYisj.Ììà•`cÃÿÿéx­Áü^v
+App/build
+App/Pods
+App/output
+App/App/public
+DerivedData
+xcuserdata
+
+# Cordova plugins for Capacitor
+capacitor-cordova-ios-plugins
+
+# Generated Config files
+App/App/capacitor.config.json
+App/App/config.xml

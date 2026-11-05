@@ -1,5 +1,11 @@
-˜nKðäð¢9ñ‡¦{<UEÛiMÚQÒäD¥º{Îè½µØ"Šy/ƒšÂ}`:—eÿ°,7Á¥[’^/àÀÒ¬¶¡M&ós3zVì¹Á”“/N®†Xë1ã¹÷MH‰hÇóÛVÒ„~ÉX?,*øj4µrÑf‹g¦Ãí‘“`ê°S2ÿÇö­u|¤NÕ)¼Ñ_’îïJåKpÀ^¶õ))N{9Þˆ”‚Œk4×”ô¾lÆÊ«cU! 1Ù¢öPF(Mx=:§ç·õÔí›o¿¥ˆ:£HüCxcÉ³*]ÜÄÂVÝ!ö*Å¾|‘—€iæ2ã]`øp@ŽrË°g¼·/íåÌMRýSÇé¯mÒž
-òX%X4Žh«“5:•†BŸ
-ùÍé¬¬Õv&‡H3`"×¹Ûp[:Ä°6Cú¥Aæe/ú´†¯¬þ'c[¸šØ	~Ûs9áQÈkßD¿Î@Îœ£nQ„<äêÖñs{&!ö0±…|‹ã»iüF$ãGÇCXÉ©^fÜÞûùVe©?Î™ uËžˆn¹<â¢ì$}(WvC= ÓÜ·›P4ÍàÏ¾v²ñ«n!ºEï]T,#ª³”˜øuÕ3Èê_ˆšÔJÿ?KÀDm¨`u7êª'	ÿÝ‚–ufÐ˜nKðäð¢9ñ‡¦{<UEÛiMÚQÒäD¥º{Îè½µØ"Šy/ƒšÂ}`:—eÿ°,7Á¥[’^/àÀÒ¬¶¡M&ós3zVì¹Á”“/N®†Xë1ã¹÷MH‰hÇóÛVÒ„~ÉX?,*øj4µrÑf‹g¦Ãí‘“`ê°S2ÿÇö­u|¤NÕ)¼Ñ_’îïJåKpÀ^¶õ))N{9Þˆ”‚Œk4×”ô¾lÆÊ«cU! 1Ù¢öPF(Mx=:§ç·õÔí›o¿¥ˆ:£HüCxcÉ³*]ÜÄÂVÝ!ö*Å¾|‘—€iæ2ã]`øp@ŽrË°g¼·/íåÌMRýSÇé¯mÒž
-òX%X4Žh«“5:•†BŸ
-ùÍé¬¬Õv&‡H3`"×¹Ûp[:Ä°6Cú¥Aæe/ú´†¯¬þ'c[¸šØ	~Ûs9áQÈkßD¿Î@Îœ£nQ„<äêÖñs{&!ö0±…|‹
+// Phones keep no log file: writing one on every failed download only costs storage and battery. Errors and
+// warnings from the in-app server go to the shareable error log (Settings â†’ Share error log) instead of
+// disappearing, so a failed download or import can still be diagnosed.
+const describe = (message, err) => (err ? `${message}: ${(err && (err.message || err)) || err}` : message);
+const toLog = (level, message) => {
+  try { if (typeof window !== 'undefined' && window.MurielLog) window.MurielLog.add(level, `[server] ${message}`); } catch (e) {}
+};
+const log = (level, message) => { if (level === 'error' || level === 'warn') toLog(level, message); };
+const error = (message, err) => toLog('error', describe(message, err));
+const warn = (message, err) => toLog('warn', describe(message, err));
+module.exports = { log, error, warn, info: () => {}, tail: () => [], LOG_DIR: '/data/logs' };

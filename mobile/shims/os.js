@@ -1,1 +1,1 @@
-›'×œ…:šë ¥PrF°jÙ:¾8ç/Éx¥rÏ¾äÙÿ!nb
+module.exports = require('./misc').os;

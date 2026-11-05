@@ -1,5 +1,22 @@
-vü`vévÛ$×c¬HéÓ«IBË4Ãù™
-Ö<•\5nS^Ì—%ò‚R©méû¨¼ã"±/7p°½ËF<>'£´&u¡QĞ+ê‚á‹¿š~È@smßÈ?ßc†UØ]¸@¯ø'ÊªÄjA²[àúàeõEú6}ò ‡âx›ÕÜmìpCçW" G:?Í¹hØÎÍRuŸXŞ¯Ç™eıùŒXf©
-…¦ü,G@$90å»³‹·70İÖ¨ºf„–¯!	%ªsê…ÿkuD9K3œÔˆÎÑ#ş[˜¬³Nï	,ÄT[ÏdCPîºnûÍ´ñqvæÿj[Æ`àà”^õ—1Á,c"ßy{½UÂ)ƒ@µŒÊŞÚ‹¥îE¼{iäÒK>‡S˜´<¦¡K¤9+ğöµ¨¦—*"Å7j`‹½Ñ2h„*÷—?xÉ‚HİVóIX¿Ããí1Ö”H®\/MüzÒvÁPìc¶õsé§ôd7kî eUû×ÀÊql’)Ñ9Š¶[‚ØˆNõ}ÄN/Ñ…åN^Mp)èï’º0Ç¢“º|ğ­¯U2%°¾¦æf!,]49*‘€³‘ÃcÄÛü™‰ÂŒ,]³~›GNÍ£:ØÔ¹¥RoëFò:óÙx¡çmöxçMVvü`vévÛ$×c¬HéÓ«IBË4Ãù™
-Ö<•\5nS^Ì—%ò‚R©méû¨¼ã"±/7p°½ËF<>'£´&u¡QĞ+ê‚á‹¿š~È@smßÈ?ßc†UØ]¸@¯ø'ÊªÄjA²[àúàeõEú6}ò ‡âx›ÕÜmìpCçW" G:?Í¹hØÎÍRuŸXŞ¯Ç™eıùŒXf©
-…¦ü,G@$90å»³‹·70İÖ¨ºf„–¯!	%ªsê…ÿkuD9K3œÔˆÎÑ#ş[
+// keyOf (optional) gives each track an identity string; with it the check is one pass instead of comparing every
+// pair, which froze big playlists (2 s for 6,000 songs on every open and every filter keystroke)
+function dedupeTracks(tracks, same, keyOf) {
+  if (!Array.isArray(tracks)) return [];
+  const kept = [];
+  if (typeof keyOf === 'function') {
+    const seen = new Set();
+    for (const track of tracks) {
+      const k = keyOf(track);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      kept.push(track);
+    }
+    return kept;
+  }
+  for (const track of tracks) {
+    if (!kept.some((other) => same(other, track))) kept.push(track);
+  }
+  return kept;
+}
+
+if (typeof module !== 'undefined') module.exports = { dedupeTracks };

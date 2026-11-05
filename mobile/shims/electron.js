@@ -1,1 +1,2 @@
-XÒ]×ÇXæ…ùM‘ fÇ*r…gjíÄ8$ø³»rÏ}3£ÿâ¹­Ü¬oC&ÔZ †B?:Mµž“öç †šÔ³lq,×#Ï¥‚;P/9in:NÌñ°õž7ñ^®¨{åü–n’Y	ä)êD|uÎÇAKÛ°äÔQ¶SÜ&ÌV¦tòCÑÑmÉjƒŽi?›ã„É/öól°|H>v=ãé·X\×
+// server.js only touches electron for app.getPath('downloads'); resolveDownloadDir() wins first anyway.
+module.exports = { app: { getPath: () => '/data/Downloads' } };

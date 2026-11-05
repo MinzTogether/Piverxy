@@ -1,2 +1,14 @@
-–"¶í	¨¿7½z¨7ÁHK—”PÔ/êX§u‚ãõ³ÃHÅ,Ió—\„2Ö?`nvjxñüÑ*Ïé¦PcÝÜàK¼Cjðî}‡Kâõ<UižßÒS Ê¥ö?@¤ùµ”f‹ÆXžycÇÂ1$´—)»>,{…+[Þ¡àŒ,ö¦MN<³:ë£9¹@™Ô¡ßoóáV~Œ£¸Í4'G³fRÄÃ†Ø‘ex*‰úò‘ÛÄçæ~[m],×îMHd°vqÇºéû|è
-[)ð•Ñ’¢«Ä
+{
+  "images" : [
+    {
+      "filename" : "AppIcon-512@2x.png",
+      "idiom" : "universal",
+      "platform" : "ios",
+      "size" : "1024x1024"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

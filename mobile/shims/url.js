@@ -1,2 +1,1 @@
-Ы·▒╪p
-К:e}/ея╞}FOУe┘┼(7ч╨_ТxZф└╛OЁ!СЇв
+module.exports = require('./misc').url;

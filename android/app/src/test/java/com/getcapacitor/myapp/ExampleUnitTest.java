@@ -1,3 +1,18 @@
-)4à¶¾[Nˆ«,ë!—¹ôÂ¡kyóUVÊ”µÕ4“_¥f­JÒÃ2Ài‘Ñ`<‰Nê‡Ûpÿğ~ïuK,cöMü|¦ÂiÑº]ãjè¾C?ğ!É„¢Üó€VHUFãeÙX7çˆ/’x”À›¢ÁØ(zŠ:=/¥·¶}": í½°¿ƒ¥l/×Hÿ‚P`9^N§ÁšõõÛ^Å˜Qå—¦D’29Î)`Ún|xEäÇ*{ñ°ä{İhø]¼÷ræîÉg‘KVí*µM*ÇÄSÒ³ö‹X¤M£”Ò“Æì†ocsÔ1¬)&:{13MŞ®¹öŒ ¢Û¬?(`ş=[·¬	}ùâBCÜˆ5æC´…C%„ÉÖ$Üés»VR!Xö9Ç|¼kùiËÎfãpœê`&ıuê¯Kÿê
-ÔuQX7Õ@¨_¿–JÈ·	ÀsåÏØÕPc‡n"ñ”¯p4úh¾A:³«6Ÿ,!Í«¬›]4& 
-3Wª•¹ìøv
+package com.getcapacitor.myapp;
+
+import static org.junit.Assert.*;
+
+import org.junit.Test;
+
+/**
+ * Example local unit test, which will execute on the development machine (host).
+ *
+ * @see <a href="http://d.android.com/tools/testing">Testing documentation</a>
+ */
+public class ExampleUnitTest {
+
+    @Test
+    public void addition_isCorrect() throws Exception {
+        assertEquals(4, 2 + 2);
+    }
+}

@@ -1,6 +1,34 @@
-Hä`P×nÛé{¬§vñõ•QBí
-Ûù¿4Î«D5Hmxò%*ÌšRSéİ°°¼Å/:—/p2¥Ë`&¬&S£¹Qö<3ê¤ß“¿¼@î~sKá†È'Çc)¸MØ{†X¯ŞÒŒúrA”eøúÆ[ícÄg61Cê ¡Ü`›óâuìV}ÿW_Õ¹N?ÀÎë Ju¹fŞ‰ùeÛÇ”~X©,»¾ü4$4Gf!0Ã…«‹‘	(İğ–¢f¢¨·7=ªUÔÿMKDu3ºêˆˆè,É#Ø³C˜ŠVï/ÜT}ñ|enöº7PãÍ’ÏivÀÁr[à^øà²`í—ÿg,EÇy]ƒMÂ½Xµª"Òøä“¥È{šEi?Ú†Òm9&‡u¦¬<'˜¹K‚3ğĞ‹°¦±:ã*/jFµ¥ÑV„É?^÷šHûhó©®QX™1ÛãËÎ”nD/<säz$ìnÁvÒ{¶ÓMñÊ|Uö Ckã×æôil´É9¬ˆC‚ş¶Võ[)ÜN	ïå9p^kN)ÎÑˆ’œ2(Ç„­¢|Ö“·s=°!€¾æ@4]!!*·¾«‘å]ÄıÂ¯ü”
-c³X¥_h:Õ£:ÀÔŸ›JoÍxê:Õç`‡Ùuö"FÿMpHä`P×nÛé{¬§vñõ•QBí
-Ûù¿4Î«D5Hmxò%*ÌšRSéİ°°¼Å/:—/p2¥Ë`&¬&S£¹Qö<3ê¤ß“¿¼@î~sKá†È'Çc)¸MØ{†X¯ŞÒŒúrA”eøúÆ[ícÄg61Cê ¡Ü`›óâuìV}ÿW_Õ¹N?ÀÎë Ju¹fŞ‰ùeÛÇ”~X©,»¾ü4$4Gf!0Ã…«‹‘	(İğ–¢f¢¨·7=ªUÔÿMKDu3ºêˆˆè,É#Ø³C˜ŠVï/ÜT}ñ|enöº7PãÍ’ÏivÀÁr[à^øà²`í—ÿg,EÇy]ƒMÂ½Xµª"Òøä“¥È{šEi?Ú†Òm9&‡u¦¬<'˜¹K‚3ğĞ‹°¦±:ã*/jFµ¥ÑV„É?^÷šHûhó©®QX™1ÛãËÎ”nD/<säz$ìnÁvÒ{¶ÓMñÊ|Uö Ckã×æôil´É9¬ˆC‚ş¶Võ[)ÜN	ïå9p^kN)ÎÑˆ’œ2(Ç„­¢|Ö“·s=°!€¾æ@4]!!*·¾«‘å]ÄıÂ¯ü”
-c³X¥_h:Õ£:ÀÔŸ›JoÍxê:Õç`‡Ùuö"FÿMpHä`P×nÛé{¬§vñõ•QBí
-Ûù¿4Î«D5Hmxò%*ÌšRSéİ°°¼Å/:—/p2¥Ë`&¬&S£¹Qö<3ê¤ß“¿¼@î~sKá†È'Çc)
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert');
+
+const { isRtlText } = require('../lyrics-rtl');
+
+test('detects Arabic lyrics as right-to-left', () => {
+  assert.strictEqual(isRtlText('Ø£Ø­Ø¨Ùƒ ÙŠØ§ Ø­ÙŠØ§ØªÙŠ'), true);
+});
+
+test('detects Hebrew lyrics as right-to-left', () => {
+  assert.strictEqual(isRtlText('×× ×™ ××•×”×‘ ××•×ª×š'), true);
+});
+
+test('treats English lyrics as left-to-right', () => {
+  assert.strictEqual(isRtlText('I love you tonight'), false);
+});
+
+test('ignores leading numbers and punctuation before the first strong character', () => {
+  assert.strictEqual(isRtlText('123 - Ø£Ø­Ø¨Ùƒ'), true);
+  assert.strictEqual(isRtlText('123 - I love you'), false);
+});
+
+test('uses the first strong character for mixed lines', () => {
+  assert.strictEqual(isRtlText('Hello Ù…Ø±Ø­Ø¨Ø§'), false);
+  assert.strictEqual(isRtlText('Ù…Ø±Ø­Ø¨Ø§ Hello'), true);
+});
+
+test('ignores markup and blank lyrics', () => {
+  assert.strictEqual(isRtlText('<span>Ù…Ø±Ø­Ø¨Ø§</span>'), true);
+  assert.strictEqual(isRtlText(''), false);
+  assert.strictEqual(isRtlText('   '), false);
+});

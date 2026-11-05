@@ -1,1 +1,6 @@
-s@oìÊÔ]Òß£øMUª®õM²1öàjEà:V¡‘'É+*u÷>]Ðh´æ‚‹³šžÈ*‹mµÄ?9‚’^¦)˜^©—åûä7°ã{½±E¨|Ú"ÇFclvƒé×$½ü "vÓÁÖNË^\õ™`I‚<ÿÃ9nxN/þçÄ”¬ÙÑã	F[X[¥ûC:q¶dÁ´›îzæ]¯ÑÖÂ%j„ü
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "muriel-mobile", "runtimeExecutable": "node", "runtimeArgs": ["mobile/dev-server.mjs"], "port": 5173 }
+  ]
+}

@@ -1,2 +1,14 @@
->(ˇÅ¥ì≠ø°‰ +_Z√ã
-B\±b∆µ˝û}Á;ﬂ÷◊§UmÖö@  °rÊjÙjy‡O8Gı8ùÿÉœT¸’ÆÀvn¸ıcYjÈ¢âI˜√LA(÷;‰∑\Ä∂q+ÜÓóê‘–ÇÁqO\#¨®	;3"≤i7≈ÃíΩ~û0hä∫”\¥Ø§˘+%´»ÖJ≥WÒ·iÜDˆê=0—ñ&Ø[-tëNZ—ƒ·ÉÌd¥õrÓ…L˚xl”q√>_Úï_¿x.˛mY®aÁ‚˙ÇG∑‚Õ∞#ÿ{ºR¿GzkwÂô–%€åßÄD“ß¶I 8,Úò9Ö=ô≥>oó®O"®67ﬂ∏©ΩdÍJ1Ú’óä†ÎÇ˝tFW≤IÌg-√V5÷!ê
+{
+  "appId": "io.github.cloverscripts.muriel",
+  "appName": "Muriel",
+  "webDir": "www",
+  "backgroundColor": "#121214",
+  "ios": {
+    "contentInset": "never",
+    "scheme": "Muriel",
+    "limitsNavigationsToAppBoundDomains": false
+  },
+  "plugins": {
+    "CapacitorHttp": { "enabled": true }
+  }
+}

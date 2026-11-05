@@ -1,1 +1,1 @@
-JΎ²ΐΰ ΥrEΏ_Ι\ÿΓu']ύ`Pψbκλª¤«@;!ϋΘ4mΎ7?yb
+module.exports = require('./misc').string_decoder;

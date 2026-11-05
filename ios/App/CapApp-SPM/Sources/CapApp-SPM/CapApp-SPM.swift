@@ -1,1 +1,1 @@
-'‡‹¸0\†Gù’ü«ú2©³e¸á[­eDÄ'Þ
+public let isCapacitorApp = true
