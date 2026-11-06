@@ -343,7 +343,7 @@ public class MediaControlsPlugin extends Plugin {
         backgroundStatus(call);
     }
 
-    // A song saved to Music/Muriel Mod (mobile/shims/store.js) goes into the phone's media index right away, so music
+    // A song saved to Music/Muriel (mobile/shims/store.js) goes into the phone's media index right away, so music
     // apps list it: Android 10 and older only find new files at their next full scan. Takes a path or file:// URI.
     @PluginMethod
     public void scanFile(PluginCall call) {

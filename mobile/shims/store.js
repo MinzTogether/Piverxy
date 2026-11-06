@@ -1,6 +1,6 @@
 // Persistent storage behind the fs shim. Virtual paths under /data map to Capacitor Filesystem paths under
 // Muriel/ (IndexedDB in a browser): in Documents on iOS, visible in the Files app; in the app's private storage
-// on Android, except the songs people download, which go to Music/Muriel Mod (see "Android: downloads" below).
+// on Android, except the songs people download, which go to Music/Muriel (see "Android: downloads" below).
 const path = require('path');
 const { Filesystem, Directory, Encoding } = require('@capacitor/filesystem');
 const { Capacitor } = require('@capacitor/core');
@@ -15,7 +15,7 @@ const toVirtual = (rpath) => '/data' + rpath.slice(ROOT.length);
 const priv = (vpath) => ({ path: toReal(vpath), directory: DIR });
 
 // ---- Android: downloads ----
-// Songs saved with Download (/data/Downloads) go to Music/Muriel Mod on the phone's shared storage (Documents/Muriel Mod
+// Songs saved with Download (/data/Downloads) go to Music/Muriel on the phone's shared storage (Documents/Muriel
 // if Music can't be used), where file managers and music apps find them. The song cache and the rest stay private.
 // Android 11+ lets an app save files there without asking. Android 10 and older need the storage permission
 // (AndroidManifest.xml); it's asked for when the first song is saved, and without it downloads stay private.
@@ -24,19 +24,16 @@ const PUBLIC = Directory.ExternalStorage;
 // the app's own folder on shared storage: Android/data/<package>/files. Needs no permission on any Android version
 // (other apps and, on Android 11+, file managers can't browse it).
 const APPDIR = Directory.External;
-// The mod's own folder name: the original Muriel saves to Music/Muriel, and on Android 11+ an app can't change or delete
-// files another app made there, so two apps sharing one folder would trip over each other.
-const FOLDER = 'Muriel Mod';
-const PUBLIC_ROOTS = [`Music/${FOLDER}`, `Documents/${FOLDER}`];
-let pub = null; // the folder in use, e.g. 'Music/Muriel Mod' (in PUBLIC) or 'download' (in APPDIR)
+const PUBLIC_ROOTS = ['Music/Muriel', 'Documents/Muriel'];
+let pub = null; // the folder in use, e.g. 'Music/Muriel' (in PUBLIC) or 'download' (in APPDIR)
 let pubDir = PUBLIC; // which of the two it is in
 let mayAsk = false; // Android 10 and older: storage permission not given, but may be
 let asked = false;
 // ---- Android: choosing the download folder (Settings → Folders → Download folder → Change) ----
-// The choice is kept as text: 'Music/Muriel Mod' (shared storage) or 'Android/data/<package>/files/download' (the app's
+// The choice is kept as text: 'Music/Muriel' (shared storage) or 'Android/data/<package>/files/download' (the app's
 // own folder). Shared storage only takes the folders Android lets an app write to, and a folder of its own inside one.
 // the package name; replaced by the real one at launch (list below), because a rebuilt app may carry another
-let APP_ID = 'io.github.murielmod';
+let APP_ID = 'io.github.cloverscripts.muriel';
 const appFiles = () => `Android/data/${APP_ID}/files`;
 const SHARED_TOPS = ['Music', 'Documents', 'Download', 'Podcasts', 'Audiobooks'];
 const LOC_KEY = 'muriel_download_location';
@@ -63,7 +60,7 @@ function parseLocation(text) {
 const kindDir = (kind) => (kind === 'app' ? APPDIR : PUBLIC);
 const textOf = (kind, root) => (kind === 'app' ? `${appFiles()}/${root}` : root);
 const readLoc = () => parseLocation(lsGet(LOC_KEY));
-// a folder as Settings shows it: 'Music/Muriel Mod' (the sheet that picks it also shows the full path)
+// a folder as Settings shows it: 'Music/Muriel', as before (the sheet that picks it also shows the full path)
 const shown = (kind, root) => textOf(kind, root);
 const sharedName = (rel, dir) => (dir === PUBLIC ? rel.replace(/\.webm$/i, '.mka') : rel);
 
@@ -342,9 +339,9 @@ module.exports = {
   // ---- Android: download folder choice ----
   // each place offered in Settings: text (what is kept), shown (as Settings shows it), full (the path on the phone)
   downloadChoices: () => [
-    { text: PUBLIC_ROOTS[0], label: `Music / ${FOLDER}`, hint: 'Music apps and file managers find it' },
-    { text: `Download/${FOLDER}`, label: `Download / ${FOLDER}`, hint: 'Next to your other downloads' },
-    { text: PUBLIC_ROOTS[1], label: `Documents / ${FOLDER}`, hint: '' },
+    { text: 'Music/Muriel', label: 'Music / Muriel', hint: 'Music apps and file managers find it' },
+    { text: 'Download/Muriel', label: 'Download / Muriel', hint: 'Next to your other downloads' },
+    { text: 'Documents/Muriel', label: 'Documents / Muriel', hint: '' },
     { text: `${appFiles()}/download`, label: 'App folder', hint: 'Android / data / … / files / download. Needs no permission; file managers on Android 11+ can\'t open it' },
   ].map((c) => ({ ...c, shown: c.text, full: ROOT_PREFIX + c.text })),
   isCustomDownloadDir: () => !!readLoc(),

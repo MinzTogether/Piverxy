@@ -4,9 +4,7 @@ android {
     namespace = "io.github.cloverscripts.muriel"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        // the mod installs next to the original Muriel (io.github.cloverscripts.muriel): another package name.
-        // The Java package (namespace above) stays the same on purpose.
-        applicationId "io.github.murielmod"
+        applicationId "io.github.cloverscripts.muriel"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         // CI passes the run number so every build installs as an update

@@ -1,6 +1,6 @@
 {
-  "appId": "io.github.murielmod",
-  "appName": "Muriel Mod",
+  "appId": "io.github.cloverscripts.muriel",
+  "appName": "Muriel",
   "webDir": "www",
   "backgroundColor": "#121214",
   "ios": {

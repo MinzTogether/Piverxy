@@ -24,7 +24,7 @@ const ANDROID = Capacitor.getPlatform() === 'android';
 
 // Settings → Folders → Download folder → Change (Android): a sheet listing the places Android lets Muriel save songs in,
 // one of your own inside Music / Download / Documents, and whether the songs already downloaded go along.
-// Resolves { text, move } (text: the folder as Settings shows it, e.g. Music/Muriel Mod), or null when cancelled.
+// Resolves { text, move } (text: the folder as Settings shows it, e.g. Music/Muriel), or null when cancelled.
 function chooseDownloadFolder(current) {
   return new Promise((resolve) => {
     const choices = store.downloadChoices();
@@ -225,7 +225,7 @@ module.exports = function electronAPI({ ready, port, fs, fileUrlFor }) {
     getDataDir: async () => ({ dir: 'On this iPhone (Files → Muriel)', defaultDir: '/data', isCustom: false }),
     pickDataDir: async () => null,
     setDataDir: async () => ({ success: false, error: 'The music folder is fixed on iPhone' }),
-    // iOS: fixed, Files → Muriel → Downloads. Android: Music/Muriel Mod unless changed in Settings (shims/store.js)
+    // iOS: fixed, Files → Muriel → Downloads. Android: Music/Muriel unless changed in Settings (shims/store.js)
     async getDownloadDir() {
       if (!ANDROID) return { dir: 'Files → Muriel → Downloads', isCustom: false };
       await ready;
