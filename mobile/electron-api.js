@@ -186,6 +186,29 @@ module.exports = function electronAPI({ ready, port, fs, fileUrlFor }) {
     return { parent: found.parent, groups, partial: found.partial };
   }
 
+  // Android: a move of the songs that is not finished (see shims/store.js). Settings shows where it stands; Retry runs
+  // the move once more, now (it also runs by itself at every launch).
+  async function getMoveStatus() {
+    await ready;
+    return store.moveStatus();
+  }
+  async function retryMove() {
+    await ready;
+    const status = store.moveStatus();
+    if (!status.pending) return { ok: true, ran: false, ...status };
+    // songs the app did not save itself stay hidden until it may read music and audio: ask first, carry on once it is given
+    if (status.permission) {
+      let access = await store.readAccess();
+      if (!access.granted) {
+        const settings = !access.canAsk;
+        access = await store.readAccess({ ask: true, settings });
+        if (!access.granted) return { ok: false, needsPermission: true, settingsOpened: settings, ...store.moveStatus() };
+      }
+    }
+    toast(Tm('Moving your songs…'), 'info');
+    return store.retryMove();
+  }
+
   return {
     isWindows: false,
     isMobile: true,
@@ -289,7 +312,7 @@ module.exports = function electronAPI({ ready, port, fs, fileUrlFor }) {
       if (!res.ok) return { ...res, error: Tm(res.error) };
       return { ...res, unlinked: await forgetLinked(), restart: true };
     },
-    ...(ANDROID ? { scanLocalFolders } : {}),
+    ...(ANDROID ? { scanLocalFolders, getMoveStatus, retryMove } : {}),
     restartApp: () => location.reload(),
     getAppVersion: async () => { const b = window.MURIEL_BUILD || {}; return b.version ? `${b.version}${b.run ? ` (build ${b.run})` : ''}` : '1.1.2'; },
     getHwAccel: async () => true,

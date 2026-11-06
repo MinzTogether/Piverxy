@@ -179,26 +179,38 @@ async function listDownloads(out) {
     if (old && old.directory === DIR) leftovers.push(old); // copied over before, but not deleted
     placed.set(e.vpath, { path: e.rpath, directory: pubDir });
   }
-  // a move that was cut short: the songs still in the old folders stay where they are, and the move carries on
+  // A move that is not settled (cut short, or with songs it could not move): the songs still in the old folders stay where
+  // they are and are listed from there, so none disappears, and the move carries on. A song with the same name as one in
+  // the folder in use is that same song when the move was cut short after copying it (the copy counts). When it hit a
+  // conflict it is another file: it is listed under another name (its own with "(old)" added) so that it can still be played.
   const behind = [];
   const m = readMove();
-  if (m && pubDir === kindDir(m.to.kind) && pub === m.to.root) {
+  if (m) {
     const have = new Set(found.map((e) => e.vpath));
+    const sizes = new Map(found.filter((e) => !e.isDir).map((e) => [e.vpath, e.size]));
+    const held = heldOf(m);
+    const active = { kind: pubDir === APPDIR ? 'app' : 'shared', root: pub };
     for (const from of m.from) {
+      if (sameLoc(from, active)) continue; // walked above
       const dir = kindDir(from.kind);
       let list;
-      try { list = (await Filesystem.readdir({ path: from.root, directory: dir })).files; } catch (e) { continue; }
+      try { list = (await Filesystem.readdir({ path: from.root, directory: dir })).files; } catch (e) { warnMove('list', textOfLoc(from), e); continue; }
       for (const f of list) {
         if (f.type !== 'file' || f.name.startsWith('.')) continue;
-        const vpath = `${DOWNLOADS}/${dir === PUBLIC ? f.name.replace(/\.mka$/i, '.webm') : f.name}`;
-        if (have.has(vpath)) continue; // in the new folder as well: it is the one that counts
+        let vpath = `${DOWNLOADS}/${dir === PUBLIC ? f.name.replace(/\.mka$/i, '.webm') : f.name}`;
+        if (have.has(vpath)) {
+          if (sizes.get(vpath) === (f.size || 0) && !held(textOfLoc(from), f.name)) continue; // in the folder in use as well: that is the one that counts
+          vpath = freeName(vpath, have);
+        }
         have.add(vpath);
         placed.set(vpath, { path: `${from.root}/${f.name}`, directory: dir });
         behind.push({ vpath, isDir: false, size: f.size || 0, mtimeMs: Number(f.mtime) || Date.now() });
       }
     }
-    const timer = setTimeout(resumeMove, 10000); // once the app has started
-    if (timer && timer.unref) timer.unref();
+    if (sameLoc(active, m.to)) {
+      const timer = setTimeout(resumeMove, 10000); // once the app has started
+      if (timer && timer.unref) timer.unref();
+    }
   }
   out.push({ vpath: DOWNLOADS, isDir: true, size: 0, mtimeMs: Date.now() }, ...found, ...behind);
 }
@@ -270,29 +282,69 @@ async function checkWritable({ kind, root }) {
   return null;
 }
 
-// A move writes a journal first (MOVE_KEY: where the songs go, where they come from, how often it was tried), then
-// moves the songs one by one. If the app is closed in the middle, the next launch reads the journal: the songs still
-// in an old folder show up where they are (none disappears) and the move carries on in the background.
+// A move writes a journal first (MOVE_KEY: where the songs go, where they come from, how often it was run, what the last
+// run left over), then moves the songs one by one. If the app is closed in the middle, the next launch reads the journal:
+// the songs still in an old folder show up where they are (none disappears) and the move carries on in the background.
+// The journal goes only when nothing is left to settle: a song that could not move (a failed copy, another file with its
+// name, an old copy that would not delete), a folder that could not be read and a missing permission all keep it, however
+// often it was tried. `tries` only counts the runs; it never ends the move. Every launch tries once more, and so does
+// Retry in Settings.
 const MOVE_KEY = 'muriel_download_move';
 const PART = '.muriel-part-'; // a song being copied has this in front of its name; it gets its own name once it is whole
+const MAX_HELD = 500; // names of conflicting songs the journal remembers (see listDownloads)
 const sameLoc = (a, b) => !!a && !!b && a.kind === b.kind && a.root === b.root;
 const textOfLoc = (l) => textOf(l.kind, l.root);
 
-// -> { to, from: [..], tries } or null
+// -> { to, from: [..], tries, last } or null; last: what the latest run left over (see summary)
 function readMove() {
   const j = lsGet(MOVE_KEY);
   const to = j && typeof j.to === 'string' ? parseLocation(j.to) : null;
   if (!to) return null;
   const from = (Array.isArray(j.from) ? j.from : []).map(parseLocation).filter((l) => l && !sameLoc(l, to));
-  return { to, from, tries: Number(j.tries) || 0 };
+  return { to, from, tries: Number(j.tries) || 0, last: j.last && typeof j.last === 'object' ? j.last : null };
 }
 // no `to`, or nowhere to move from: the journal goes
-const writeMove = (to, from, tries) => lsSet(MOVE_KEY, to && from.length ? { to: textOfLoc(to), from: from.map(textOfLoc), tries } : null);
+const writeMove = (to, from, tries, last) => lsSet(MOVE_KEY, to && from.length ? { to: textOfLoc(to), from: from.map(textOfLoc), tries, ...(last ? { last } : {}) } : null);
 
-// 'moved' | 'conflict' | 'failed'. Never copies onto a file that is already there: what the plugin does then
-// (replace it, refuse, something else) is not something to lean on. Same name and same size means the song is
-// already there (a move cut short after copying it); a different file with that name is left alone, and so is the song.
-// The copy goes to a temporary name and is renamed once its size is right, so a half song never has the real name.
+// ---- what went wrong is told apart: a folder that is not there is not a folder that could not be read ----
+const NOT_THERE = /not exist|no such|not found|enoent|doesn'?t exist/i;
+const errText = (e) => `${e && e.code ? `${e.code} ` : ''}${e && e.message ? e.message : e}`;
+const isNotThere = (e) => NOT_THERE.test(errText(e));
+// what the log keeps: the phase, the path and the error; never what is in a song
+const warnMove = (phase, path, e) => { try { console.warn(`[muriel move] ${phase} ${path}: ${errText(e)}`); } catch (x) {} };
+
+// true only when the error says "not there" AND the folder really is not there. Anything else (no permission, an I/O
+// error, a provider that does not answer) says nothing about whether the songs are still there.
+async function isGoneDir(loc, err) {
+  if (!isNotThere(err)) return false;
+  try { await Filesystem.stat({ path: loc.root, directory: kindDir(loc.kind) }); return false; } catch (e) { return isNotThere(e); }
+}
+
+// Whether two files hold exactly the same bytes: true, false, or null (could not be checked). The same name and the same
+// size prove nothing; only the bytes do. MediaControlsPlugin.sameFile reads both in pieces (a FLAC is 30-150 MB).
+async function sameBytes(a, b) {
+  const media = Capacitor.Plugins && Capacitor.Plugins.MurielMedia; // registered by media-controls.js
+  if (!media) return null;
+  try {
+    const [ua, ub] = await Promise.all([Filesystem.getUri(a), Filesystem.getUri(b)]);
+    const r = await media.sameFile({ a: ua.uri, b: ub.uri });
+    return r && typeof r.same === 'boolean' ? r.same : null;
+  } catch (e) { return null; } // an older build of the plugin, or a file that can't be read: not proven
+}
+
+// The old copy is deleted, and only counts as gone when it really is (a delete that fails must not pass for a move).
+async function dropSource(src) {
+  try { await Filesystem.deleteFile(src); } catch (e) { /* it may be gone already: the check below says */ }
+  try { await Filesystem.stat(src); return false; } catch (e) { return isNotThere(e); }
+}
+
+// 'moved' | 'cleanup' | 'conflict' | 'failed'. Never copies onto a file that is already there: what the plugin does then
+// (replace it, refuse, something else) is not something to lean on. When the name is taken, the same name and the same
+// size are not proof that it is the same song. Only equal bytes are (sameBytes): then the song was copied before a move
+// was cut short and the old copy can go. A different file, or one that could not be checked, is a conflict: both files
+// stay exactly as they are. The copy goes to a temporary name and is renamed once its size is right, so a half song never
+// has the real name. The old copy goes only after the new one is checked, and the song counts as moved only when the old
+// copy is really gone; if it would not go it is 'cleanup' (copied, old copy still there).
 async function moveOne(from, to, f) {
   const fromDir = kindDir(from.kind);
   const toDir = kindDir(to.kind);
@@ -301,16 +353,26 @@ async function moveOne(from, to, f) {
   const src = { path: `${from.root}/${f.name}`, directory: fromDir };
   const dst = { path: `${to.root}/${dname}`, directory: toDir };
   const part = { path: `${to.root}/${PART}${dname}`, directory: toDir };
-  const result = (status) => ({ status, vpath: `${DOWNLOADS}/${vname}`, dst });
+  const result = (status, why) => ({ status, why, vpath: `${DOWNLOADS}/${vname}`, dst });
+  const finish = async () => {
+    const gone = await dropSource(src);
+    scan(dst);
+    if (gone) scan(src);
+    else warnMove('delete-old-copy', src.path, 'the old copy is still there');
+    return result(gone ? 'moved' : 'cleanup');
+  };
   let size = f.size;
-  if (!size) { try { size = (await Filesystem.stat(src)).size; } catch (e) { return result('failed'); } }
+  if (!size) { try { size = (await Filesystem.stat(src)).size; } catch (e) { return result('failed', 'stat'); } }
   let there = null;
-  try { there = await Filesystem.stat(dst); } catch (e) {} // nothing there: the usual case
+  try { there = await Filesystem.stat(dst); } catch (e) {
+    // nothing there is the usual case; but when it can't be told whether the name is taken, copying could replace a song
+    if (!isNotThere(e)) { warnMove('stat-new', dst.path, e); return result('failed', 'stat'); }
+  }
   if (there) {
-    if (there.type !== 'file' || there.size !== size) return result('conflict');
-    await Filesystem.deleteFile(src).catch(() => {});
-    scan(src);
-    return result('moved');
+    if (there.type !== 'file' || there.size !== size) return result('conflict', 'other');
+    const same = await sameBytes(src, dst);
+    if (same !== true) return result('conflict', same === false ? 'other' : 'unchecked');
+    return finish();
   }
   try {
     await Filesystem.mkdir({ path: to.root, directory: toDir, recursive: true }).catch(() => {}); // there already
@@ -319,57 +381,143 @@ async function moveOne(from, to, f) {
     if ((await Filesystem.stat(part)).size !== size) throw new Error('short copy');
     await Filesystem.rename({ from: part.path, directory: toDir, to: dst.path, toDirectory: toDir });
   } catch (e) {
+    warnMove('copy', src.path, e);
     await Filesystem.deleteFile(part).catch(() => {});
-    return result('failed');
+    return result('failed', 'copy');
   }
-  await Filesystem.deleteFile(src).catch(() => {});
-  scan(src);
-  scan(dst);
-  return result('moved');
+  // the old copy is deleted only after the new one is seen to be there and whole
+  try { if ((await Filesystem.stat(dst)).size !== size) throw new Error('wrong size'); } catch (e) {
+    warnMove('verify', dst.path, e);
+    return result('failed', 'verify');
+  }
+  return finish();
 }
 
-// every song in the old folders goes to `to`; one that can't go stays where it is
-async function runMove(to, froms) {
-  const total = { moved: 0, failed: 0, conflicts: 0 };
+const emptyRun = () => ({ moved: 0, failed: 0, conflicts: 0, cleanup: 0, unreadable: 0, missing: 0, left: 0, permission: false, held: {}, heldMore: false });
+
+// every song in the old folders goes to `to`; one that can't go stays where it is. -> counts of what happened:
+//   moved (copied and the old copy gone), cleanup (copied, the old copy would not delete), conflicts (the name is taken by
+//   another file, or one that could not be compared), failed (the copy did not work), unreadable (an old folder that could
+//   not be read, which says nothing about its songs), missing (an old folder that is really gone), permission (Android 11+
+//   hides songs the app did not make until it may read music and audio, so a folder read without it can look empty), left
+//   (songs still in the old folders). `prev` is the journal's last summary: what it knew about a folder that can't be read now.
+async function runMove(to, froms, prev) {
+  const total = emptyRun();
   const toDir = kindDir(to.kind);
+  if ([to, ...froms].some((l) => l.kind === 'shared') && !(await readAccessOf()).granted) total.permission = true;
   try { // half copies that a cut-short run left behind
     for (const f of (await Filesystem.readdir({ path: to.root, directory: toDir })).files) {
       if (f.name.startsWith(PART)) await Filesystem.deleteFile({ path: `${to.root}/${f.name}`, directory: toDir }).catch(() => {});
     }
   } catch (e) {}
+  const before = (prev && prev.held) || {};
   for (const from of froms) {
     if (sameLoc(from, to)) continue;
+    const key = textOfLoc(from);
     let list;
-    try { list = (await Filesystem.readdir({ path: from.root, directory: kindDir(from.kind) })).files; } catch (e) { continue; } // gone: nothing left there
+    try { list = (await Filesystem.readdir({ path: from.root, directory: kindDir(from.kind) })).files; } catch (e) {
+      if (await isGoneDir(from, e)) { total.missing++; continue; } // really gone: nothing left there
+      total.unreadable++; // permission, I/O, a provider that does not answer: nothing is known about the songs there
+      if (Array.isArray(before[key])) total.held[key] = before[key];
+      warnMove('readdir', key, e);
+      continue;
+    }
     for (const f of list) {
       if (f.type !== 'file' || f.name.startsWith('.')) continue;
       const r = await moveOne(from, to, f);
-      if (r.status === 'moved') {
-        total.moved++;
+      if (r.status === 'moved' || r.status === 'cleanup') {
+        total[r.status === 'moved' ? 'moved' : 'cleanup']++;
         if (placed.has(r.vpath)) placed.set(r.vpath, r.dst);
-      } else if (r.status === 'conflict') total.conflicts++;
-      else total.failed++;
+      } else if (r.status === 'conflict') {
+        total.conflicts++;
+        (total.held[key] = total.held[key] || []).push(f.name);
+      } else total.failed++;
     }
   }
+  total.left = total.failed + total.conflicts + total.cleanup;
   return total;
 }
 
-// After a run: done, or only conflicts (another try would not change them): the journal goes. A song that failed to
-// copy is tried again at the next launches, three runs in all.
+// what the journal keeps of a run: the counts, and the names of the songs that hit a conflict (listDownloads needs them)
+function summary(r) {
+  const held = {};
+  let count = 0;
+  let more = !!r.heldMore;
+  for (const [key, names] of Object.entries(r.held || {})) {
+    const keep = [];
+    for (const n of names) { if (count >= MAX_HELD) { more = true; break; } keep.push(n); count++; }
+    if (keep.length) held[key] = keep;
+  }
+  const { moved, failed, conflicts, cleanup, unreadable, missing, left } = r;
+  return { moved, failed, conflicts, cleanup, unreadable, missing, left, permission: !!r.permission, ...(count ? { held } : {}), ...(more ? { heldMore: true } : {}), at: Date.now() };
+}
+const publicRun = (r) => { const { moved, failed, conflicts, cleanup, unreadable, missing, left, permission } = r; return { moved, failed, conflicts, cleanup, unreadable, missing, left, permission }; };
+
+// After a run: the journal goes only when nothing is left to settle. Conflicts, failed copies, old copies that would not
+// delete, folders that could not be read and a missing permission keep it (see the top of this section).
 function settleMove(to, froms, tries, r) {
-  if (r.failed === 0 || tries + 1 >= 3) writeMove(null);
-  else writeMove(to, froms, tries + 1);
+  if (r.failed + r.conflicts + r.cleanup + r.unreadable === 0 && !r.permission) writeMove(null);
+  else writeMove(to, froms, tries + 1, summary(r));
 }
 
-let resuming = false;
+// -> a function (folder text, file name) -> whether that song hit a conflict; every one when the journal could not keep them all
+function heldOf(m) {
+  const held = (m && m.last && m.last.held) || {};
+  const more = !!(m && m.last && m.last.heldMore);
+  return (key, name) => more || (Array.isArray(held[key]) && held[key].includes(name));
+}
+
+// Two runs at once would trip over each other's half copies: one after the other. A background retry or a tap on Retry
+// while a run is going on does not queue up behind it; it says "busy" and leaves it to that run.
+let running = 0; // runs going on, or waiting for their turn
+let busy = Promise.resolve();
+const exclusive = (job) => {
+  running++;
+  const run = busy.then(job);
+  busy = run.then(() => {}, () => {});
+  return run.finally(() => { running--; });
+};
+
+// where a move stands, for Settings: { pending: false }, or what is left over from the last run
+function moveStatus() {
+  const m = readMove();
+  if (!m) return { pending: false };
+  const last = m.last || {};
+  const n = (k) => Number(last[k]) || 0;
+  return {
+    pending: true,
+    to: shown(m.to.kind, m.to.root),
+    from: m.from.map((l) => shown(l.kind, l.root)),
+    tries: m.tries,
+    left: n('left'), conflicts: n('conflicts'), failed: n('failed'), cleanup: n('cleanup'), unreadable: n('unreadable'),
+    permission: !!last.permission,
+  };
+}
+// the page listens for this to refresh what Settings says (a move finishes in the background, after launch)
+function announceMove() {
+  try { window.dispatchEvent(new CustomEvent('muriel-move-status')); } catch (e) {}
+}
+
 async function resumeMove() {
   const m = readMove();
   // only into the folder that is in use (the app falls back to another one when the chosen one can't be opened)
-  if (!m || resuming || !pub || pubDir !== kindDir(m.to.kind) || pub !== m.to.root) return;
-  resuming = true;
-  try {
-    settleMove(m.to, m.from, m.tries, await runMove(m.to, m.from));
-  } finally { resuming = false; }
+  if (!m || running || !pub || pubDir !== kindDir(m.to.kind) || pub !== m.to.root) return null;
+  const r = await exclusive(() => runMove(m.to, m.from, m.last));
+  settleMove(m.to, m.from, m.tries, r);
+  announceMove();
+  return r;
+}
+
+// Retry in Settings: the same run the app makes at every launch, now. -> { ok, ran, ...moveStatus, moved }
+async function retryMove() {
+  const m = ANDROID ? readMove() : null;
+  if (!m) return { ok: true, ran: false, ...moveStatus() };
+  if (!pub || pubDir !== kindDir(m.to.kind) || pub !== m.to.root) {
+    return { ok: false, ran: false, error: "Muriel can't use the new download folder right now", ...moveStatus() };
+  }
+  const r = await resumeMove();
+  if (!r) return { ok: true, ran: false, busy: true, ...moveStatus() }; // one is running already
+  return { ok: true, ran: true, ...moveStatus(), moved: r.moved };
 }
 
 // Saves the new folder. The journal goes before the choice, and both before the first song moves.
@@ -379,30 +527,54 @@ async function switchTo(loc, move, custom) {
   // where songs may be now: the folder in use, and the folders of an earlier move that never finished
   const froms = [...(pending ? [...pending.from, pending.to] : []), ...(was ? [was] : [])]
     .filter((l, i, all) => !sameLoc(l, loc) && all.findIndex((x) => sameLoc(x, l)) === i);
-  writeMove(move ? loc : null, move ? froms : [], 0);
+  writeMove(move ? loc : null, move ? froms : [], 0, move && pending ? pending.last : null);
   lsSet(LOC_KEY, custom ? textOfLoc(loc) : null);
   lsSet(SIB_KEY, null); // the folders next to the old one are not the ones next to the new one
-  let r = { moved: 0, failed: 0, conflicts: 0 };
+  let r = emptyRun();
   if (move && froms.length) {
-    r = await runMove(loc, froms);
+    r = await exclusive(() => runMove(loc, froms, pending && pending.last));
     settleMove(loc, froms, 0, r);
   }
-  return { ok: true, dir: shown(loc.kind, loc.root), ...r };
+  return { ok: true, dir: shown(loc.kind, loc.root), ...publicRun(r), pending: !!readMove() };
+}
+
+// -> { granted, canAsk } (canAsk false: said no for good, only the app's page in Settings turns it on). With ask, the
+// system dialog comes first (answers when it is closed); with settings too, a refusal for good opens that page.
+async function readAccessOf({ ask = false, settings = false } = {}) {
+  const media = Capacitor.Plugins && Capacitor.Plugins.MurielMedia; // registered by media-controls.js
+  if (!ANDROID || !media) return { granted: true, canAsk: false };
+  try { return await (ask ? media.allowAudioAccess({ settings }) : media.audioAccess()); } catch (e) {
+    return { granted: true, canAsk: false }; // an older build of the plugin: nothing to ask
+  }
+}
+
+// `vpath` with " (old)" before its extension, or " (old 2)" ... when that is taken too
+function freeName(vpath, taken) {
+  const parts = /^(.*?)(\.[^./]+)?$/.exec(vpath);
+  for (let n = 1; ; n++) {
+    const alt = `${parts[1]} (old${n > 1 ? ` ${n}` : ''})${parts[2] || ''}`;
+    if (!taken.has(alt)) return alt;
+  }
 }
 
 // ---- Android: the folders next to the download folder, as playlists ----
 // Reads one folder (relative to the folder that holds the download folder), down to `depth` levels of subfolders.
 // ctx.partial turns true when something could not be read or the limit cut the list short: the result is then not
-// "everything there is", and the caller must not take a missing song for a deleted one.
+// "everything there is", and the caller must not take a missing song for a deleted one. The limit (MAX_LINKED) is for the
+// whole scan: ctx.count counts every song found so far, in every folder.
 async function listAudio(rel, depth, found, ctx) {
+  if (ctx.count >= MAX_LINKED) { ctx.partial = true; return; } // not read: it may hold songs
   let res;
   try { res = await Filesystem.readdir({ path: parentRoot() ? `${parentRoot()}/${rel}` : rel, directory: pubDir }); } catch (e) { ctx.partial = true; return; }
   for (const f of res.files) {
-    if (found.length >= MAX_LINKED) { ctx.partial = true; return; }
     if (f.name.startsWith('.')) continue;
     const child = `${rel}/${f.name}`;
     if (f.type === 'directory') { if (depth > 0) await listAudio(child, depth - 1, found, ctx); }
-    else if (AUDIO_RE.test(f.name)) found.push({ rel: child, size: f.size || 0, mtimeMs: Number(f.mtime) || Date.now() });
+    else if (AUDIO_RE.test(f.name)) {
+      if (ctx.count >= MAX_LINKED) { ctx.partial = true; return; }
+      found.push({ rel: child, size: f.size || 0, mtimeMs: Number(f.mtime) || Date.now() });
+      ctx.count++;
+    }
   }
 }
 
@@ -411,25 +583,24 @@ async function listAudio(rel, depth, found, ctx) {
 // loose next to the download folder. `only` ({ folders, loose }) narrows it to what was linked before (every launch).
 async function collectLinked(only) {
   if (!ANDROID || !pub) return null;
-  const ctx = { partial: false };
+  const ctx = { partial: false, count: 0 };
   let top;
   try { top = await Filesystem.readdir({ path: parentRoot(), directory: pubDir }); } catch (e) { return { failed: true }; }
   const mine = pub.slice(pub.lastIndexOf('/') + 1).toLowerCase(); // the download folder itself is not a playlist
   const groups = [];
   const loose = [];
-  let total = 0;
   for (const f of top.files) {
     if (f.name.startsWith('.')) continue;
-    if (total >= MAX_LINKED) { ctx.partial = true; continue; }
     if (f.type === 'directory') {
       if (f.name.toLowerCase() === mine || f.name === 'Android') continue;
       if (only && !only.folders.includes(f.name)) continue;
       const found = [];
       await listAudio(f.name, 2, found, ctx);
-      if (found.length) { groups.push({ folder: f.name, found }); total += found.length; }
+      if (found.length) groups.push({ folder: f.name, found });
     } else if (AUDIO_RE.test(f.name) && (!only || only.loose)) {
+      if (ctx.count >= MAX_LINKED) { ctx.partial = true; continue; }
       loose.push({ rel: f.name, size: f.size || 0, mtimeMs: Number(f.mtime) || Date.now() });
-      total++;
+      ctx.count++;
     }
   }
   if (loose.length) groups.unshift({ folder: '', found: loose });
@@ -502,8 +673,11 @@ module.exports = {
     }
     return { ok: false, error: "Muriel can't save songs in the default folder right now" };
   },
-  // a move that was cut short carries on by itself shortly after launch; this is for tests
+  // a move that was cut short carries on by itself shortly after launch (and at every launch after, until nothing is left)
   resumeMove,
+  // where an unfinished move stands, and Retry: for Settings
+  moveStatus,
+  retryMove,
 
   // ---- Android: folders next to the download folder ----
   // -> null when downloads are kept inside the app (nothing "next to" them to read); { failed: true } when the folder
@@ -512,7 +686,12 @@ module.exports = {
     const found = await collectLinked(null);
     if (!found || found.failed) return found;
     const { groups, partial } = found;
-    lsSet(SIB_KEY, { folders: groups.filter((g) => g.folder).map((g) => g.folder), loose: groups.some((g) => !g.folder) });
+    // What is remembered for the next launch (listLinked) is exactly what the scan saw only when the scan saw everything.
+    // A partial one (a folder it could not read, or the limit) adds what it found and never takes a folder out: a folder
+    // that was linked before and could not be read now must come back at the next launch, not be taken for a deleted one.
+    const seen = { folders: groups.filter((g) => g.folder).map((g) => g.folder), loose: groups.some((g) => !g.folder) };
+    const was = partial ? lsGet(SIB_KEY) : null;
+    lsSet(SIB_KEY, was ? { folders: [...new Set([...(Array.isArray(was.folders) ? was.folders : []), ...seen.folders])], loose: !!was.loose || seen.loose } : seen);
     return { parent: ROOT_PREFIX + (pubDir === APPDIR ? `${appFiles()}/` : '') + parentRoot(), groups, partial };
   },
   hasLinkedFolders: () => !!(ANDROID && pub),
@@ -524,13 +703,7 @@ module.exports = {
   needsReadAccess: () => !!(ANDROID && pub && pubDir === PUBLIC),
   // -> { granted, canAsk } (canAsk false: said no for good, only the app's page in Settings turns it on). With ask, the
   // system dialog comes first (answers when it is closed); with settings too, a refusal for good opens that page.
-  async readAccess({ ask = false, settings = false } = {}) {
-    const media = Capacitor.Plugins && Capacitor.Plugins.MurielMedia; // registered by media-controls.js
-    if (!ANDROID || !media) return { granted: true, canAsk: false };
-    try { return await (ask ? media.allowAudioAccess({ settings }) : media.audioAccess()); } catch (e) {
-      return { granted: true, canAsk: false }; // an older build of the plugin: nothing to ask
-    }
-  },
+  readAccess: readAccessOf,
   // The download folder read again, for songs that were hidden until the permission came in. -> the ones that are new.
   async rescanDownloads() {
     if (!ANDROID || !pub) return [];

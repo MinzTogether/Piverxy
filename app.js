@@ -240,8 +240,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     'Use a folder name without special characters: no slashes, colons or quotes, and no leading dot.',
     'Muriel needs access to storage to save songs there', "Muriel can't save songs in that folder",
     "That isn't a folder Muriel can save songs in", "Muriel can't save songs in the default folder right now",
-    "{0} songs couldn't be moved. They stay in the old folder, Muriel plays them from there and tries again at the next start.",
-    '{0} songs have a different file with the same name in the new folder, so they stay in the old folder',
+    "{0} songs couldn't be moved. They stay in the old folder, Muriel plays them from there and tries again at every start, or when you tap Retry in Settings.",
+    '{0} songs have another file with the same name in the new folder. Both files are kept, and the old ones are listed with (old) after the name.',
+    '{0} songs were copied, but the old copy could not be removed. Both copies are kept.',
+    "Muriel couldn't read {0} of the old folders. Their songs stay where they are.",
+    'Songs Muriel did not save itself may be hidden. Allow Muriel to read music and audio, then tap Retry in Settings.',
+    'Retry', '{0} songs are still in the old folder. Muriel plays them from there.',
+    '{0} have another file with the same name in the new folder.', "{0} couldn't be copied.",
+    '{0} were copied, but the old copy could not be removed.', "{0} old folders couldn't be read.",
+    'Some songs may be hidden until you allow Muriel to read music and audio.', 'The move of your songs is not finished yet.',
+    'All your songs are in the download folder', 'The move is already running',
+    'Allow Muriel to read music and audio in the settings that just opened, then tap Retry.',
+    'Muriel needs permission to read the songs in the old folder. Tap Retry again and allow it.',
+    "Muriel can't use the new download folder right now",
     'Allow Muriel to read music and audio in the settings that just opened, then tap Folder playlists again.',
     'Muriel needs permission to read the songs in those folders. Tap Folder playlists again and allow it.',
     'Local files', 'Looking for songs next to the download folder...', 'Playlists are up to date',
@@ -18517,7 +18528,61 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  // Android: a move of the songs that did not finish (a conflict, a failed copy, an old copy that would not delete, a folder
+  // that could not be read, a missing permission) stays pending. Settings says where it stands; Retry runs it again (it also
+  // runs by itself at every launch). Nothing here deletes or overwrites a song.
+  async function updateMoveStatusUI() {
+    const box = document.getElementById('download-move-status');
+    const text = document.getElementById('download-move-text');
+    if (!box || !text) return;
+    let st = null;
+    try {
+      if (window.electronAPI && window.electronAPI.getMoveStatus) st = await window.electronAPI.getMoveStatus();
+    } catch (e) {
+      console.warn('getMoveStatus failed', e);
+    }
+    if (!st || !st.pending) { box.style.display = 'none'; return; }
+    const parts = [];
+    if (st.left) parts.push(Tm('{0} songs are still in the old folder. Muriel plays them from there.', st.left));
+    if (st.conflicts) parts.push(Tm('{0} have another file with the same name in the new folder.', st.conflicts));
+    if (st.failed) parts.push(Tm("{0} couldn't be copied.", st.failed));
+    if (st.cleanup) parts.push(Tm('{0} were copied, but the old copy could not be removed.', st.cleanup));
+    if (st.unreadable) parts.push(Tm("{0} old folders couldn't be read.", st.unreadable));
+    if (st.permission) parts.push(Tm('Some songs may be hidden until you allow Muriel to read music and audio.'));
+    text.textContent = parts.length ? parts.join(' ') : Tm('The move of your songs is not finished yet.');
+    box.style.display = 'flex';
+  }
+  window.addEventListener('muriel-move-status', () => { updateMoveStatusUI(); });
+
+  const btnRetryMove = document.getElementById('btn-retry-move');
+  if (btnRetryMove) {
+    btnRetryMove.addEventListener('click', async () => {
+      if (!window.electronAPI || !window.electronAPI.retryMove || btnRetryMove.disabled) return;
+      btnRetryMove.disabled = true;
+      let res = null;
+      try {
+        res = await window.electronAPI.retryMove();
+      } catch (e) {
+        res = { ok: false, error: e.message };
+      }
+      btnRetryMove.disabled = false;
+      await updateMoveStatusUI();
+      if (!res) return;
+      if (res.needsPermission) {
+        showToast(res.settingsOpened ? Tm('Allow Muriel to read music and audio in the settings that just opened, then tap Retry.') : Tm('Muriel needs permission to read the songs in the old folder. Tap Retry again and allow it.'), 'error');
+        return;
+      }
+      if (!res.ok) { showToast(Tm(res.error || "Muriel can't use the new download folder right now"), 'error'); return; }
+      if (res.busy) { showToast(Tm('The move is already running')); return; }
+      if (res.pending) showToast(res.left ? Tm('{0} songs are still in the old folder. Muriel plays them from there.', res.left) : Tm('The move of your songs is not finished yet.'), 'error');
+      else showToast(Tm('All your songs are in the download folder'));
+      // songs that moved are somewhere else now, and every part of the app keeps the old place in its file index
+      if (res.moved && window.electronAPI.restartApp) setTimeout(() => window.electronAPI.restartApp(), 1500);
+    });
+  }
+
   async function updateDownloadFolderUI() {
+    updateMoveStatusUI();
     const elPath = document.getElementById('download-folder-path');
     const btnReset = document.getElementById('btn-reset-download-folder');
     if (elPath) {
@@ -18542,8 +18607,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   // now; and the app restarts, because every part of it keeps the old folder in its file index
   function afterDownloadFolderChange(res) {
     if (!res) return;
-    if (res.failed) showToast(Tm("{0} songs couldn't be moved. They stay in the old folder, Muriel plays them from there and tries again at the next start.", res.failed), 'error');
-    if (res.conflicts) showToast(Tm('{0} songs have a different file with the same name in the new folder, so they stay in the old folder', res.conflicts), 'error');
+    if (res.failed) showToast(Tm("{0} songs couldn't be moved. They stay in the old folder, Muriel plays them from there and tries again at every start, or when you tap Retry in Settings.", res.failed), 'error');
+    if (res.conflicts) showToast(Tm('{0} songs have another file with the same name in the new folder. Both files are kept, and the old ones are listed with (old) after the name.', res.conflicts), 'error');
+    if (res.cleanup) showToast(Tm('{0} songs were copied, but the old copy could not be removed. Both copies are kept.', res.cleanup), 'error');
+    if (res.unreadable) showToast(Tm("Muriel couldn't read {0} of the old folders. Their songs stay where they are.", res.unreadable), 'error');
+    if (res.permission) showToast(Tm('Songs Muriel did not save itself may be hidden. Allow Muriel to read music and audio, then tap Retry in Settings.'), 'error');
     dropLinkedFromLists(res.unlinked);
     if (res.restart && window.electronAPI && window.electronAPI.restartApp) setTimeout(() => window.electronAPI.restartApp(), 1500);
   }

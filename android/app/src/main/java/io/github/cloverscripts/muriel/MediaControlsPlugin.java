@@ -100,6 +100,8 @@ public class MediaControlsPlugin extends Plugin {
 
     private MediaSessionCompat session;
     private final ExecutorService artLoader = Executors.newSingleThreadExecutor();
+    // sameFile reads whole songs: off the plugin's own thread, so the playback notification is not kept waiting
+    private final ExecutorService fileWork = Executors.newSingleThreadExecutor();
     private String title = "";
     private String artist = "";
     private String album = "";
@@ -360,6 +362,33 @@ public class MediaControlsPlugin extends Plugin {
         }
         MediaScannerConnection.scanFile(getContext(), new String[] { path }, null, null);
         call.resolve();
+    }
+
+    // Whether two files hold exactly the same bytes (mobile/shims/store.js). Moving the downloads to another folder deletes
+    // the old copy of a song only after proving that the copy in the new folder is the same file: the same name and the same
+    // size prove nothing. Takes a and b, each a path or file:// URI. -> { same }. Rejects when either file can't be read, and
+    // the page then keeps both files (it never guesses). Reads in pieces on its own thread (FileCompare).
+    @PluginMethod
+    public void sameFile(final PluginCall call) {
+        String first = call.getString("a", "");
+        String second = call.getString("b", "");
+        if (first != null && first.startsWith("file:")) first = Uri.parse(first).getPath();
+        if (second != null && second.startsWith("file:")) second = Uri.parse(second).getPath();
+        if (first == null || first.isEmpty() || second == null || second.isEmpty()) {
+            call.reject("no path");
+            return;
+        }
+        final String pathA = first;
+        final String pathB = second;
+        fileWork.execute(() -> {
+            try {
+                JSObject r = new JSObject();
+                r.put("same", FileCompare.sameBytes(new java.io.File(pathA), new java.io.File(pathB)));
+                call.resolve(r);
+            } catch (Exception e) {
+                call.reject("could not compare the files: " + e.getMessage());
+            }
+        });
     }
 
     // ---- reading songs Muriel did not save itself ----

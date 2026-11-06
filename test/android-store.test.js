@@ -35,6 +35,10 @@ let answer;       // what the person says to the dialog
 let denials;
 let asked;        // allowAudioAccess calls
 let opened;       // times the app's page in Settings was opened
+let deleteFails;  // path endings whose deletion fails (the file stays)
+let deleted;      // every file the app asked to delete
+let compared;     // sameFile calls (MediaControlsPlugin.sameFile: are two files the same bytes?)
+let compareFails; // the plugin cannot read the files to compare them
 
 const abs = ({ path: p, directory }) => path.posix.join(ROOTS[directory], p || '');
 function mkdirs(dir) { for (let d = dir; d.length > 1; d = path.posix.dirname(d)) dirs.add(d); }
@@ -79,7 +83,13 @@ const Filesystem = {
     files.set(a, String(o.data));
   },
   async appendFile(o) { const a = abs(o); files.set(a, (files.get(a) || '') + String(o.data)); },
-  async deleteFile(o) { const a = abs(o); if (!files.has(a)) throw new Error('does not exist'); files.delete(a); },
+  async deleteFile(o) {
+    const a = abs(o);
+    deleted.push(a);
+    if (deleteFails.some((end) => a.endsWith(end))) throw new Error('EACCES');
+    if (!files.has(a)) throw new Error('does not exist');
+    files.delete(a);
+  },
   async rmdir(o) { const a = abs(o); for (const f of [...files.keys()]) if (f.startsWith(a + '/')) files.delete(f); dirs.delete(a); },
   async copy({ from, directory, to, toDirectory }) {
     if (copyHook) await copyHook({ from, to });
@@ -131,8 +141,21 @@ beforeEach(() => {
   denials = 0;
   asked = [];
   opened = 0;
-  // the native side (MediaControlsPlugin.audioAccess / allowAudioAccess)
+  deleteFails = [];
+  deleted = [];
+  compared = [];
+  compareFails = false;
+  // the native side (MediaControlsPlugin.audioAccess / allowAudioAccess / sameFile)
   capacitor.Plugins.MurielMedia = {
+    // the plugin reads both files and compares every byte; it rejects when one can't be read
+    sameFile: async ({ a, b }) => {
+      compared.push({ a, b });
+      if (compareFails) throw new Error('could not compare the files');
+      const pa = a.replace('file://', '');
+      const pb = b.replace('file://', '');
+      if (!files.has(pa) || !files.has(pb)) throw new Error('not a file');
+      return { same: files.get(pa) === files.get(pb) };
+    },
     audioAccess: async () => ({ granted: audioGranted, canAsk: audioGranted ? false : canAsk }),
     allowAudioAccess: async ({ settings } = {}) => {
       asked.push({ settings: !!settings });
@@ -378,10 +401,150 @@ test('a different file with the same name in the new folder is left alone, toget
   assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3'), true, 'and so is the song that could not go');
   assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Opus.mka'), false, 'the copy that was already there counts as moved');
   assert.equal(overwrites, 0, 'nothing is ever copied onto an existing file, so what the plugin does then does not matter');
-  assert.equal(journal(), null, 'a conflict does not change by trying again');
+  // MUR-STORE-003: a conflict is not "done". The journal stays, so the song is not forgotten, however often the app starts.
+  assert.ok(journal(), 'the journal stays while a conflict is open');
+  assert.equal(journal().last.conflicts, 1);
 });
 
-test('songs that fail to copy stay where they are, are listed from there, and are tried again at the next launches (three runs in all)', async () => {
+// ---- MUR-STORE-001 (P0): the same name and the same size are not proof that it is the same song ----
+test('RT-01: same name, same size, other bytes: nothing is deleted or replaced, it is a conflict', async () => {
+  put('EXTERNAL', 'download/Artist - Song.mp3', 'BBBB'); // the old Song.mp3 is 'AAAA': 4 bytes as well
+  const store = launch();
+  await store.list();
+  const res = await store.setDownloadDir(APPFOLDER, { move: true });
+  assert.equal(res.conflicts, 1);
+  assert.equal(res.moved, 1, 'the other song (Opus) has no namesake and moves');
+  assert.equal(files.get(`${ROOTS.EXTERNAL}/download/Artist - Song.mp3`), 'BBBB', 'the file in the new folder is not replaced');
+  assert.equal(files.get(`${ROOTS.EXTERNAL_STORAGE}/Music/Muriel Mod/Artist - Song.mp3`), 'AAAA', 'the song in the old folder is still there');
+  assert.equal(compared.length, 1, 'the bytes were compared; the size alone was not trusted');
+  assert.equal(deleted.some((f) => f.endsWith('Music/Muriel Mod/Artist - Song.mp3')), false, 'no delete was even tried on it');
+  assert.equal(overwrites, 0);
+  assert.equal(journal().last.conflicts, 1);
+});
+
+test('RT-01: when the bytes cannot be compared the song is not guessed at: both files stay', async () => {
+  put('EXTERNAL', 'download/Artist - Song.mp3', 'AAAA'); // in fact the same bytes, but nobody can tell here
+  compareFails = true; // an older build of the plugin, or a file that can't be read
+  const store = launch();
+  await store.list();
+  const res = await store.setDownloadDir(APPFOLDER, { move: true });
+  assert.equal(res.conflicts, 1);
+  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3'), true);
+  assert.equal(has('EXTERNAL', 'download/Artist - Song.mp3'), true);
+  assert.equal(deleted.some((f) => f.endsWith('Music/Muriel Mod/Artist - Song.mp3')), false);
+  assert.ok(journal());
+  // with no plugin at all (an old build) it is the same
+  delete capacitor.Plugins.MurielMedia.sameFile;
+  const next = launch();
+  await next.list();
+  const again = await next.resumeMove();
+  assert.equal(again.conflicts, 1);
+  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3'), true);
+});
+
+test('RT-02: the same bytes in the new folder after a move that was cut short: it finishes, no third copy appears', async () => {
+  put('EXTERNAL', 'download/Artist - Song.mp3', 'AAAA'); // copied, then the app was closed before the old copy was deleted
+  const store = launch();
+  await store.list();
+  const res = await store.setDownloadDir(APPFOLDER, { move: true });
+  assert.equal(res.moved, 2);
+  assert.equal(res.conflicts, 0);
+  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3'), false, 'the old copy is gone');
+  assert.equal([...files.keys()].filter((f) => /Artist - Song/.test(f)).length, 1, 'one copy, not two or three');
+  assert.equal(overwrites, 0);
+  assert.equal(journal(), null);
+});
+
+// ---- MUR-STORE-003: a conflict stays listed and playable after a restart ----
+test('RT-05: a conflict, then the app restarts: the old song is still listed and plays', async () => {
+  put('EXTERNAL', 'download/Artist - Song.mp3', 'BBBB');
+  const store = launch();
+  await store.list();
+  await store.setDownloadDir(APPFOLDER, { move: true });
+  for (let launches = 0; launches < 3; launches++) {
+    const next = launch(); // restart
+    const vpaths = (await next.list()).map((e) => e.vpath);
+    assert.ok(vpaths.includes('/data/Downloads/Artist - Song.mp3'), 'the file in the new folder');
+    assert.ok(vpaths.includes('/data/Downloads/Artist - Song (old).mp3'), 'the song that could not move, under its own name plus (old)');
+    assert.equal(files.get(where(await next.fileUrl('/data/Downloads/Artist - Song.mp3'))), 'BBBB');
+    assert.equal(files.get(where(await next.fileUrl('/data/Downloads/Artist - Song (old).mp3'))), 'AAAA', 'it plays from where it is');
+    await next.resumeMove(); // still a conflict
+    assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3'), true);
+    assert.ok(journal(), 'and the journal is still there');
+  }
+});
+
+test('a conflict is settled by the person (removing one of the files); then Retry finishes the move', async () => {
+  put('EXTERNAL', 'download/Artist - Song.mp3', 'BBBB');
+  let store = launch();
+  await store.list();
+  await store.setDownloadDir(APPFOLDER, { move: true });
+  store = launch();
+  await store.list();
+  assert.deepEqual(
+    { pending: store.moveStatus().pending, conflicts: store.moveStatus().conflicts, left: store.moveStatus().left },
+    { pending: true, conflicts: 1, left: 1 });
+  const again = await store.retryMove();
+  assert.equal(again.ran, true);
+  assert.equal(store.moveStatus().conflicts, 1, 'nothing was resolved by itself');
+  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3'), true);
+
+  files.delete(`${ROOTS.EXTERNAL}/download/Artist - Song.mp3`); // the person got rid of the namesake
+  const done = await store.retryMove();
+  assert.equal(done.ran, true);
+  assert.equal(done.pending, false);
+  assert.equal(files.get(`${ROOTS.EXTERNAL}/download/Artist - Song.mp3`), 'AAAA');
+  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3'), false);
+  assert.equal(journal(), null);
+});
+
+// ---- MUR-STORE-002: an old folder that cannot be read is not an old folder that is gone ----
+test('RT-03: an old folder that will not be read (permission, I/O): the journal stays, a later try finishes it', async () => {
+  const store = launch();
+  await store.list();
+  readFail.push(`${ROOTS.EXTERNAL_STORAGE}/Music/Muriel Mod`);
+  const res = await store.setDownloadDir(APPFOLDER, { move: true });
+  assert.equal(res.unreadable, 1);
+  assert.equal(res.missing, 0, 'not told apart from a folder that is gone: it is not');
+  assert.equal(res.moved, 0);
+  assert.ok(journal(), 'the journal stays');
+  assert.equal(journal().last.unreadable, 1);
+  assert.equal(files.get(where(await store.fileUrl('/data/Downloads/Artist - Song.mp3'))), 'AAAA', 'the song still plays from where it is');
+  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3'), true);
+
+  readFail = []; // whatever it was is over
+  const next = launch();
+  const vpaths = (await next.list()).map((e) => e.vpath);
+  assert.ok(vpaths.includes('/data/Downloads/Artist - Song.mp3'), 'listed from the old folder');
+  const r = await next.resumeMove();
+  assert.equal(r.moved, 2);
+  assert.equal(r.unreadable, 0);
+  assert.equal(journal(), null);
+  assert.equal(has('EXTERNAL', 'download/Artist - Song.mp3'), true);
+});
+
+test('RT-04: an old folder that is really gone (not there) is marked as missing, and is not mistaken for a read error', async () => {
+  ls.set('muriel_download_move', JSON.stringify({ to: APPFOLDER, from: ['Music/Gone Folder'], tries: 1 }));
+  const store = launch();
+  await store.list();
+  const r = await store.resumeMove();
+  assert.equal(r.missing, 1);
+  assert.equal(r.unreadable, 0);
+  assert.equal(journal(), null, 'nothing left to settle');
+  // the same folder, but now it is there and cannot be read: that is not "gone"
+  mkdirs(`${ROOTS.EXTERNAL_STORAGE}/Music/Locked Folder`);
+  readFail.push(`${ROOTS.EXTERNAL_STORAGE}/Music/Locked Folder`);
+  ls.set('muriel_download_move', JSON.stringify({ to: APPFOLDER, from: ['Music/Locked Folder'], tries: 1 }));
+  const next = launch();
+  await next.list();
+  const locked = await next.resumeMove();
+  assert.equal(locked.missing, 0);
+  assert.equal(locked.unreadable, 1);
+  assert.ok(journal());
+});
+
+// ---- MUR-STORE-004: a move is never dropped because it was tried often ----
+test('RT-06: songs that fail to copy stay where they are, stay listed, and the move stays pending after 3, 10 or more runs', async () => {
   const store = launch();
   await store.list();
   copyHook = async () => { throw new Error('no space left'); };
@@ -392,16 +555,88 @@ test('songs that fail to copy stay where they are, are listed from there, and ar
   assert.equal(journal().tries, 1);
   assert.equal([...files.keys()].some((f) => f.includes('.muriel-part-')), false);
 
-  for (const tries of [2, 3]) {
-    const next = launch();
+  for (let tries = 2; tries <= 12; tries++) {
+    const next = launch(); // a restart
     const vpaths = (await next.list()).map((e) => e.vpath);
-    assert.ok(vpaths.includes('/data/Downloads/Artist - Song.mp3'), 'still listed');
+    assert.ok(vpaths.includes('/data/Downloads/Artist - Song.mp3'), `still listed at run ${tries}`);
+    assert.equal(files.get(where(await next.fileUrl('/data/Downloads/Artist - Song.mp3'))), 'AAAA', 'and it plays');
     await next.resumeMove(); // still failing
     assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3'), true);
-    if (tries < 3) assert.equal(journal().tries, tries);
-    else assert.equal(journal(), null, 'after the third run the journal goes');
+    assert.ok(journal(), `the journal is still there after run ${tries}`);
+    assert.equal(journal().tries, tries);
+    assert.deepEqual({ pending: next.moveStatus().pending, left: next.moveStatus().left, failed: next.moveStatus().failed }, { pending: true, left: 2, failed: 2 });
   }
-  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3'), true, 'the songs are still on the phone, in the old folder');
+  // the cause goes away: the next run completes
+  copyHook = null;
+  const last = launch();
+  await last.list();
+  await last.resumeMove();
+  assert.equal(has('EXTERNAL', 'download/Artist - Song.mp3'), true);
+  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3'), false);
+  assert.equal(journal(), null);
+});
+
+// ---- MUR-STORE-005: a song counts as moved only when the old copy is really gone ----
+test('RT-10: copied, but the old copy would not delete: the new copy plays, the old one is not forced, cleanup is pending', async () => {
+  deleteFails.push('Music/Muriel Mod/Artist - Song.mp3');
+  const store = launch();
+  await store.list();
+  const res = await store.setDownloadDir(APPFOLDER, { move: true });
+  assert.equal(res.cleanup, 1);
+  assert.equal(res.moved, 1, 'Opus: fully moved');
+  assert.equal(res.failed, 0);
+  assert.equal(files.get(`${ROOTS.EXTERNAL}/download/Artist - Song.mp3`), 'AAAA', 'the new copy is whole');
+  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3'), true, 'the old copy is left alone (no forcing)');
+  assert.equal(journal().last.cleanup, 1);
+  assert.equal(journal().last.left, 1);
+
+  const next = launch(); // restart: the song is listed once, from the new folder
+  const vpaths = (await next.list()).map((e) => e.vpath);
+  assert.equal(vpaths.filter((v) => v.startsWith('/data/Downloads/Artist - Song')).length, 1, 'one entry, not a duplicate');
+  assert.equal(files.get(where(await next.fileUrl('/data/Downloads/Artist - Song.mp3'))), 'AAAA');
+  assert.ok(journal());
+
+  deleteFails = []; // the cause is gone: the old copy goes now
+  const r = await next.resumeMove();
+  assert.equal(r.moved, 1);
+  assert.equal(r.cleanup, 0);
+  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3'), false);
+  assert.equal(journal(), null);
+});
+
+// ---- Android 11+ hides songs the app did not make until it may read music and audio ----
+test('RT-12: with the permission taken back, an old folder looks empty: that is not "nothing to move"', async () => {
+  audioGranted = false; // the foreign songs in Music/Muriel Mod are hidden now
+  const store = launch();
+  await store.list();
+  const res = await store.setDownloadDir(APPFOLDER, { move: true });
+  assert.equal(res.permission, true);
+  assert.equal(res.moved, 0);
+  assert.ok(journal(), 'kept: there may be songs behind the permission');
+  assert.equal(store.moveStatus().permission, true);
+  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3'), true, 'nothing was unlinked or deleted');
+
+  audioGranted = true; // allowed in Settings
+  const next = launch();
+  await next.list();
+  const done = await next.retryMove();
+  assert.equal(done.ran, true);
+  assert.equal(done.pending, false);
+  assert.equal(has('EXTERNAL', 'download/Artist - Song.mp3'), true);
+  assert.equal(journal(), null);
+});
+
+test('a move whose new folder is not in use right now cannot run, and keeps what it knows', async () => {
+  ls.set('muriel_download_move', JSON.stringify({ to: 'Download/Muriel songs', from: ['Music/Muriel Mod'], tries: 1 }));
+  denied.push(`${ROOTS.EXTERNAL_STORAGE}/Download/Muriel songs`); // the new folder can't be opened
+  const store = launch();
+  const vpaths = (await store.list()).map((e) => e.vpath);
+  assert.equal(store.downloadsFolder(), 'Music/Muriel Mod', 'the app falls back to the default folder');
+  assert.ok(vpaths.includes('/data/Downloads/Artist - Song.mp3'));
+  const r = await store.retryMove();
+  assert.equal(r.ok, false);
+  assert.equal(store.moveStatus().pending, true);
+  assert.ok(journal());
 });
 
 test('a journal that is still there finishes once the cause is gone', async () => {
@@ -447,6 +682,103 @@ test('a scan that could not read everything says so (the caller must not take mi
 
   readFail.push(`${ROOTS.EXTERNAL_STORAGE}/Music`); // the folder next to the downloads itself
   assert.deepEqual(await store.scanLinked(), { failed: true });
+});
+
+// ---- MUR-LIB-001: a scan that saw only part must not make the app forget a folder ----
+const sibKey = () => JSON.parse(ls.get('muriel_local_folders') || 'null');
+
+test('RT-07: a partial scan does not take a linked folder out of what is remembered', async () => {
+  const store = launch();
+  await store.list();
+  assert.equal((await store.scanLinked()).partial, false);
+  assert.deepEqual(sibKey(), { folders: ['Album One'], loose: true });
+
+  readFail.push(`${ROOTS.EXTERNAL_STORAGE}/Music/Album One`); // it can't be read just now
+  const partial = await store.scanLinked();
+  assert.equal(partial.partial, true);
+  assert.deepEqual(partial.groups.map((g) => g.folder), ['']);
+  assert.deepEqual(sibKey(), { folders: ['Album One'], loose: true }, 'the folder that could not be read is still remembered');
+
+  readFail = []; // a complete scan is the one that may change what is remembered
+  assert.equal((await store.scanLinked()).partial, false);
+  assert.deepEqual(sibKey(), { folders: ['Album One'], loose: true });
+});
+
+test('RT-07: a partial scan adds what it found; a complete scan is what takes a folder out', async () => {
+  const store = launch();
+  await store.list();
+  await store.scanLinked();
+  put('EXTERNAL_STORAGE', 'Music/Album Two/a.mp3');
+  readFail.push(`${ROOTS.EXTERNAL_STORAGE}/Music/Album One`);
+  await store.scanLinked(); // partial: Album Two is new, Album One was not readable
+  assert.deepEqual(sibKey().folders.slice().sort(), ['Album One', 'Album Two']);
+  readFail = [];
+  for (const f of [...files.keys()]) if (f.includes('/Music/Album One/')) files.delete(f); // the person really deleted it
+  assert.equal((await store.scanLinked()).partial, false);
+  assert.deepEqual(sibKey().folders, ['Album Two'], 'seen in full and gone: now it is forgotten');
+});
+
+test('RT-07: a first scan that is partial still remembers what it linked (nothing to lose, and the songs must play after a restart)', async () => {
+  const store = launch();
+  await store.list();
+  readFail.push(`${ROOTS.EXTERNAL_STORAGE}/Music/Album One`);
+  assert.equal((await store.scanLinked()).partial, true);
+  assert.deepEqual(sibKey(), { folders: [], loose: true });
+});
+
+test('RT-08: after a partial scan and a restart the earlier folder is back in the file index', async () => {
+  let store = launch();
+  await store.list();
+  await store.scanLinked();
+  readFail.push(`${ROOTS.EXTERNAL_STORAGE}/Music/Album One`);
+  assert.equal((await store.scanLinked()).partial, true);
+  readFail = []; // restart: whatever it was is over
+  store = launch();
+  const vpaths = (await store.list()).map((e) => e.vpath);
+  assert.ok(vpaths.includes('/data/LocalMusic/Album One/01 First.mp3'), 'the folder is restored');
+  assert.ok(vpaths.includes('/data/LocalMusic/Album One/Disc 2/02 Second.flac'));
+  assert.equal(await store.fileUrl('/data/LocalMusic/Album One/01 First.mp3'), `file://${ROOTS.EXTERNAL_STORAGE}/Music/Album One/01 First.mp3`);
+});
+
+// ---- MUR-LIB-002: the limit is for the whole scan, not for one folder ----
+function songs(folder, count) { for (let i = 0; i < count; i++) put('EXTERNAL_STORAGE', `Music/${folder}/song ${i}.mp3`); }
+
+test('RT-09: many folders, each under the limit, together over it: the scan stops at the limit and says it is partial', async () => {
+  songs('Big A', 2400);
+  songs('Big B', 2400);
+  songs('Big C', 2400); // 7200 and the 3 of the fixture: each folder alone is far under 5000
+  const store = launch();
+  await store.list();
+  const found = await store.scanLinked();
+  const total = found.groups.reduce((n, g) => n + g.files.length, 0);
+  assert.equal(total, 5000, 'never over the limit');
+  assert.equal(found.partial, true);
+  // a partial scan must not unlink anything: it remembers every folder it saw
+  assert.ok(sibKey().folders.length >= 1);
+});
+
+test('RT-09: exactly the limit is not partial, one song more is', async () => {
+  songs('Exact', 4997); // 4997 + the 3 songs of the fixture
+  const store = launch();
+  await store.list();
+  const exact = await store.scanLinked();
+  assert.equal(exact.groups.reduce((n, g) => n + g.files.length, 0), 5000);
+  assert.equal(exact.partial, false, 'nothing was left out');
+  put('EXTERNAL_STORAGE', 'Music/Exact/one more.mp3');
+  const over = await store.scanLinked();
+  assert.equal(over.groups.reduce((n, g) => n + g.files.length, 0), 5000);
+  assert.equal(over.partial, true);
+});
+
+test('RT-09: the limit holds at launch too (the folders remembered are read again with the same limit)', async () => {
+  songs('Big A', 3000);
+  songs('Big B', 3000);
+  let store = launch();
+  await store.list();
+  await store.scanLinked();
+  store = launch();
+  const vpaths = (await store.list()).map((e) => e.vpath).filter((v) => v.startsWith('/data/LocalMusic/'));
+  assert.ok(vpaths.length <= 5000, `${vpaths.length} linked songs listed`);
 });
 
 // ---- the permission to read music and audio (Android 11+ hides songs the app did not make until it is given) ----
@@ -540,4 +872,79 @@ test('an older build of the plugin without these methods does not block the scan
   const store = launch();
   await store.list();
   assert.deepEqual(await store.readAccess(), { granted: true, canAsk: false });
+});
+
+// ---- Settings: where an unfinished move stands, and Retry (mobile/electron-api.js) ----
+test('the API: with nothing pending, the status says so and Retry does nothing', async () => {
+  const store = launch();
+  await store.list();
+  const { api: electron } = api(store);
+  assert.deepEqual(await electron.getMoveStatus(), { pending: false });
+  const res = await electron.retryMove();
+  assert.equal(res.ok, true);
+  assert.equal(res.ran, false);
+  assert.equal(res.pending, false);
+});
+
+test('the API: the status tells what is left and why; Retry runs the move again', async () => {
+  put('EXTERNAL', 'download/Artist - Song.mp3', 'BBBB'); // same name, same size, other bytes
+  deleteFails.push('Music/Muriel Mod/Artist - Opus.mka');
+  let store = launch();
+  await store.list();
+  await store.setDownloadDir(APPFOLDER, { move: true });
+  store = launch();
+  await store.list();
+  const { api: electron } = api(store);
+  const status = await electron.getMoveStatus();
+  assert.equal(status.pending, true);
+  assert.equal(status.conflicts, 1);
+  assert.equal(status.cleanup, 1);
+  assert.equal(status.left, 2);
+  assert.equal(status.failed, 0);
+  assert.equal(status.permission, false);
+  deleteFails = [];
+  const res = await electron.retryMove();
+  assert.equal(res.ran, true);
+  assert.equal(res.pending, true, 'the conflict is still there: it needs the person');
+  assert.equal(res.conflicts, 1);
+  assert.equal(res.cleanup, 0, 'the old copy that would not delete is gone now');
+  assert.equal(res.moved, 1);
+});
+
+test('the API: Retry asks for the permission first when the move is waiting for it, then finishes the move', async () => {
+  audioGranted = false; // songs the app did not save are hidden
+  answer = 'allow';
+  let store = launch();
+  await store.list();
+  await store.setDownloadDir(APPFOLDER, { move: true });
+  assert.equal(journal().last.permission, true);
+  store = launch();
+  await store.list();
+  const { api: electron } = api(store);
+  assert.equal((await electron.getMoveStatus()).permission, true);
+  asked.length = 0;
+  const res = await electron.retryMove();
+  assert.deepEqual(asked, [{ settings: false }], 'the system dialog came first');
+  assert.equal(res.ok, true);
+  assert.equal(res.ran, true);
+  assert.equal(res.pending, false);
+  assert.equal(journal(), null);
+  assert.equal(has('EXTERNAL', 'download/Artist - Song.mp3'), true);
+});
+
+test('the API: Retry without the permission says so, moves nothing and keeps the move pending', async () => {
+  audioGranted = false;
+  answer = 'deny';
+  let store = launch();
+  await store.list();
+  await store.setDownloadDir(APPFOLDER, { move: true });
+  store = launch();
+  await store.list();
+  const { api: electron } = api(store);
+  const res = await electron.retryMove();
+  assert.equal(res.ok, false);
+  assert.equal(res.needsPermission, true);
+  assert.equal(res.settingsOpened, false);
+  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3'), true);
+  assert.ok(journal());
 });

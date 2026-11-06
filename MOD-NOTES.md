@@ -28,11 +28,18 @@ Nút **Change** / **Reset** trước đây bị ẩn trên điện thoại. Gi�
 
 Có tuỳ chọn *Move the songs I already downloaded*. App kiểm tra ghi được trước khi lưu lựa chọn, rồi tự khởi động lại.
 
-Cách di chuyển an toàn khi app bị đóng giữa chừng hoặc gặp tệp trùng tên:
-- **Nhật ký (journal):** trước khi chuyển bài đầu tiên, app ghi nhật ký (đi đâu, từ đâu, đã thử mấy lần), rồi mới ghi lựa chọn. Nếu app bị đóng giữa chừng, lần mở sau các bài còn ở thư mục cũ vẫn hiện và phát được tại chỗ, và việc chuyển tự chạy tiếp ở nền (khoảng 10 giây sau khi mở). Không có bài nào "biến mất".
-- **Chép an toàn:** mỗi bài được chép sang tên tạm `.muriel-part-<tên>`, kiểm tra đúng dung lượng rồi mới đổi tên thật và xoá bản cũ. Bài chép dở không bao giờ mang tên thật; tệp tạm bị bỏ sót sẽ được dọn ở lần chạy sau.
-- **Trùng tên ở thư mục đích:** app kiểm tra trước khi chép và không bao giờ chép đè lên tệp có sẵn, nên không phụ thuộc cách plugin Filesystem xử lý. Cùng tên và cùng dung lượng thì coi là bài đó đã có sẵn (lần chuyển trước dừng sau khi chép) và xoá bản cũ. Cùng tên nhưng khác dung lượng thì giữ nguyên cả hai tệp, bài đó ở lại thư mục cũ và app báo số bài bị bỏ qua.
-- **Bài chép lỗi** (đầy bộ nhớ, mất quyền...): ở lại thư mục cũ, vẫn phát được, và được thử lại ở các lần mở sau (tối đa 3 lượt). Sau lượt thứ ba nhật ký bị bỏ; các bài đó vẫn nằm trên máy ở thư mục cũ nhưng app không còn liệt kê.
+Cách di chuyển an toàn khi app bị đóng giữa chừng, gặp tệp trùng tên, mất quyền đọc hoặc lỗi đọc thư mục.
+Nguyên tắc: **không bao giờ xoá hay ngừng liệt kê một bài chỉ vì app không đọc được, quét chưa đầy đủ, trùng tên, trùng dung lượng hoặc đã thử nhiều lần.** Bài ở lại và phát được cho tới khi xác minh được việc di chuyển đã xong.
+- **Nhật ký (journal):** trước khi chuyển bài đầu tiên, app ghi nhật ký (đi đâu, từ đâu, đã chạy mấy lượt, lượt gần nhất còn lại gì), rồi mới ghi lựa chọn. Nếu app bị đóng giữa chừng, lần mở sau các bài còn ở thư mục cũ vẫn hiện và phát được tại chỗ, và việc chuyển tự chạy tiếp ở nền (khoảng 10 giây sau khi mở). Không có bài nào "biến mất".
+- **Nhật ký chỉ bị xoá khi không còn gì phải xử lý.** Bài trùng tên (conflict), bài chép lỗi, bản cũ không xoá được, thư mục cũ không đọc được và thiếu quyền đọc nhạc đều giữ nhật ký. Số lượt chạy (`tries`) chỉ để đếm, không bao giờ làm nhật ký bị bỏ. Mỗi lần mở app chạy thử một lượt, và nút **Retry** trong Settings chạy ngay.
+- **Chép an toàn:** mỗi bài được chép sang tên tạm `.muriel-part-<tên>`, kiểm tra đúng dung lượng rồi mới đổi tên thật, kiểm tra lại bản mới, và chỉ sau đó mới xoá bản cũ. Bài chép dở không bao giờ mang tên thật; tệp tạm bị bỏ sót sẽ được dọn ở lần chạy sau.
+- **Trùng tên ở thư mục đích:** app kiểm tra trước khi chép và không bao giờ chép đè lên tệp có sẵn. **Cùng tên và cùng dung lượng không chứng minh là cùng một bài.** Chỉ khi hai tệp giống nhau từng byte (`MediaControlsPlugin.sameFile`: đọc từng khối 64 KB, không nạp cả tệp vào RAM, dừng ở byte khác đầu tiên) thì mới coi là lần chuyển trước dừng sau khi chép và xoá bản cũ. Khác nội dung, khác dung lượng, hoặc không so sánh được (plugin bản cũ, tệp không đọc được) thì là *conflict*: giữ nguyên cả hai tệp, không đoán.
+- **Conflict vẫn hiện và phát được sau khi mở lại app:** bản ở thư mục cũ được liệt kê dưới tên `<tên> (old).<đuôi>` (hoặc `(old 2)`...), bản ở thư mục mới giữ tên gốc. Bạn tự xử lý (xoá hoặc đổi tên một trong hai tệp) rồi bấm **Retry**; app không tự xoá hay ghi đè.
+- **Xoá bản cũ phải được xác nhận:** xoá xong app kiểm tra lại. Nếu bản cũ vẫn còn thì bài ở trạng thái *cleanup pending*, không tính là "đã chuyển": bản mới vẫn phát được, bản cũ không bị ép xoá, nhật ký được giữ để thử tiếp.
+- **Thư mục cũ không đọc được ≠ thư mục đã mất:** lỗi quyền, I/O hoặc không rõ lý do thì thư mục đó tính là *unreadable* (giữ nhật ký, không coi là đã xử lý xong). Chỉ khi lỗi báo "không tồn tại" **và** kiểm tra lại cũng không thấy thư mục thì mới đánh dấu *missing*. Lỗi được ghi vào log (giai đoạn, đường dẫn, mã lỗi; không ghi nội dung bài).
+- **Quyền đọc nhạc:** từ Android 11 một thư mục cũ có thể "trông như trống" vì bài do app khác tạo bị ẩn. Khi chưa có quyền, các bài nhìn thấy vẫn được chuyển nhưng nhật ký được giữ ("cần quyền") để chuyển nốt khi đã cấp quyền.
+- **Bài chép lỗi** (đầy bộ nhớ, mất quyền...): ở lại thư mục cũ, vẫn phát được, và được thử lại ở mọi lần mở app sau đó cũng như khi bấm Retry (không giới hạn số lần).
+- **Trạng thái và Retry:** nếu còn bài chưa chuyển, Settings → Folders → Download folder hiện số bài còn lại và lý do (trùng tên, chép lỗi, chưa xoá được bản cũ, thư mục cũ không đọc được, cần quyền) cùng nút **Retry**. Retry hỏi quyền đọc nhạc trước nếu việc chuyển đang chờ quyền, rồi chạy lại việc chuyển; có bài chuyển được thì app tự khởi động lại để làm mới danh sách.
 - Đổi thư mục lần nữa khi lần chuyển trước chưa xong thì chuyển luôn cả bài còn sót ở các thư mục cũ.
 Nếu thư mục đã chọn không dùng được nữa (bị xoá, mất quyền), app quay về `Music/Muriel Mod` thay vì mất bài.
 Android 11+ không cho app tự tạo thư mục tuỳ ý ở gốc bộ nhớ, nên mới giới hạn trong các thư mục chuẩn ở trên.
@@ -45,6 +52,8 @@ Nút **Folder playlists** ở màn hình *My files* (chỉ hiện trên Android)
 - Các tệp nhạc nằm rời ở thư mục cha thành playlist **Local files**.
 - Bỏ qua chính thư mục tải, thư mục ẩn (bắt đầu bằng dấu chấm), `Android`, và tệp không phải âm thanh.
 - Quét lại: thêm bài mới vào playlist cũ, bỏ bài đã bị xoá khỏi máy. Bài chỉ bị bỏ khi mọi yêu cầu liên kết với server đều thành công (kiểm tra mã HTTP) **và** lần quét đọc được đủ mọi thư mục. Nếu một thư mục không đọc được (hoặc vượt giới hạn 5000 bài) thì không xoá gì và app báo "Some folders could not be read".
+- Giới hạn 5000 bài tính trên **toàn bộ lần quét** (mọi thư mục cộng lại), không phải từng thư mục. Chạm giới hạn thì lần quét dừng và được đánh dấu *partial*; đúng 5000 bài mà không bỏ sót gì thì không phải partial.
+- Danh sách thư mục đã liên kết (app dùng nó để khôi phục bài vào file index mỗi lần mở) chỉ được ghi đúng theo kết quả khi lần quét **đầy đủ**. Lần quét dở (partial) chỉ **thêm** thư mục mới thấy, không bao giờ bỏ thư mục nào: thư mục tạm thời không đọc được không bị coi là đã bị xoá, và vẫn được khôi phục ở lần mở sau.
 - Tệp được **liên kết tại chỗ**, không sao chép; Muriel không bao giờ xoá chúng.
 - Định dạng: mp3, m4a, flac, opus, wav, ogg/oga, aac, weba.
 
@@ -55,6 +64,7 @@ Ví dụ: tải về `Music/Muriel Mod` thì quét ra các thư mục trong `Mus
 Từ Android 11, app chỉ thấy tệp do chính nó tạo. Nhạc bạn chép vào `Music/` hay `Download/` bằng file manager hoặc từ máy tính, hoặc bài do bản cài trước của app tải, sẽ bị ẩn cho tới khi app được phép đọc nhạc và âm thanh. Plugin Filesystem coi như luôn "đã cấp" từ Android 11 nên không bao giờ hỏi quyền này.
 - Manifest: thêm `READ_MEDIA_AUDIO` (Android 13+) và nới `READ_EXTERNAL_STORAGE` lên `maxSdkVersion=32` (Android 12 trở xuống). Không dùng `MANAGE_EXTERNAL_STORAGE` (quyền "truy cập mọi tệp") vì quá rộng so với nhu cầu.
 - `MediaControlsPlugin.java`: `audioAccess` (xem trạng thái) và `allowAudioAccess` (hiện hộp thoại hệ thống; nếu đã từ chối hẳn thì mở trang cài đặt của app).
+- `MediaControlsPlugin.sameFile` + `FileCompare.java`: so sánh hai tệp từng byte (dùng khi di chuyển, xem mục 1). Chạy trên luồng riêng, không chặn thông báo phát nhạc, và không ghi/xoá/đổi tên gì.
 - Hỏi khi bấm **Folder playlists**, và chỉ khi thư mục tải nằm trong bộ nhớ chung. Thư mục "App folder" (`Android/data/<package>/files/...`) không cần quyền này nên không hỏi.
 - Được cấp xong thì quét tiếp ngay, và các bài trong thư mục tải mà trước đó bị ẩn cũng hiện ra mà không cần khởi động lại app.
 - Bị từ chối: app báo cần làm gì. Từ chối hẳn thì lần bấm sau mở trang cài đặt của app (bật mục nhạc và âm thanh, hoặc "Tệp và đa phương tiện" trên Android 11-12).
@@ -69,13 +79,14 @@ Muriel dịch giao diện bằng máy lúc chạy (`i18n.js`), không có bảng
 ## Các tệp đã sửa
 
 - `android/app/build.gradle`, `res/values/strings.xml`, `capacitor.config.json` — tên gói và tên app riêng cho bản mod
-- `android/app/src/main/AndroidManifest.xml`, `MediaControlsPlugin.java` — quyền đọc nhạc
-- `mobile/shims/store.js` — vị trí tải cấu hình được, kiểm tra ghi, di chuyển tệp, quét thư mục ngang hàng
-- `mobile/electron-api.js` — bảng chọn thư mục (có dịch); `scanLocalFolders`
+- `android/app/src/main/AndroidManifest.xml`, `MediaControlsPlugin.java` — quyền đọc nhạc; `sameFile` (so sánh byte)
+- `android/app/src/main/java/.../FileCompare.java` — so sánh hai tệp từng khối 64 KB (thuần Java); `android/app/src/test/java/.../FileCompareTest.java` — 6 test JUnit (`./gradlew testDebugUnitTest`)
+- `mobile/shims/store.js` — vị trí tải cấu hình được, kiểm tra ghi, di chuyển tệp (nhật ký không bao giờ bị bỏ khi còn việc dở), quét thư mục ngang hàng (giới hạn toàn cục, không ghi đè danh sách khi quét dở); `moveStatus`, `retryMove`
+- `mobile/electron-api.js` — bảng chọn thư mục (có dịch); `scanLocalFolders`; `getMoveStatus`, `retryMove`
 - `library-tools.js` — `linkFolderSongs` (liên kết rồi mới quên bài, chỉ khi an toàn)
 - `mobile/shims/platform.js`, `server.js` — `LOCAL_LINK_DIR`, `/api/library-link`, `/api/library-unlink`, đọc tệp theo `item.path`
-- `app.js`, `index.html`, `mobile/mobile.css`, `mobile/bridge.js`, `profiles-core.js` — nút, luồng quét/tạo playlist, hiện nút Change trên Android, 2 khoá chỉ-của-máy
-- `test/android-store.test.js`, `test/library-link.test.js`, `test/android-picker.test.js`, `test/library-tools.test.js` — 43 test mới (có test app bị đóng giữa chừng, trùng tên, thử lại, quét đọc dở, bảng chọn, quyền đọc nhạc); `test/phone-store.test.js` — đổi tên thư mục mặc định
+- `app.js`, `index.html`, `mobile/mobile.css`, `mobile/bridge.js`, `profiles-core.js` — nút, luồng quét/tạo playlist, hiện nút Change trên Android, 2 khoá chỉ-của-máy; dòng trạng thái việc chuyển + nút Retry và các thông báo sau khi đổi thư mục
+- `test/android-store.test.js`, `test/library-link.test.js`, `test/android-picker.test.js`, `test/library-tools.test.js` — test cho app bị đóng giữa chừng, trùng tên (cùng dung lượng khác nội dung), thử lại nhiều lần, đọc thư mục lỗi / thư mục đã mất, xoá bản cũ thất bại, quét đọc dở, giới hạn toàn cục, bảng chọn, quyền đọc nhạc, trạng thái và Retry; `test/phone-store.test.js` — đổi tên thư mục mặc định
 
 ## Build
 
