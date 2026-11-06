@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Muriel · free music player</title>
+  <meta name="description" content="Muriel is a free, ad-free music player for iPhone, Android, Windows, Mac and Linux. Stream from YouTube, YouTube Music and SoundCloud, sing along with synced lyrics and keep songs offline.">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="color-scheme" content="light">
+  <meta property="og:title" content="Muriel · free music player">
+  <meta property="og:description" content="No ads. No account. YouTube, YouTube Music and SoundCloud with synced lyrics, on every device.">
+  <meta property="og:image" content="https://cloverscripts.github.io/riff-muriel/icon.png">
+  <link rel="icon" href="icon.png">
+  <link rel="apple-touch-icon" href="icon.png">
+  <!-- Apple devices use SF Pro (the system font); everyone else gets Inter, its closest free cousin -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script>document.documentElement.classList.add('js');</script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <!-- the product bar: sticks to the top, frosted -->
+  <nav class="nav" id="nav" aria-label="Muriel">
+    <div class="nav-in">
+      <a class="nav-brand" href="#top"><img src="icon.png" alt="" width="26" height="26"><span>Muriel</span></a>
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-links" aria-label="Menu">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg>
+      </button>
+      <div class="nav-links" id="nav-links">
+        <a href="#features" data-sec="features">Features</a>
+        <a href="#inside" data-sec="inside">Inside</a>
+        <a href="#download" data-sec="download">Download</a>
+        <a href="#faq" data-sec="faq">FAQ</a>
+        <a href="play/">Web player</a>
+      </div>
+      <a class="nav-get" id="np-get" href="#download">Download</a>
+    </div>
+  </nav>
+
+  <main id="main">
+    <!-- hero -->
+    <header class="hero" id="top">
+      <img class="hero-icon reveal" src="icon.png" alt="" width="112" height="112">
+      <p class="eyebrow reveal">Muriel</p>
+      <h1 class="reveal">All your music.<br>None of the strings.</h1>
+      <p class="lede reveal">YouTube, YouTube Music and SoundCloud with synced lyrics and songs that play offline. Free on iPhone, Android, Windows, Mac and Linux.</p>
+      <div class="ctas reveal">
+        <a class="btn" id="main-dl" href="#download"><span id="main-dl-label">Download Muriel</span></a>
+        <a class="more" href="play/">Try the web player</a>
+      </div>
+      <p class="fine reveal" id="build-info">Free · open source · new builds every week</p>
+
+      <div class="hero-stage reveal" aria-hidden="true">
+        <div class="phone side left"><img src="shots/player.webp" alt="" width="393" height="852"></div>
+        <div class="phone main"><img src="shots/home.webp" alt="" width="393" height="852"></div>
+        <div class="phone side right"><img src="shots/foryou.webp" alt="" width="393" height="852"></div>
+      </div>
+    </header>
+
+    <!-- the counter -->
+    <section class="dark count" aria-labelledby="count-label">
+      <p class="eyebrow light reveal">Downloaded</p>
+      <div class="odo reveal" id="odo" aria-hidden="true"><span class="odo-wait">—</span></div>
+      <p class="sr" id="count-sr" aria-live="polite"></p>
+      <p class="count-label reveal" id="count-label"><span>times, and counting.</span> <span class="live"><span class="pulse" aria-hidden="true"></span><span id="live-text">Live from GitHub</span></span></p>
+      <ol class="ranks reveal" id="ranks" aria-label="Downloads per platform"></ol>
+    </section>
+
+    <!-- features -->
+    <section class="features" id="features" aria-labelledby="features-h">
+      <div class="wrap">
+        <p class="eyebrow reveal">Features</p>
+        <h2 class="h2 reveal" id="features-h">Made for listening.<br><span class="dim">Not for selling you things.</span></h2>
+
+        <div class="bento">
+          <article class="tile wide black reveal">
+            <div class="tile-text">
+              <svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h7"/><circle cx="18" cy="17" r="2.5"/><path d="M20.5 17V10"/></svg>
+              <h3>Lyrics you can sing.</h3>
+              <p>Word-by-word karaoke, translations, a fullscreen sing-along mode, and an editor to write and sync your own.</p>
+            </div>
+            <div class="tile-shot"><div class="phone small"><img src="shots/player.webp" alt="Now playing with synced lyrics" loading="lazy" width="393" height="852"></div></div>
+          </article>
+
+          <article class="tile reveal">
+            <svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <h3>Three sources.<br>One search.</h3>
+            <p>YouTube, YouTube Music and SoundCloud. No premium, no skip limits.</p>
+          </article>
+
+          <article class="tile reveal">
+            <svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 19h16"/></svg>
+            <h3>Works offline.</h3>
+            <p>Songs you play stay on your phone, so they keep going on the train or in airplane mode.</p>
+          </article>
+
+          <article class="tile reveal">
+            <svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.9 5.2L19 10l-5.1 1.8L12 17l-1.9-5.2L5 10l5.1-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>
+            <h3>Muriel Encore.</h3>
+            <p>Your own year in music, any day of the year: top songs, artists, minutes and streaks.</p>
+          </article>
+
+          <article class="tile reveal">
+            <svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12c2.5-5 5-5 7.5 0s5 5 7.5 0 3.5-3 5-1.5"/></svg>
+            <h3>My Wave.</h3>
+            <p>Endless picks from your genres and the artists you play most.</p>
+          </article>
+
+          <article class="tile reveal">
+            <svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h12M3 12h12M3 18h7"/><circle cx="17" cy="18" r="2.5"/><path d="M19.5 18V9l2-1"/></svg>
+            <h3>Bring your library.</h3>
+            <p>Import from Spotify, Apple Music and YouTube, or paste a YouTube Music or SoundCloud playlist link.</p>
+          </article>
+
+          <article class="tile wide reveal">
+            <div class="tile-text">
+              <svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/></svg>
+              <h3>Screen off.<br>Still playing.</h3>
+              <p>Controls on your lock screen, lyrics in the iPhone Dynamic Island, and play and pause in the Android notification.</p>
+            </div>
+            <div class="island" aria-hidden="true">
+              <div class="island-pill"><img src="shots/art-island.webp" alt="" width="40" height="40"><span><b>Boy's a liar Pt. 2</b><small>He doesn't see ya, you're not looking at me</small></span><i class="bars"><i></i><i></i><i></i></i></div>
+            </div>
+          </article>
+
+          <article class="tile reveal">
+            <svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>
+            <h3>Desktop extras.</h3>
+            <p>EQ, effects, crossfade, sleep timer, mini player, MP3 or FLAC downloads, and plugins.</p>
+          </article>
+
+          <article class="tile wide black free reveal">
+            <h3>Free.<br>Actually free.</h3>
+            <p>No ads, no account, no subscription. Open source, and nobody earns money from it.</p>
+            <a class="more light" href="https://github.com/cloverscripts/riff-muriel">See the source</a>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- screenshots -->
+    <section class="dark inside" id="inside" aria-labelledby="inside-h">
+      <div class="wrap">
+        <p class="eyebrow light reveal">Inside</p>
+        <h2 class="h2 reveal" id="inside-h">Take a look around.</h2>
+      </div>
+      <div class="gallery" id="shelf" tabindex="0" aria-label="Screenshots">
+        <figure><div class="phone"><img src="shots/home.webp" alt="Home with Hot picks" loading="lazy" width="393" height="852"></div><figcaption><b>Home.</b> Hot picks and My Wave.</figcaption></figure>
+        <figure><div class="phone"><img src="shots/player.webp" alt="Now playing with lyrics" loading="lazy" width="393" height="852"></div><figcaption><b>Now playing.</b> Lyrics that follow along.</figcaption></figure>
+        <figure><div class="phone"><img src="shots/foryou.webp" alt="On repeat and Encore" loading="lazy" width="393" height="852"></div><figcaption><b>On repeat.</b> Encore and your top 3.</figcaption></figure>
+        <figure><div class="phone"><img src="shots/search.webp" alt="Search results" loading="lazy" width="393" height="852"></div><figcaption><b>Search.</b> Three sources at once.</figcaption></figure>
+        <figure><div class="phone"><img src="shots/queue.webp" alt="Up next queue" loading="lazy" width="393" height="852"></div><figcaption><b>Queue.</b> Drag to reorder.</figcaption></figure>
+      </div>
+      <div class="paddles">
+        <button type="button" class="paddle" data-scroll="-1" aria-label="Previous screenshots"><svg viewBox="0 0 24 24"><path d="m14.5 6-6 6 6 6"/></svg></button>
+        <button type="button" class="paddle" data-scroll="1" aria-label="Next screenshots"><svg viewBox="0 0 24 24"><path d="m9.5 6 6 6-6 6"/></svg></button>
+      </div>
+    </section>
+
+    <!-- downloads -->
+    <section class="download" id="download" aria-labelledby="dl-h">
+      <div class="wrap narrow">
+        <p class="eyebrow reveal">Download</p>
+        <h2 class="h2 reveal" id="dl-h">Get Muriel.</h2>
+        <p class="lede small reveal">Always the newest build, straight from GitHub.</p>
+
+        <div class="segmented reveal" role="tablist" aria-label="Platform">
+          <button role="tab" id="tab-android" aria-controls="panel-android" aria-selected="false" data-os="android" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-android"/></svg>Android</button>
+          <button role="tab" id="tab-ios" aria-controls="panel-ios" aria-selected="false" data-os="ios" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-apple"/></svg>iPhone</button>
+          <button role="tab" id="tab-windows" aria-controls="panel-windows" aria-selected="false" data-os="windows" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-windows"/></svg>Windows</button>
+          <button role="tab" id="tab-desktop" aria-controls="panel-desktop" aria-selected="false" data-os="desktop" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-desktop"/></svg>Mac &amp; Linux</button>
+        </div>
+
+        <div class="card tabpanel" role="tabpanel" id="panel-android" aria-labelledby="tab-android" hidden>
+          <div class="card-head"><h3>Android</h3><span class="n" data-count="android"></span></div>
+          <ol class="steps"><li>Download <b>Muriel.apk</b> on your phone.</li><li>Open it. If Android asks, allow installs from your browser.</li><li>Tap <b>Install</b>. Updates install over it and keep your music.</li></ol>
+          <div class="btns"><a class="btn" id="dl-android" href="https://github.com/cloverscripts/riff-muriel/releases/download/android-latest/Muriel.apk">Download APK <small id="size-android"></small></a></div>
+        </div>
+
+        <div class="card tabpanel" role="tabpanel" id="panel-ios" aria-labelledby="tab-ios" hidden>
+          <div class="card-head"><h3>iPhone</h3><span class="n" data-count="ios"></span></div>
+          <ol class="steps"><li>Install <a href="https://sidestore.io">SideStore</a> once (needs a computer one time).</li><li>Tap <b>Add to SideStore</b>. Muriel installs and keeps itself updated.</li></ol>
+          <div class="btns">
+            <a class="btn" id="dl-sidestore" href="#">Add to SideStore</a>
+            <a class="btn outline" id="dl-ipa" href="https://github.com/cloverscripts/riff-muriel/releases/download/ios-latest/Muriel.ipa">Download .ipa <small id="size-ios"></small></a>
+          </div>
+          <p class="note">No SideStore? Install the .ipa with <a href="https://sideloadly.io">Sideloadly</a> from your computer. iPhones only run signed apps, so one of these is needed.</p>
+        </div>
+
+        <div class="card tabpanel" role="tabpanel" id="panel-windows" aria-labelledby="tab-windows" hidden>
+          <div class="card-head"><h3>Windows</h3><span class="n" data-count="windows"></span></div>
+          <ol class="steps"><li>Download <b>Muriel.exe</b>. It's portable, no installer.</li><li>Run it. If SmartScreen appears: <b>More info → Run anyway</b>.</li></ol>
+          <div class="btns"><a class="btn" id="dl-windows" href="https://github.com/cloverscripts/riff-muriel/releases/download/windows-latest/Muriel.exe">Download for Windows <small id="size-windows"></small></a></div>
+          <p class="note">Or install it with a desktop shortcut from PowerShell:</p>
+          <div class="copy"><code id="ps-line">$ProgressPreference='SilentlyContinue'; $p="$env:LOCALAPPDATA\Programs\Muriel"; ni -ItemType Directory -Force $p | Out-Null; iwr https://github.com/cloverscripts/riff-muriel/releases/download/windows-latest/Muriel.exe -OutFile "$p\Muriel.exe"; Unblock-File "$p\Muriel.exe"; $s=(New-Object -ComObject WScript.Shell).CreateShortcut("$([Environment]::GetFolderPath('Desktop'))\Muriel.lnk"); $s.TargetPath="$p\Muriel.exe"; $s.IconLocation="$p\Muriel.exe,0"; $s.Save()</code><button type="button" data-copy="ps-line">Copy</button></div>
+        </div>
+
+        <div class="card tabpanel" role="tabpanel" id="panel-desktop" aria-labelledby="tab-desktop" hidden>
+          <div class="card-head"><h3>Mac &amp; Linux</h3><span class="n" data-count="desktop"></span></div>
+          <ol class="steps"><li>Pick your download below (<b id="rel-version">v1.1.5</b>).</li><li>Mac: if it's blocked, open <b>System Settings → Privacy &amp; Security → Open Anyway</b>.</li></ol>
+          <div class="btns">
+            <a class="btn" id="dl-mac-arm" href="https://github.com/cloverscripts/riff-muriel/releases/download/v1.1.5/Muriel-1.1.5-mac-arm64.dmg">Mac with Apple silicon</a>
+            <a class="btn outline" id="dl-mac-x64" href="https://github.com/cloverscripts/riff-muriel/releases/download/v1.1.5/Muriel-1.1.5-mac-x64.dmg">Mac with Intel</a>
+            <a class="btn outline" id="dl-linux" href="https://github.com/cloverscripts/riff-muriel/releases/download/v1.1.5/muriel-1.1.5-linux-x86_64.AppImage">Linux AppImage <small id="size-linux"></small></a>
+          </div>
+          <p class="note">Linux in one line (needs FUSE 2, e.g. <code>fuse2</code> or <code>libfuse2</code>):</p>
+          <div class="copy"><code id="linux-line">mkdir -p ~/Applications && curl -L -o ~/Applications/Muriel.AppImage https://github.com/cloverscripts/riff-muriel/releases/download/v1.1.5/muriel-1.1.5-linux-x86_64.AppImage && chmod +x ~/Applications/Muriel.AppImage && ~/Applications/Muriel.AppImage</code><button type="button" data-copy="linux-line">Copy</button></div>
+        </div>
+
+        <p class="also reveal"><a class="more" href="play/">No install? Open the web player</a></p>
+      </div>
+    </section>
+
+    <!-- FAQ and about -->
+    <section class="faq" id="faq" aria-labelledby="faq-h">
+      <div class="wrap narrow">
+        <h2 class="h2 reveal" id="faq-h">Questions? Answers.</h2>
+        <div class="acc reveal">
+          <details><summary>Is Muriel really free?</summary><p>Yes. No ads, no account, no subscription. It's open source and based on <a href="https://github.com/rootscripts/riff">Riff</a> by rootscripts (MIT).</p></details>
+          <details><summary>Is Muriel connected to YouTube, SoundCloud or Spotify?</summary><p>No. Muriel is an independent, non-commercial open-source player and hosts no music; it plays publicly available sources on your own device. Use it for private listening and only download music you have the right to. More in the <a href="https://github.com/cloverscripts/riff-muriel/blob/main/LEGAL.md">legal notice</a>, which also says how rights holders can reach us.</p></details>
+          <details><summary>Where does the download counter come from?</summary><p>Straight from GitHub: it adds up every download of every Muriel file there and refreshes while this page is open. Downloads from before the counter existed are included where GitHub still had them.</p></details>
+          <details><summary>Why can't I just tap "install" on iPhone?</summary><p>iOS only runs apps signed with a certificate from Apple. Muriel doesn't use leaked certificates (those get revoked and can push anything to your phone), so on iPhone it installs through SideStore or Sideloadly with your own Apple ID.</p></details>
+          <details><summary>Why does my iPhone app stop opening after 7 days?</summary><p>Apps signed with a free Apple ID expire after 7 days. SideStore refreshes them automatically on your phone; with Sideloadly, just install again.</p></details>
+          <details><summary>Does music keep playing with the screen off?</summary><p>Yes, on iPhone and Android, with play, pause and skip on the lock screen.</p></details>
+          <details><summary>Where are my downloaded songs?</summary><p>Inside Muriel (Library → Offline). On iPhone they're also in the Files app under Muriel. On Android, downloads are also saved to Music/Muriel.</p></details>
+        </div>
+
+        <div class="about reveal">
+          <img src="icon.png" alt="" width="56" height="56">
+          <p>Muriel is a free music player made by cloverscripts and based on <a href="https://github.com/rootscripts/riff">Riff</a> by rootscripts (MIT). It's an independent, non-commercial open-source project: it hosts no music and plays publicly available sources on your own device. Use it for private listening and only download music you have the right to.</p>
+          <p class="about-links"><a class="more" href="https://github.com/cloverscripts/riff-muriel">Source on GitHub <b class="stars-n"></b></a><a class="more" href="https://github.com/cloverscripts/riff-muriel/blob/main/LEGAL.md">Legal notice</a><a class="more" href="https://github.com/cloverscripts/riff-muriel/issues/new?template=rights-holder-request.yml">Rights holders</a></p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <div class="wrap">
+      <p class="disclaimer">Muriel is an independent, non-commercial project and is not affiliated with, endorsed or sponsored by YouTube, Google, SoundCloud, Spotify or Apple. YouTube and YouTube Music are trademarks of Google LLC; SoundCloud, Spotify and Apple Music are trademarks of their owners and are named only to describe what Muriel works with. Muriel hosts no music.</p>
+      <div class="foot-row">
+        <span>Muriel by cloverscripts · based on Riff by rootscripts (MIT)</span>
+        <span class="foot-links"><a href="https://github.com/cloverscripts/riff-muriel/blob/main/LEGAL.md">Legal</a><a href="https://github.com/cloverscripts/riff-muriel">Source</a><a href="play/">Web player</a></span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- icons -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-android" viewBox="0 0 24 24"><path fill="currentColor" d="M6 18c0 .55.45 1 1 1h1v3.5a1.5 1.5 0 0 0 3 0V19h2v3.5a1.5 1.5 0 0 0 3 0V19h1c.55 0 1-.45 1-1V8H6v10zM3.5 8A1.5 1.5 0 0 0 2 9.5v7a1.5 1.5 0 0 0 3 0v-7A1.5 1.5 0 0 0 3.5 8zm17 0A1.5 1.5 0 0 0 19 9.5v7a1.5 1.5 0 0 0 3 0v-7A1.5 1.5 0 0 0 20.5 8zm-4.97-5.84 1.3-1.3a.5.5 0 1 0-.71-.71l-1.48 1.48A5.84 5.84 0 0 0 12 1c-.96 0-1.86.23-2.66.63L7.85.15a.5.5 0 1 0-.71.71l1.31 1.31A5.97 5.97 0 0 0 6 7h12a5.97 5.97 0 0 0-2.47-4.84zM10 5H9V4h1v1zm5 0h-1V4h1v1z"/></symbol>
+    <symbol id="i-apple" viewBox="0 0 24 24"><path fill="currentColor" d="M16.37 12.6c-.02-2.2 1.8-3.26 1.88-3.31a4.05 4.05 0 0 0-3.2-1.73c-1.36-.14-2.66.8-3.35.8-.7 0-1.76-.78-2.9-.76a4.3 4.3 0 0 0-3.62 2.2c-1.55 2.68-.4 6.65 1.11 8.83.74 1.06 1.62 2.26 2.77 2.22 1.11-.04 1.53-.72 2.88-.72 1.34 0 1.72.72 2.9.7 1.2-.02 1.96-1.08 2.69-2.15a9.6 9.6 0 0 0 1.22-2.5 3.9 3.9 0 0 1-2.38-3.58zM14.15 6.13A3.9 3.9 0 0 0 15.07 3a3.97 3.97 0 0 0-2.57 1.33 3.7 3.7 0 0 0-.94 2.98 3.28 3.28 0 0 0 2.59-1.18z"/></symbol>
+    <symbol id="i-windows" viewBox="0 0 24 24"><path fill="currentColor" d="M3 5.1 10.4 4v7.1H3zM11.3 3.9 21 2.5v8.6h-9.7zM3 12h7.4v7.1L3 18zm8.3 0H21v8.6l-9.7-1.4z"/></symbol>
+    <symbol id="i-desktop" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="2.5" y="4" width="19" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></g></symbol>
+  </svg>
+
+  <script src="app.js"></script>
+</body>
+</html>

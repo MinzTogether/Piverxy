@@ -1,0 +1,38 @@
+name: Rights holder request
+description: You hold rights to content and believe Muriel infringes them. We'll look at it promptly.
+title: "Rights holder request: "
+labels: ["rights-holder"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reaching out first. Muriel doesn't host any music; it plays publicly available sources on the
+        listener's device (see [LEGAL.md](https://github.com/cloverscripts/riff-muriel/blob/main/LEGAL.md)).
+        This issue is **public**: don't post personal details or confidential information here. Tick the box
+        below and we'll contact you privately instead.
+  - type: textarea
+    id: what
+    attributes:
+      label: What is concerned
+      description: The content, feature or file in this repository you're writing about.
+    validations:
+      required: true
+  - type: textarea
+    id: rights
+    attributes:
+      label: Your rights
+      description: Which rights you hold or represent (for example the artist, label or publisher).
+    validations:
+      required: true
+  - type: textarea
+    id: request
+    attributes:
+      label: What you'd like us to do
+    validations:
+      required: true
+  - type: checkboxes
+    id: private
+    attributes:
+      label: Contact
+      options:
+        - label: Please contact me privately (we'll reply here asking for a way to reach you).

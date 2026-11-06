@@ -1,0 +1,6 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "muriel-mobile", "runtimeExecutable": "node", "runtimeArgs": ["mobile/dev-server.mjs"], "port": 5173 }
+  ]
+}

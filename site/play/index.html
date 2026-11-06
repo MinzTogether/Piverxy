@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Muriel Web Player</title>
+  <meta name="description" content="Play playlists shared from Muriel right in your browser. No account, no download.">
+  <meta name="theme-color" content="#09090b">
+  <meta name="color-scheme" content="dark">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Muriel">
+  <meta property="og:title" content="Muriel Web Player">
+  <meta property="og:description" content="Someone shared a playlist with you. Listen in your browser, or add it to Muriel.">
+  <meta property="og:image" content="https://cloverscripts.github.io/riff-muriel/icon.png">
+  <meta property="og:url" content="https://cloverscripts.github.io/riff-muriel/play/">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Muriel Web Player">
+  <meta name="twitter:description" content="Someone shared a playlist with you. Listen in your browser, or add it to Muriel.">
+  <link rel="icon" href="../icon.png">
+  <link rel="apple-touch-icon" href="../icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://www.youtube.com">
+  <link rel="preconnect" href="https://i.ytimg.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="player.css">
+  <script src="share-link.js" defer></script>
+  <script src="player.js" defer></script>
+</head>
+<body class="is-booting">
+  <!-- icons -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <symbol id="i-play" viewBox="0 0 24 24"><path fill="currentColor" d="M8 5.14v13.72a1 1 0 0 0 1.5.86l11-6.86a1 1 0 0 0 0-1.72l-11-6.86A1 1 0 0 0 8 5.14z"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><rect fill="currentColor" x="6" y="5" width="4" height="14" rx="1.2"/><rect fill="currentColor" x="14" y="5" width="4" height="14" rx="1.2"/></symbol>
+    <symbol id="i-prev" viewBox="0 0 24 24"><path fill="currentColor" d="M19 6.2v11.6a.8.8 0 0 1-1.25.66L9.5 12.66a.8.8 0 0 1 0-1.32l8.25-5.8A.8.8 0 0 1 19 6.2z"/><rect fill="currentColor" x="5" y="5" width="2.6" height="14" rx="1.1"/></symbol>
+    <symbol id="i-next" viewBox="0 0 24 24"><path fill="currentColor" d="M5 6.2v11.6a.8.8 0 0 0 1.25.66l8.25-5.8a.8.8 0 0 0 0-1.32L6.25 5.54A.8.8 0 0 0 5 6.2z"/><rect fill="currentColor" x="16.4" y="5" width="2.6" height="14" rx="1.1"/></symbol>
+    <symbol id="i-shuffle" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></g></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-out" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4 11 13"/><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"/></g></symbol>
+    <symbol id="i-note" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></g></symbol>
+    <symbol id="i-vol" viewBox="0 0 24 24"><path fill="currentColor" d="M4 9.5h3.2L11.4 6a.6.6 0 0 1 1 .46v11.08a.6.6 0 0 1-1 .46L7.2 14.5H4a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1z"/><g class="vol-waves" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path class="w1" d="M15.5 9.2a4 4 0 0 1 0 5.6"/><path class="w2" d="M18.2 6.6a7.6 7.6 0 0 1 0 10.8"/></g></symbol>
+    <symbol id="i-mute" viewBox="0 0 24 24"><path fill="currentColor" d="M4 9.5h3.2L11.4 6a.6.6 0 0 1 1 .46v11.08a.6.6 0 0 1-1 .46L7.2 14.5H4a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1z"/><path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" d="m16 9.5 5 5m0-5-5 5"/></symbol>
+    <symbol id="i-cloud" viewBox="0 0 24 24"><path fill="currentColor" d="M17.5 18H7a4 4 0 0 1-.6-7.95A5.5 5.5 0 0 1 17 9.1 4.5 4.5 0 1 1 17.5 18z"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5"/></g></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19.5h14"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5v.01"/></g></symbol>
+  </svg>
+
+  <div class="backdrop" aria-hidden="true">
+    <div class="bd-layer" id="bd-a"></div>
+    <div class="bd-layer" id="bd-b"></div>
+    <div class="bd-glow"></div>
+  </div>
+
+  <header class="topbar">
+    <a class="brand" href="../" aria-label="Muriel home">
+      <img src="../icon.png" alt="" width="30" height="30">
+      <span class="brand-name">Muriel</span>
+      <span class="brand-sub">Web Player</span>
+    </a>
+    <a class="top-get" id="top-get" href="../#download">Get Muriel</a>
+  </header>
+
+  <!-- landing: no playlist in the link (or a broken one) -->
+  <main class="landing" id="landing" hidden>
+    <div class="land-card">
+      <img class="land-icon" src="../icon.png" alt="" width="76" height="76">
+      <h1 class="land-title">Muriel Web Player</h1>
+      <p class="land-lead">Plays playlists shared from Muriel, right in your browser.</p>
+      <div class="land-error" id="land-error" role="alert" hidden>
+        <svg class="ico" aria-hidden="true"><use href="#i-alert"/></svg>
+        <div><b id="land-error-title">That link didn't work</b><span id="land-error-text"></span></div>
+      </div>
+      <form class="paste" id="paste-form" autocomplete="off" novalidate>
+        <label class="sr" for="paste-input">Playlist link</label>
+        <span class="paste-ico" aria-hidden="true"><svg class="ico"><use href="#i-link"/></svg></span>
+        <input id="paste-input" type="text" inputmode="url" placeholder="Paste a playlist link" spellcheck="false" autocapitalize="off" autocorrect="off" enterkeyhint="go">
+        <button class="btn primary" type="submit">Open</button>
+      </form>
+      <p class="paste-hint" id="paste-hint" aria-live="polite"></p>
+      <a class="btn ghost wide" href="../#download"><svg class="ico" aria-hidden="true"><use href="#i-down"/></svg>Get Muriel</a>
+      <p class="land-foot">In Muriel, open a playlist and tap <b>Share</b> to make a link.</p>
+    </div>
+  </main>
+
+  <!-- playlist -->
+  <main class="view" id="view" hidden>
+    <section class="hero" aria-labelledby="pl-name">
+      <div class="cover" id="cover" aria-hidden="true"></div>
+      <div class="hero-text">
+        <p class="eyebrow">Shared playlist</p>
+        <h1 class="pl-name" id="pl-name"></h1>
+        <p class="pl-meta" id="pl-meta"></p>
+        <div class="hero-actions">
+          <button class="btn primary" id="btn-play-all" type="button"><svg class="ico" aria-hidden="true"><use href="#i-play"/></svg>Play</button>
+          <button class="btn tonal" id="btn-shuffle-all" type="button"><svg class="ico" aria-hidden="true"><use href="#i-shuffle"/></svg>Shuffle</button>
+          <a class="btn ghost" id="btn-add" href="../#download"><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg><span>Add to Muriel</span></a>
+        </div>
+        <p class="add-note" id="add-note" role="status" hidden></p>
+      </div>
+    </section>
+
+    <aside class="np" id="np" aria-label="Now playing">
+      <div class="np-stage" id="np-stage">
+        <div class="np-yt" id="np-yt"><div id="yt-host"></div></div>
+        <div class="np-sc" id="np-sc"></div>
+        <div class="np-ph" id="np-ph">
+          <div class="np-ph-art" id="np-ph-art"></div>
+          <p class="np-ph-text" id="np-ph-text">Loading the player…</p>
+          <button class="btn tonal small" id="np-retry" type="button" hidden>Try again</button>
+        </div>
+      </div>
+      <p class="np-hint" id="np-hint" hidden>Tap the video to start playing.</p>
+      <div class="np-info">
+        <p class="np-kicker" id="np-kicker">Up first</p>
+        <h2 class="np-title" id="np-title"></h2>
+        <p class="np-artist" id="np-artist"></p>
+        <a class="np-src" id="np-src" href="#" target="_blank" rel="noopener noreferrer" hidden><svg class="ico" aria-hidden="true"><use href="#i-out"/></svg><span id="np-src-text">Open on YouTube</span></a>
+      </div>
+      <div class="np-next" id="np-next-wrap" hidden>
+        <p class="np-next-h">Up next</p>
+        <ol class="np-next-list" id="np-next"></ol>
+      </div>
+    </aside>
+
+    <section class="list" aria-label="Songs">
+      <ol class="songs" id="songs"></ol>
+      <p class="fine">Songs play through the official YouTube and SoundCloud players. Muriel isn't affiliated with either.</p>
+    </section>
+  </main>
+
+  <!-- player bar -->
+  <div class="bar" id="bar" role="region" aria-label="Player" hidden>
+    <div class="bar-np">
+      <div class="bar-art" id="bar-art"></div>
+      <div class="bar-text">
+        <b class="bar-title" id="bar-title"></b>
+        <span class="bar-artist" id="bar-artist"></span>
+      </div>
+    </div>
+    <div class="bar-center">
+      <div class="ctrls">
+        <button class="ic toggle" id="b-shuffle" type="button" aria-pressed="false" aria-label="Shuffle" title="Shuffle"><svg aria-hidden="true"><use href="#i-shuffle"/></svg></button>
+        <button class="ic" id="b-prev" type="button" aria-label="Previous" title="Previous"><svg aria-hidden="true"><use href="#i-prev"/></svg></button>
+        <button class="ic play" id="b-play" type="button" aria-label="Play" title="Play (Space)">
+          <svg class="i-play" aria-hidden="true"><use href="#i-play"/></svg>
+          <svg class="i-pause" aria-hidden="true"><use href="#i-pause"/></svg>
+          <span class="spin" aria-hidden="true"></span>
+        </button>
+        <button class="ic" id="b-next" type="button" aria-label="Next" title="Next"><svg aria-hidden="true"><use href="#i-next"/></svg></button>
+        <button class="ic toggle" id="b-repeat" type="button" aria-label="Repeat" title="Repeat">
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/><polyline class="repeat-one-mark" points="10.5 10.5 12.5 9 12.5 15"/></svg>
+        </button>
+      </div>
+      <div class="scrub">
+        <span class="time" id="t-cur">0:00</span>
+        <input class="range seek" id="seek" type="range" min="0" max="1000" step="1" value="0" aria-label="Seek" aria-valuetext="0:00">
+        <span class="time" id="t-dur">0:00</span>
+      </div>
+    </div>
+    <div class="bar-right">
+      <button class="ic" id="b-mute" type="button" aria-label="Mute" title="Mute">
+        <svg class="i-vol" aria-hidden="true"><use href="#i-vol"/></svg>
+        <svg class="i-mute" aria-hidden="true"><use href="#i-mute"/></svg>
+      </button>
+      <input class="range vol" id="vol" type="range" min="0" max="100" step="1" value="100" aria-label="Volume">
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

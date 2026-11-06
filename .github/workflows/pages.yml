@@ -1,0 +1,46 @@
+name: Website
+
+# Publishes site/ (the download page) to GitHub Pages.
+on:
+  push:
+    branches: [main]
+    paths: ['site/**', 'share-link.js', '.github/workflows/pages.yml']
+  workflow_dispatch:
+  # the download counter: GitHub's API allows a visitor only 60 requests an hour, and people behind one address
+  # (phone networks, schools) share that, so the numbers are published with the site (site/stats.json) instead
+  schedule:
+    - cron: '*/10 * * * *'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      # the web player reads shared playlist links with the same code as the app
+      - run: cp share-link.js site/play/share-link.js
+      # what the page needs from the releases, plus the stars; the page counts them the same way as before
+      - name: Download counts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/${{ github.repository }}/releases?per_page=100" --jq '[.[] | {tag_name, body: ((.body // "") | capture("(?<m>muriel-downloads-before:\\s*\\d+)").m // ""), draft, prerelease, published_at, assets: [.assets[] | {name, size, download_count, browser_download_url}]}]' > releases.json
+          stars=$(gh api "repos/${{ github.repository }}" --jq .stargazers_count)
+          jq -n --slurpfile r releases.json --argjson s "$stars" --arg at "$(date -u +%FT%TZ)" '{at: $at, stars: $s, releases: $r[0]}' > site/stats.json
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4

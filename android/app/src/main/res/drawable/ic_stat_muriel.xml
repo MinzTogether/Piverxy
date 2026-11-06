@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Muriel's sparkle, white on transparent: the status-bar icon of the playback notification -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="1024"
+    android:viewportHeight="1024">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M500,160Q543.2,476.8 860,520Q543.2,563.2 500,880Q456.8,563.2 140,520Q456.8,476.8 500,160Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M780,154Q791.5,238.5 876,250Q791.5,261.5 780,346Q768.5,261.5 684,250Q768.5,238.5 780,154Z" />
+</vector>
