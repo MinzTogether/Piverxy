@@ -9,7 +9,7 @@ const assert = require('node:assert/strict');
 const Module = require('node:module');
 const path = require('node:path');
 
-const APP = 'io.github.cloverscripts.muriel';
+const APP = 'io.github.murielmod';
 const ROOTS = {
   DATA: `/data/user/0/${APP}/files`,
   EXTERNAL_STORAGE: '/storage/emulated/0',
@@ -102,8 +102,8 @@ beforeEach(() => {
   ls = new Map();
   global.localStorage = { getItem: (k) => (ls.has(k) ? ls.get(k) : null), setItem: (k, v) => ls.set(k, String(v)), removeItem: (k) => ls.delete(k) };
   // what a phone with some songs looks like
-  put('EXTERNAL_STORAGE', 'Music/Muriel/Artist - Song.mp3', 'AAAA');
-  put('EXTERNAL_STORAGE', 'Music/Muriel/Artist - Opus.mka', 'BBBB');
+  put('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3', 'AAAA');
+  put('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Opus.mka', 'BBBB');
   put('EXTERNAL_STORAGE', 'Music/Album One/01 First.mp3');
   put('EXTERNAL_STORAGE', 'Music/Album One/Disc 2/02 Second.flac');
   put('EXTERNAL_STORAGE', 'Music/loose song.mp3');
@@ -112,13 +112,13 @@ beforeEach(() => {
   put('EXTERNAL', 'music/mine.mp3');
 });
 
-test('the default download folder is Music/Muriel, and what was downloaded shows up as /data/Downloads', async () => {
+test('the default download folder is Music/Muriel Mod, and what was downloaded shows up as /data/Downloads', async () => {
   const store = launch();
   const entries = await store.list();
   const vpaths = entries.map((e) => e.vpath).sort();
   assert.ok(vpaths.includes('/data/Downloads/Artist - Song.mp3'));
   assert.ok(vpaths.includes('/data/Downloads/Artist - Opus.webm'), 'an .mka in Music/ is the .webm song inside the app');
-  assert.equal(store.downloadsFolder(), 'Music/Muriel');
+  assert.equal(store.downloadsFolder(), 'Music/Muriel Mod');
   assert.equal(store.isCustomDownloadDir(), false);
 });
 
@@ -164,8 +164,8 @@ test('choosing the app folder moves the songs there (.mka back to .webm), and th
   assert.equal(res.failed, 0);
   assert.equal(has('EXTERNAL', 'download/Artist - Song.mp3'), true);
   assert.equal(has('EXTERNAL', 'download/Artist - Opus.webm'), true);
-  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel/Artist - Song.mp3'), false);
-  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel/Artist - Opus.mka'), false);
+  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3'), false);
+  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Opus.mka'), false);
 
   const next = launch(); // the restart
   const vpaths = (await next.list()).map((e) => e.vpath);
@@ -196,7 +196,7 @@ test('without moving, the songs stay in the old folder', async () => {
   const res = await store.setDownloadDir('Download/Muriel songs', { move: false });
   assert.equal(res.ok, true);
   assert.equal(res.moved, 0);
-  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel/Artist - Song.mp3'), true);
+  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3'), true);
   assert.equal(has('EXTERNAL_STORAGE', 'Download/Muriel songs/.muriel-write-test.mp3'), false, 'the test file is cleaned up');
 });
 
@@ -219,11 +219,11 @@ test('a typed path is read the way the sheet shows it (full path, odd slashes, a
   const store = launch();
   assert.equal(store.showDownloadDir('/storage/emulated/0/music//My songs/'), 'Music/My songs');
   assert.equal(store.showDownloadDir('Download\\Muriel'), 'Download/Muriel');
-  assert.equal(store.downloadChoices().find((c) => c.text === 'Music/Muriel').full, '/storage/emulated/0/Music/Muriel');
+  assert.equal(store.downloadChoices().find((c) => c.text === 'Music/Muriel Mod').full, '/storage/emulated/0/Music/Muriel Mod');
   assert.equal(store.showDownloadDir('Music'), null);
 });
 
-test('reset puts the songs back in Music/Muriel and forgets the choice', async () => {
+test('reset puts the songs back in Music/Muriel Mod and forgets the choice', async () => {
   let store = launch();
   await store.list();
   await store.setDownloadDir(`Android/data/${APP}/files/download`, { move: true });
@@ -232,13 +232,13 @@ test('reset puts the songs back in Music/Muriel and forgets the choice', async (
   const res = await store.resetDownloadDir({ move: true });
   assert.equal(res.ok, true);
   assert.equal(res.moved, 2);
-  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel/Artist - Song.mp3'), true);
-  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel/Artist - Opus.mka'), true, 'a WebM song is an .mka in Music/');
+  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3'), true);
+  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Opus.mka'), true, 'a WebM song is an .mka in Music/');
   assert.equal(has('EXTERNAL', 'download/Artist - Song.mp3'), false);
   assert.equal(launch().isCustomDownloadDir(), false);
 });
 
-test('a chosen folder that stops working falls back to Music/Muriel instead of losing the downloads', async () => {
+test('a chosen folder that stops working falls back to Music/Muriel Mod instead of losing the downloads', async () => {
   let store = launch();
   await store.list();
   await store.setDownloadDir('Download/Muriel songs', { move: false });
@@ -247,7 +247,7 @@ test('a chosen folder that stops working falls back to Music/Muriel instead of l
   denied.push(`${ROOTS.EXTERNAL_STORAGE}/Download/Muriel songs`);
   store = launch();
   await store.list();
-  assert.equal(store.downloadsFolder(), 'Music/Muriel');
+  assert.equal(store.downloadsFolder(), 'Music/Muriel Mod');
 });
 
 test('a rebuilt app with another package name gets its own app folder (not the original app\'s)', async () => {
