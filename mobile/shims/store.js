@@ -62,7 +62,8 @@ function parseLocation(text) {
 }
 const kindDir = (kind) => (kind === 'app' ? APPDIR : PUBLIC);
 const textOf = (kind, root) => (kind === 'app' ? `${appFiles()}/${root}` : root);
-const readLoc = () => parseLocation(lsGet(LOC_KEY));
+// the folder chosen in Settings; while a move to another one is unfinished, that one (see "moving the downloads")
+const readLoc = () => { const m = readMove(); return m ? m.to : parseLocation(lsGet(LOC_KEY)); };
 // a folder as Settings shows it: 'Music/Muriel Mod' (the sheet that picks it also shows the full path)
 const shown = (kind, root) => textOf(kind, root);
 const sharedName = (rel, dir) => (dir === PUBLIC ? rel.replace(/\.webm$/i, '.mka') : rel);
@@ -178,7 +179,28 @@ async function listDownloads(out) {
     if (old && old.directory === DIR) leftovers.push(old); // copied over before, but not deleted
     placed.set(e.vpath, { path: e.rpath, directory: pubDir });
   }
-  out.push({ vpath: DOWNLOADS, isDir: true, size: 0, mtimeMs: Date.now() }, ...found);
+  // a move that was cut short: the songs still in the old folders stay where they are, and the move carries on
+  const behind = [];
+  const m = readMove();
+  if (m && pubDir === kindDir(m.to.kind) && pub === m.to.root) {
+    const have = new Set(found.map((e) => e.vpath));
+    for (const from of m.from) {
+      const dir = kindDir(from.kind);
+      let list;
+      try { list = (await Filesystem.readdir({ path: from.root, directory: dir })).files; } catch (e) { continue; }
+      for (const f of list) {
+        if (f.type !== 'file' || f.name.startsWith('.')) continue;
+        const vpath = `${DOWNLOADS}/${dir === PUBLIC ? f.name.replace(/\.mka$/i, '.webm') : f.name}`;
+        if (have.has(vpath)) continue; // in the new folder as well: it is the one that counts
+        have.add(vpath);
+        placed.set(vpath, { path: `${from.root}/${f.name}`, directory: dir });
+        behind.push({ vpath, isDir: false, size: f.size || 0, mtimeMs: Number(f.mtime) || Date.now() });
+      }
+    }
+    const timer = setTimeout(resumeMove, 10000); // once the app has started
+    if (timer && timer.unref) timer.unref();
+  }
+  out.push({ vpath: DOWNLOADS, isDir: true, size: 0, mtimeMs: Date.now() }, ...found, ...behind);
 }
 
 function b64FromBytes(bytes) {
@@ -215,6 +237,7 @@ async function walk(rpath, directory, toV, out) {
   let res;
   try { res = await Filesystem.readdir({ path: rpath, directory }); } catch (e) { return; }
   for (const f of res.files) {
+    if (f.name.startsWith(PART)) continue; // a song still being copied by a move
     const child = `${rpath}/${f.name}`;
     const isDir = f.type === 'directory';
     out.push({ vpath: toV(child), rpath: child, isDir, size: f.size || 0, mtimeMs: Number(f.mtime) || Date.now() });
@@ -247,59 +270,162 @@ async function checkWritable({ kind, root }) {
   return null;
 }
 
-// Copies every download the app knows of to the new folder, then deletes the old copy. A song that can't be
-// moved stays where it is. Returns how many went and how many didn't.
-async function moveDownloads({ kind, root }) {
-  const directory = kindDir(kind);
-  let moved = 0;
-  let failed = 0;
-  for (const [vpath, from] of [...placed]) {
-    if (path.dirname(vpath) !== DOWNLOADS) continue;
-    const to = { path: root + sharedName(vpath.slice(DOWNLOADS.length), directory), directory };
-    if (from.directory === to.directory && from.path === to.path) continue;
-    try {
-      await Filesystem.mkdir({ path: path.dirname(to.path), directory, recursive: true }).catch(() => {});
-      await Filesystem.copy({ from: from.path, directory: from.directory, to: to.path, toDirectory: to.directory });
-    } catch (e) { failed++; continue; }
-    await Filesystem.deleteFile(from).catch(() => {});
-    scan(from);
-    scan(to);
-    moved++;
+// A move writes a journal first (MOVE_KEY: where the songs go, where they come from, how often it was tried), then
+// moves the songs one by one. If the app is closed in the middle, the next launch reads the journal: the songs still
+// in an old folder show up where they are (none disappears) and the move carries on in the background.
+const MOVE_KEY = 'muriel_download_move';
+const PART = '.muriel-part-'; // a song being copied has this in front of its name; it gets its own name once it is whole
+const sameLoc = (a, b) => !!a && !!b && a.kind === b.kind && a.root === b.root;
+const textOfLoc = (l) => textOf(l.kind, l.root);
+
+// -> { to, from: [..], tries } or null
+function readMove() {
+  const j = lsGet(MOVE_KEY);
+  const to = j && typeof j.to === 'string' ? parseLocation(j.to) : null;
+  if (!to) return null;
+  const from = (Array.isArray(j.from) ? j.from : []).map(parseLocation).filter((l) => l && !sameLoc(l, to));
+  return { to, from, tries: Number(j.tries) || 0 };
+}
+// no `to`, or nowhere to move from: the journal goes
+const writeMove = (to, from, tries) => lsSet(MOVE_KEY, to && from.length ? { to: textOfLoc(to), from: from.map(textOfLoc), tries } : null);
+
+// 'moved' | 'conflict' | 'failed'. Never copies onto a file that is already there: what the plugin does then
+// (replace it, refuse, something else) is not something to lean on. Same name and same size means the song is
+// already there (a move cut short after copying it); a different file with that name is left alone, and so is the song.
+// The copy goes to a temporary name and is renamed once its size is right, so a half song never has the real name.
+async function moveOne(from, to, f) {
+  const fromDir = kindDir(from.kind);
+  const toDir = kindDir(to.kind);
+  const vname = fromDir === PUBLIC ? f.name.replace(/\.mka$/i, '.webm') : f.name;
+  const dname = sharedName(vname, toDir);
+  const src = { path: `${from.root}/${f.name}`, directory: fromDir };
+  const dst = { path: `${to.root}/${dname}`, directory: toDir };
+  const part = { path: `${to.root}/${PART}${dname}`, directory: toDir };
+  const result = (status) => ({ status, vpath: `${DOWNLOADS}/${vname}`, dst });
+  let size = f.size;
+  if (!size) { try { size = (await Filesystem.stat(src)).size; } catch (e) { return result('failed'); } }
+  let there = null;
+  try { there = await Filesystem.stat(dst); } catch (e) {} // nothing there: the usual case
+  if (there) {
+    if (there.type !== 'file' || there.size !== size) return result('conflict');
+    await Filesystem.deleteFile(src).catch(() => {});
+    scan(src);
+    return result('moved');
   }
-  return { moved, failed };
+  try {
+    await Filesystem.mkdir({ path: to.root, directory: toDir, recursive: true }).catch(() => {}); // there already
+    await Filesystem.deleteFile(part).catch(() => {}); // a half copy from an earlier try
+    await Filesystem.copy({ from: src.path, directory: fromDir, to: part.path, toDirectory: toDir });
+    if ((await Filesystem.stat(part)).size !== size) throw new Error('short copy');
+    await Filesystem.rename({ from: part.path, directory: toDir, to: dst.path, toDirectory: toDir });
+  } catch (e) {
+    await Filesystem.deleteFile(part).catch(() => {});
+    return result('failed');
+  }
+  await Filesystem.deleteFile(src).catch(() => {});
+  scan(src);
+  scan(dst);
+  return result('moved');
+}
+
+// every song in the old folders goes to `to`; one that can't go stays where it is
+async function runMove(to, froms) {
+  const total = { moved: 0, failed: 0, conflicts: 0 };
+  const toDir = kindDir(to.kind);
+  try { // half copies that a cut-short run left behind
+    for (const f of (await Filesystem.readdir({ path: to.root, directory: toDir })).files) {
+      if (f.name.startsWith(PART)) await Filesystem.deleteFile({ path: `${to.root}/${f.name}`, directory: toDir }).catch(() => {});
+    }
+  } catch (e) {}
+  for (const from of froms) {
+    if (sameLoc(from, to)) continue;
+    let list;
+    try { list = (await Filesystem.readdir({ path: from.root, directory: kindDir(from.kind) })).files; } catch (e) { continue; } // gone: nothing left there
+    for (const f of list) {
+      if (f.type !== 'file' || f.name.startsWith('.')) continue;
+      const r = await moveOne(from, to, f);
+      if (r.status === 'moved') {
+        total.moved++;
+        if (placed.has(r.vpath)) placed.set(r.vpath, r.dst);
+      } else if (r.status === 'conflict') total.conflicts++;
+      else total.failed++;
+    }
+  }
+  return total;
+}
+
+// After a run: done, or only conflicts (another try would not change them): the journal goes. A song that failed to
+// copy is tried again at the next launches, three runs in all.
+function settleMove(to, froms, tries, r) {
+  if (r.failed === 0 || tries + 1 >= 3) writeMove(null);
+  else writeMove(to, froms, tries + 1);
+}
+
+let resuming = false;
+async function resumeMove() {
+  const m = readMove();
+  // only into the folder that is in use (the app falls back to another one when the chosen one can't be opened)
+  if (!m || resuming || !pub || pubDir !== kindDir(m.to.kind) || pub !== m.to.root) return;
+  resuming = true;
+  try {
+    settleMove(m.to, m.from, m.tries, await runMove(m.to, m.from));
+  } finally { resuming = false; }
+}
+
+// Saves the new folder. The journal goes before the choice, and both before the first song moves.
+async function switchTo(loc, move, custom) {
+  const pending = readMove();
+  const was = pub ? { kind: pubDir === APPDIR ? 'app' : 'shared', root: pub } : null;
+  // where songs may be now: the folder in use, and the folders of an earlier move that never finished
+  const froms = [...(pending ? [...pending.from, pending.to] : []), ...(was ? [was] : [])]
+    .filter((l, i, all) => !sameLoc(l, loc) && all.findIndex((x) => sameLoc(x, l)) === i);
+  writeMove(move ? loc : null, move ? froms : [], 0);
+  lsSet(LOC_KEY, custom ? textOfLoc(loc) : null);
+  lsSet(SIB_KEY, null); // the folders next to the old one are not the ones next to the new one
+  let r = { moved: 0, failed: 0, conflicts: 0 };
+  if (move && froms.length) {
+    r = await runMove(loc, froms);
+    settleMove(loc, froms, 0, r);
+  }
+  return { ok: true, dir: shown(loc.kind, loc.root), ...r };
 }
 
 // ---- Android: the folders next to the download folder, as playlists ----
 // Reads one folder (relative to the folder that holds the download folder), down to `depth` levels of subfolders.
-async function listAudio(rel, depth, found) {
+// ctx.partial turns true when something could not be read or the limit cut the list short: the result is then not
+// "everything there is", and the caller must not take a missing song for a deleted one.
+async function listAudio(rel, depth, found, ctx) {
   let res;
-  try { res = await Filesystem.readdir({ path: parentRoot() ? `${parentRoot()}/${rel}` : rel, directory: pubDir }); } catch (e) { return; }
+  try { res = await Filesystem.readdir({ path: parentRoot() ? `${parentRoot()}/${rel}` : rel, directory: pubDir }); } catch (e) { ctx.partial = true; return; }
   for (const f of res.files) {
-    if (found.length >= MAX_LINKED) return;
+    if (found.length >= MAX_LINKED) { ctx.partial = true; return; }
     if (f.name.startsWith('.')) continue;
     const child = `${rel}/${f.name}`;
-    if (f.type === 'directory') { if (depth > 0) await listAudio(child, depth - 1, found); }
+    if (f.type === 'directory') { if (depth > 0) await listAudio(child, depth - 1, found, ctx); }
     else if (AUDIO_RE.test(f.name)) found.push({ rel: child, size: f.size || 0, mtimeMs: Number(f.mtime) || Date.now() });
   }
 }
 
-// -> [{ folder, files: [{ vpath, name, size, mtimeMs }] }]; folder '' holds the songs that lie loose next to the
-// download folder. `only` ({ folders, loose }) narrows it to what was linked before (done at every launch).
+// -> null (the downloads are inside the app), { failed: true } (the folder next to them can't be read), or
+// { groups: [{ folder, files: [{ vpath, name, size, mtimeMs }] }], partial }; folder '' holds the songs that lie
+// loose next to the download folder. `only` ({ folders, loose }) narrows it to what was linked before (every launch).
 async function collectLinked(only) {
   if (!ANDROID || !pub) return null;
+  const ctx = { partial: false };
   let top;
-  try { top = await Filesystem.readdir({ path: parentRoot(), directory: pubDir }); } catch (e) { return null; }
+  try { top = await Filesystem.readdir({ path: parentRoot(), directory: pubDir }); } catch (e) { return { failed: true }; }
   const mine = pub.slice(pub.lastIndexOf('/') + 1).toLowerCase(); // the download folder itself is not a playlist
   const groups = [];
   const loose = [];
   let total = 0;
   for (const f of top.files) {
-    if (f.name.startsWith('.') || total >= MAX_LINKED) continue;
+    if (f.name.startsWith('.')) continue;
+    if (total >= MAX_LINKED) { ctx.partial = true; continue; }
     if (f.type === 'directory') {
       if (f.name.toLowerCase() === mine || f.name === 'Android') continue;
       if (only && !only.folders.includes(f.name)) continue;
       const found = [];
-      await listAudio(f.name, 2, found);
+      await listAudio(f.name, 2, found, ctx);
       if (found.length) { groups.push({ folder: f.name, found }); total += found.length; }
     } else if (AUDIO_RE.test(f.name) && (!only || only.loose)) {
       loose.push({ rel: f.name, size: f.size || 0, mtimeMs: Number(f.mtime) || Date.now() });
@@ -309,18 +435,19 @@ async function collectLinked(only) {
   if (loose.length) groups.unshift({ folder: '', found: loose });
   // Android lists a folder in no particular order: playlists go by file name (01 before 2 before 10), so they come out the same every time
   const byName = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
-  return groups.map((g) => ({
+  const sorted = groups.map((g) => ({
     folder: g.folder,
     files: g.found.sort((a, b) => byName.compare(a.rel, b.rel)).map((f) => ({ vpath: `${LOCALROOT}/${f.rel}`, name: f.rel.slice(f.rel.lastIndexOf('/') + 1).replace(/\.[^.]+$/, ''), size: f.size, mtimeMs: f.mtimeMs })),
   }));
+  return { groups: sorted, partial: ctx.partial };
 }
 
 // at launch: the songs of the folders that were linked before are put back in the file index (fs shim), so they play
 async function listLinked(out) {
   const was = lsGet(SIB_KEY);
   if (!was || !pub) return;
-  const groups = await collectLinked({ folders: Array.isArray(was.folders) ? was.folders : [], loose: !!was.loose }).catch(() => null);
-  for (const g of groups || []) for (const f of g.files) out.push({ vpath: f.vpath, isDir: false, size: f.size, mtimeMs: f.mtimeMs });
+  const found = await collectLinked({ folders: Array.isArray(was.folders) ? was.folders : [], loose: !!was.loose }).catch(() => null);
+  for (const g of (found && found.groups) || []) for (const f of g.files) out.push({ vpath: f.vpath, isDir: false, size: f.size, mtimeMs: f.mtimeMs });
 }
 
 module.exports = {
@@ -340,14 +467,15 @@ module.exports = {
 
 
   // ---- Android: download folder choice ----
-  // each place offered in Settings: text (what is kept), shown (as Settings shows it), full (the path on the phone)
+  // each place offered in Settings: text (what is kept), shown (as Settings shows it), full (the path on the phone).
+  // `label` of a shared folder is the folder's name (not translated); the app folder's label and every hint are Muriel's words.
   downloadChoices: () => [
-    { text: PUBLIC_ROOTS[0], label: `Music / ${FOLDER}`, hint: 'Music apps and file managers find it' },
-    { text: `Download/${FOLDER}`, label: `Download / ${FOLDER}`, hint: 'Next to your other downloads' },
-    { text: PUBLIC_ROOTS[1], label: `Documents / ${FOLDER}`, hint: '' },
-    { text: `${appFiles()}/download`, label: 'App folder', hint: 'Android / data / … / files / download. Needs no permission; file managers on Android 11+ can\'t open it' },
+    { text: PUBLIC_ROOTS[0], kind: 'shared', label: `Music / ${FOLDER}`, hint: 'Music apps and file managers find it' },
+    { text: `Download/${FOLDER}`, kind: 'shared', label: `Download / ${FOLDER}`, hint: 'Next to your other downloads' },
+    { text: PUBLIC_ROOTS[1], kind: 'shared', label: `Documents / ${FOLDER}`, hint: '' },
+    { text: `${appFiles()}/download`, kind: 'app', label: 'App folder', hint: "Needs no permission. File managers on Android 11+ can't open it" },
   ].map((c) => ({ ...c, shown: c.text, full: ROOT_PREFIX + c.text })),
-  isCustomDownloadDir: () => !!readLoc(),
+  isCustomDownloadDir: () => !!parseLocation(lsGet(LOC_KEY)),
   sharedTops: () => SHARED_TOPS.slice(),
   // a folder typed or picked in the sheet, as Settings shows it (null: not a folder Muriel can use)
   showDownloadDir(text) {
@@ -355,44 +483,67 @@ module.exports = {
     return loc ? shown(loc.kind, loc.root) : null;
   },
 
-  // Saves the choice. With move, the songs already downloaded go along. The app restarts afterwards (the caller),
-  // because every part of it has the old folder in its file index.
+  // Saves the choice. With move, the songs already downloaded go along (see switchTo). The app restarts afterwards
+  // (the caller), because every part of it has the old folder in its file index.
   async setDownloadDir(text, { move = true } = {}) {
     if (!ANDROID) return { ok: false, error: 'The download folder is fixed here' };
     const loc = parseLocation(text);
     if (!loc) return { ok: false, error: "That isn't a folder Muriel can save songs in" };
     const problem = await checkWritable(loc);
     if (problem) return { ok: false, error: problem };
-    let result = { moved: 0, failed: 0 };
-    if (move) result = await moveDownloads(loc);
-    lsSet(LOC_KEY, textOf(loc.kind, loc.root));
-    lsSet(SIB_KEY, null); // the folders next to the old one are not the ones next to the new one
-    return { ok: true, dir: shown(loc.kind, loc.root), ...result };
+    return switchTo(loc, move, true);
   },
 
   async resetDownloadDir({ move = true } = {}) {
     if (!ANDROID) return { ok: true };
     for (const root of PUBLIC_ROOTS) {
       const loc = { kind: 'shared', root };
-      if (await checkWritable(loc)) continue;
-      let result = { moved: 0, failed: 0 };
-      if (move) result = await moveDownloads(loc);
-      lsSet(LOC_KEY, null);
-      lsSet(SIB_KEY, null);
-      return { ok: true, dir: shown('shared', root), ...result };
+      if (!(await checkWritable(loc))) return switchTo(loc, move, false);
     }
     return { ok: false, error: "Muriel can't save songs in the default folder right now" };
   },
+  // a move that was cut short carries on by itself shortly after launch; this is for tests
+  resumeMove,
 
   // ---- Android: folders next to the download folder ----
-  // -> null when downloads are kept inside the app (nothing "next to" them to read), else { parent, groups }
+  // -> null when downloads are kept inside the app (nothing "next to" them to read); { failed: true } when the folder
+  // can't be read; else { parent, groups, partial } (partial: some folder could not be read, or there are too many songs)
   async scanLinked() {
-    const groups = await collectLinked(null);
-    if (!groups) return null;
+    const found = await collectLinked(null);
+    if (!found || found.failed) return found;
+    const { groups, partial } = found;
     lsSet(SIB_KEY, { folders: groups.filter((g) => g.folder).map((g) => g.folder), loose: groups.some((g) => !g.folder) });
-    return { parent: ROOT_PREFIX + (pubDir === APPDIR ? `${appFiles()}/` : '') + parentRoot(), groups };
+    return { parent: ROOT_PREFIX + (pubDir === APPDIR ? `${appFiles()}/` : '') + parentRoot(), groups, partial };
   },
   hasLinkedFolders: () => !!(ANDROID && pub),
+
+  // ---- Android: reading songs the app did not save itself ----
+  // Android 11+ hides a song the app did not make (a file manager or a computer put it there, or an earlier install of
+  // Muriel saved it) until the app may read music and audio (MediaControlsPlugin.allowAudioAccess). That is only so on
+  // shared storage: the app's own folder (Android/data/<package>/files) needs nothing.
+  needsReadAccess: () => !!(ANDROID && pub && pubDir === PUBLIC),
+  // -> { granted, canAsk } (canAsk false: said no for good, only the app's page in Settings turns it on). With ask, the
+  // system dialog comes first (answers when it is closed); with settings too, a refusal for good opens that page.
+  async readAccess({ ask = false, settings = false } = {}) {
+    const media = Capacitor.Plugins && Capacitor.Plugins.MurielMedia; // registered by media-controls.js
+    if (!ANDROID || !media) return { granted: true, canAsk: false };
+    try { return await (ask ? media.allowAudioAccess({ settings }) : media.audioAccess()); } catch (e) {
+      return { granted: true, canAsk: false }; // an older build of the plugin: nothing to ask
+    }
+  },
+  // The download folder read again, for songs that were hidden until the permission came in. -> the ones that are new.
+  async rescanDownloads() {
+    if (!ANDROID || !pub) return [];
+    const found = [];
+    await walk(pub, pubDir, fromPub, found);
+    const fresh = [];
+    for (const e of found) {
+      if (e.isDir || placed.has(e.vpath)) continue;
+      placed.set(e.vpath, { path: e.rpath, directory: pubDir });
+      fresh.push({ vpath: e.vpath, size: e.size, mtimeMs: e.mtimeMs });
+    }
+    return fresh;
+  },
 
   // the folder downloads go to, as people see it on their phone (null: inside the app, where only it sees them)
   downloadsFolder: () => (pub ? shown(pubDir === APPDIR ? 'app' : 'shared', pub) : mayAsk ? PUBLIC_ROOTS[0] : null),

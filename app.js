@@ -231,6 +231,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     'Offline: connect to the internet to search new tracks', 'No matching tracks. Try a different search', 'Search for "{0}"', 'Actions',
     'Playlists', 'Favorites', 'In playlists', 'Queue', 'History', 'Library', 'Online', 'Discover', 'View', 'Audio', 'Your stats',
     'Repeat: playlist', 'Repeat: this song', 'Start radio', 'Radio · {0}', 'Radio · {0} and {1} more', 'Sleep timer: {0} min', 'Sleep timer: end of track']);
+  // the same for what the Android mod shows from code: the download folder sheet (mobile/electron-api.js), its errors and
+  // the playlists made from the folders next to the download folder. The sheet and these toasts are made after the page
+  // was read, so they are not picked up from index.html.
+  if (I18N.known) I18N.known(['Moving your songs…', 'Download folder', 'App folder', 'Another folder', 'Folder name', 'Cancel', 'Use this folder',
+    'Move the songs I already downloaded', 'Music apps and file managers find it', 'Next to your other downloads',
+    "Needs no permission. File managers on Android 11+ can't open it",
+    'Use a folder name without special characters: no slashes, colons or quotes, and no leading dot.',
+    'Muriel needs access to storage to save songs there', "Muriel can't save songs in that folder",
+    "That isn't a folder Muriel can save songs in", "Muriel can't save songs in the default folder right now",
+    "{0} songs couldn't be moved. They stay in the old folder, Muriel plays them from there and tries again at the next start.",
+    '{0} songs have a different file with the same name in the new folder, so they stay in the old folder',
+    'Allow Muriel to read music and audio in the settings that just opened, then tap Folder playlists again.',
+    'Muriel needs permission to read the songs in those folders. Tap Folder playlists again and allow it.',
+    'Local files', 'Looking for songs next to the download folder...', 'Playlists are up to date',
+    'Downloads are kept inside the app, so there is no folder next to them. Pick a download folder in Settings first.',
+    'Could not read the folders next to the download folder', 'Some folders could not be read, so songs that are not listed were kept',
+    'No songs found next to the download folder ({0})', 'Added {0} songs, {1} new playlists', 'Added {0} new songs to your folder playlists']);
 
   const toastQueue = [];
   const MAX_QUEUED_TOASTS = 10;
@@ -9020,28 +9037,42 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       showToast(Tm('Looking for songs next to the download folder...'));
       const found = await window.electronAPI.scanLocalFolders();
-      if (!found || found.unavailable) {
+      if (found && found.needsPermission) {
+        showToast(found.settingsOpened
+          ? Tm('Allow Muriel to read music and audio in the settings that just opened, then tap Folder playlists again.')
+          : Tm('Muriel needs permission to read the songs in those folders. Tap Folder playlists again and allow it.'), 'error');
+        return;
+      }
+      if (found && found.unavailable) {
         showToast(Tm('Downloads are kept inside the app, so there is no folder next to them. Pick a download folder in Settings first.'), 'error');
+        return;
+      }
+      if (!found || found.failed) {
+        showToast(Tm('Could not read the folders next to the download folder'), 'error');
         return;
       }
       const groups = found.groups || [];
       const all = groups.flatMap((g) => g.items);
-      const json = { method: 'POST', headers: { 'Content-Type': 'application/json' } };
-      for (let i = 0; i < all.length; i += 300) {
-        await fetch(`http://127.0.0.1:${state.serverPort}/api/library-link`, { ...json, body: JSON.stringify({ items: all.slice(i, i + 300) }) });
-      }
-      // songs linked on an earlier scan whose file is gone now
-      try {
-        const r = await fetch(`http://127.0.0.1:${state.serverPort}/api/library-unlink`, { ...json, body: JSON.stringify({ keep: all.map((i) => i.id) }) });
-        dropLinkedFromLists((await r.json()).ids);
-      } catch (e) {}
+      // a request the server answers with an error is an error here too (fetch itself only fails when there is no answer)
+      const post = async (route, body) => {
+        const r = await fetch(`http://127.0.0.1:${state.serverPort}${route}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        if (!r.ok) throw new Error(`${route}: HTTP ${r.status}`);
+        return r.json();
+      };
+      // songs linked on an earlier scan whose file is gone now are forgotten, but only after every link went through and
+      // the scan saw everything (found.partial: a folder could not be read; its songs are not gone)
+      const linked = await linkFolderSongs(post, groups, !found.partial);
+      dropLinkedFromLists(linked.forgotten);
+      if (found.partial) showToast(Tm('Some folders could not be read, so songs that are not listed were kept'), 'info');
       if (!all.length) {
         showToast(Tm('No songs found next to the download folder ({0})', found.parent));
         if (state.currentView === 'local') renderLocalView(true);
         return;
       }
 
-      const lib = await (await fetch(`http://127.0.0.1:${state.serverPort}/api/library`)).json();
+      const libRes = await fetch(`http://127.0.0.1:${state.serverPort}/api/library`);
+      if (!libRes.ok) throw new Error(`/api/library: HTTP ${libRes.status}`);
+      const lib = await libRes.json();
       state.localTracks = lib;
       const byId = new Map(lib.map((t) => [t.id, t]));
       let created = 0;
@@ -18511,7 +18542,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   // now; and the app restarts, because every part of it keeps the old folder in its file index
   function afterDownloadFolderChange(res) {
     if (!res) return;
-    if (res.failed) showToast(Tm("{0} songs couldn't be moved and stay in the old folder", res.failed), 'error');
+    if (res.failed) showToast(Tm("{0} songs couldn't be moved. They stay in the old folder, Muriel plays them from there and tries again at the next start.", res.failed), 'error');
+    if (res.conflicts) showToast(Tm('{0} songs have a different file with the same name in the new folder, so they stay in the old folder', res.conflicts), 'error');
     dropLinkedFromLists(res.unlinked);
     if (res.restart && window.electronAPI && window.electronAPI.restartApp) setTimeout(() => window.electronAPI.restartApp(), 1500);
   }

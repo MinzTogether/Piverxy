@@ -63,7 +63,12 @@ import java.util.concurrent.Executors;
         name = "MurielMedia",
         // asked for by allowIsland, once when the first song plays (media-controls.js) and from the island row.
         // Android 13+ is meant to show media notifications without it, but many phones hide them too (#25).
-        permissions = { @Permission(strings = { Manifest.permission.POST_NOTIFICATIONS }, alias = "notifications") })
+        // "audio" / "storageRead": reading songs other apps or the person put on the phone (allowAudioAccess)
+        permissions = {
+                @Permission(strings = { Manifest.permission.POST_NOTIFICATIONS }, alias = "notifications"),
+                @Permission(strings = { "android.permission.READ_MEDIA_AUDIO" }, alias = "audio"),
+                @Permission(strings = { Manifest.permission.READ_EXTERNAL_STORAGE }, alias = "storageRead")
+        })
 public class MediaControlsPlugin extends Plugin {
     static final String CHANNEL = "playback";
     static final int NOTIFICATION_ID = 7041;
@@ -355,6 +360,59 @@ public class MediaControlsPlugin extends Plugin {
         }
         MediaScannerConnection.scanFile(getContext(), new String[] { path }, null, null);
         call.resolve();
+    }
+
+    // ---- reading songs Muriel did not save itself ----
+    // On Android 11+ a file counts as the app's own only when the app made it: a song put in Music or Download with a
+    // file manager or from a computer, or saved by an earlier install of Muriel, is hidden (not listed, not readable)
+    // until the app may read music and audio: READ_MEDIA_AUDIO on Android 13+, READ_EXTERNAL_STORAGE on 12 and older.
+    // Used by the folder playlists (mobile/shims/store.js readAccess). The app's own folder needs none of it.
+    private String audioAlias() {
+        return Build.VERSION.SDK_INT >= 33 ? "audio" : "storageRead";
+    }
+
+    private boolean audioGranted() {
+        String permission = Build.VERSION.SDK_INT >= 33 ? "android.permission.READ_MEDIA_AUDIO" : Manifest.permission.READ_EXTERNAL_STORAGE;
+        return ContextCompat.checkSelfPermission(getContext(), permission) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    // canAsk is false once the person has said no for good ("don't ask again"): only the app's page in Settings turns it on
+    private JSObject audioState() {
+        boolean granted = audioGranted();
+        JSObject r = new JSObject();
+        r.put("granted", granted);
+        r.put("canAsk", !granted && getPermissionState(audioAlias()) != PermissionState.DENIED);
+        return r;
+    }
+
+    @PluginMethod
+    public void audioAccess(PluginCall call) {
+        call.resolve(audioState());
+    }
+
+    // Asks with the system dialog and answers with audioState once it is closed. When the dialog can't be shown any more
+    // it opens the app's page in Settings instead (unless settings is false) and answers at once.
+    @PluginMethod
+    public void allowAudioAccess(PluginCall call) {
+        if (audioGranted()) {
+            call.resolve(audioState());
+            return;
+        }
+        boolean settings = !Boolean.FALSE.equals(call.getBoolean("settings", true));
+        if (getActivity() != null && getPermissionState(audioAlias()) != PermissionState.DENIED) {
+            requestPermissionForAlias(audioAlias(), call, "audioAnswered");
+            return;
+        }
+        if (settings) {
+            openSettings(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getContext().getPackageName())), null);
+        }
+        call.resolve(audioState());
+    }
+
+    @PermissionCallback
+    private void audioAnswered(PluginCall call) {
+        if (call == null) return;
+        call.resolve(audioState());
     }
 
     private boolean unrestricted() {

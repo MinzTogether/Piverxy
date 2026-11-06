@@ -22,6 +22,14 @@ function pickFiles(accept, multiple) {
 
 const ANDROID = Capacitor.getPlatform() === 'android';
 
+// Words of Muriel's own go through the translation system (i18n.js): an element made here carries data-i18n (its text,
+// and data-i18n-attr for a placeholder) and is translated when it is added to the page; text set later goes through
+// text(). What is not Muriel's words (folder names, paths) is left out of it: it would be sent to the translator.
+const i18n = () => window.MurielI18n || null;
+const Tm = (s) => (i18n() ? i18n().Tm(s) : s);
+const say = (el, s) => { if (i18n() && i18n().text) i18n().text(el, s); else el.textContent = s; };
+const toast = (msg, kind) => { if (window.MurielCore) window.MurielCore.toast(msg, kind); };
+
 // Settings → Folders → Download folder → Change (Android): a sheet listing the places Android lets Muriel save songs in,
 // one of your own inside Music / Download / Documents, and whether the songs already downloaded go along.
 // Resolves { text, move } (text: the folder as Settings shows it, e.g. Music/Muriel Mod), or null when cancelled.
@@ -30,23 +38,33 @@ function chooseDownloadFolder(current) {
     const choices = store.downloadChoices();
     const tops = store.sharedTops();
     const known = choices.find((c) => c.shown === current);
+    // mk(tag, css, text, words): words = Muriel's own words (translated); without it the text is a name or a path
+    const mk = (tag, css, text, words) => {
+      const n = document.createElement(tag);
+      if (css) n.style.cssText = css;
+      if (text != null) n.textContent = text;
+      if (words) n.setAttribute('data-i18n', ''); else if (text != null) n.setAttribute('translate', 'no');
+      return n;
+    };
     const wrap = document.createElement('div');
     wrap.className = 'modal-backdrop';
     wrap.id = 'download-folder-picker';
     const card = document.createElement('div');
     card.className = 'dialog-card';
     card.style.cssText = 'max-height:85vh;overflow-y:auto;';
-    const mk = (tag, css, text) => { const n = document.createElement(tag); if (css) n.style.cssText = css; if (text != null) n.textContent = text; return n; };
-    card.appendChild(mk('h3', '', 'Download folder'));
+    card.appendChild(mk('h3', '', 'Download folder', true));
 
     const rows = [];
-    const addRow = (value, title, sub, extra) => {
+    const sub = 'font-size:12px;color:var(--md-sys-color-outline);word-break:break-all;';
+    // title: a folder name (words false) or Muriel's words; path and hint are optional lines under it
+    const addRow = (value, title, titleIsWords, path, hint, extra) => {
       const label = mk('label', 'display:flex;gap:10px;align-items:flex-start;padding:10px 0;cursor:pointer;');
       const radio = document.createElement('input');
       radio.type = 'radio'; radio.name = 'dl-folder'; radio.value = value; radio.style.marginTop = '4px';
       const box = mk('div', 'display:flex;flex-direction:column;min-width:0;flex:1;');
-      box.appendChild(mk('span', 'font-weight:600;', title));
-      if (sub) box.appendChild(mk('span', 'font-size:12px;color:var(--md-sys-color-outline);word-break:break-all;', sub));
+      box.appendChild(mk('span', 'font-weight:600;', title, titleIsWords));
+      if (path) box.appendChild(mk('span', sub, path, false));
+      if (hint) box.appendChild(mk('span', sub, hint, true));
       if (extra) box.appendChild(extra);
       label.append(radio, box);
       card.appendChild(label);
@@ -54,20 +72,21 @@ function chooseDownloadFolder(current) {
       return radio;
     };
     for (const c of choices) {
-      const r = addRow(c.text, c.label, c.full + (c.hint ? `\n${c.hint}` : ''));
-      r.parentElement.querySelector('span:nth-child(2)').style.whiteSpace = 'pre-line';
+      const r = addRow(c.text, c.label, c.kind === 'app', c.full, c.hint);
       if (known && known.text === c.text) r.checked = true;
     }
     const custom = mk('div', 'display:flex;gap:8px;margin-top:6px;');
     const topSel = document.createElement('select');
     topSel.className = 'pill-text-input';
+    topSel.setAttribute('translate', 'no');
     topSel.style.cssText = 'flex:0 0 auto;width:auto;';
     for (const t of tops) topSel.appendChild(new Option(t, t));
     const nameIn = document.createElement('input');
     nameIn.type = 'text'; nameIn.className = 'pill-text-input'; nameIn.maxLength = 60; nameIn.placeholder = 'Folder name';
+    nameIn.setAttribute('data-i18n-attr', 'placeholder');
     nameIn.style.cssText = 'flex:1;min-width:0;';
     custom.append(topSel, nameIn);
-    const customRadio = addRow('__custom', 'Another folder', 'Inside Music, Download, Documents, Podcasts or Audiobooks', custom);
+    const customRadio = addRow('__custom', 'Another folder', true, null, null, custom);
     if (!known && current && !current.startsWith('Android/')) {
       const rel = current.split('/');
       if (tops.includes(rel[0])) { topSel.value = rel[0]; nameIn.value = rel.slice(1).join('/'); customRadio.checked = true; }
@@ -78,17 +97,17 @@ function chooseDownloadFolder(current) {
     const moveLabel = mk('label', 'display:flex;gap:10px;align-items:center;margin:12px 0 4px;cursor:pointer;');
     const move = document.createElement('input');
     move.type = 'checkbox'; move.checked = true;
-    moveLabel.append(move, mk('span', '', 'Move the songs I already downloaded'));
+    moveLabel.append(move, mk('span', '', 'Move the songs I already downloaded', true));
     card.appendChild(moveLabel);
-    const err = mk('div', 'color:var(--md-sys-color-error,#f2b8b5);font-size:12px;min-height:16px;margin-top:6px;', '');
+    const err = mk('div', 'color:var(--md-sys-color-error,#f2b8b5);font-size:12px;min-height:16px;margin-top:6px;');
     card.appendChild(err);
 
-    const actions = mk('div', '');
+    const actions = document.createElement('div');
     actions.className = 'dialog-actions';
-    const cancel = mk('button', '', 'Cancel');
+    const cancel = mk('button', '', 'Cancel', true);
     cancel.className = 'btn-outline-pill';
     cancel.id = 'btn-cancel-download-folder'; // the Android back button presses this (bridge.js)
-    const save = mk('button', '', 'Use this folder');
+    const save = mk('button', '', 'Use this folder', true);
     save.className = 'btn-pill-primary';
     actions.append(cancel, save);
     card.appendChild(actions);
@@ -105,7 +124,7 @@ function chooseDownloadFolder(current) {
       const picked = rows.find((r) => r.checked);
       const text = picked && picked.value === '__custom' ? `${topSel.value}/${nameIn.value.trim()}` : picked && picked.value;
       const full = text && store.showDownloadDir(text);
-      if (!full) { err.textContent = "Type a folder name without special characters (no / \\ : * ? \" < > |, and no leading dot)."; return; }
+      if (!full) { say(err, 'Use a folder name without special characters: no slashes, colons or quotes, and no leading dot.'); return; }
       close({ text: full, move: move.checked });
     });
     document.body.appendChild(wrap);
@@ -127,6 +146,7 @@ module.exports = function electronAPI({ ready, port, fs, fileUrlFor }) {
   async function forgetLinked() {
     try {
       const r = await fetch(`http://127.0.0.1:${port}/api/library-unlink`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      if (!r.ok) return [];
       const j = await r.json();
       await fs._flush();
       return Array.isArray(j.ids) ? j.ids : [];
@@ -137,8 +157,21 @@ module.exports = function electronAPI({ ready, port, fs, fileUrlFor }) {
   // what app.js needs to add them to the library (/api/library-link) and make playlists of them.
   async function scanLocalFolders() {
     await ready;
+    // Android 11+ hides the songs the app did not save itself until it may read music and audio. Ask now (the system
+    // dialog; once refused for good, the app's page in Settings opens instead) and carry on when it is given.
+    let justAllowed = false;
+    if (store.needsReadAccess()) {
+      let access = await store.readAccess();
+      if (!access.granted) {
+        const settings = !access.canAsk;
+        access = await store.readAccess({ ask: true, settings });
+        if (!access.granted) return { needsPermission: true, settingsOpened: settings };
+        justAllowed = true;
+      }
+    }
     const found = await store.scanLinked();
     if (!found) return { unavailable: true };
+    if (found.failed) return { failed: true };
     const groups = [];
     for (const g of found.groups) {
       const items = [];
@@ -148,7 +181,9 @@ module.exports = function electronAPI({ ready, port, fs, fileUrlFor }) {
       }
       groups.push({ folder: g.folder, items });
     }
-    return { parent: found.parent, groups };
+    // songs of the download folder that were hidden too (an earlier install saved them) show up now
+    if (justAllowed) for (const e of await store.rescanDownloads()) fs._register(e.vpath, e.size);
+    return { parent: found.parent, groups, partial: found.partial };
   }
 
   return {
@@ -241,17 +276,17 @@ module.exports = function electronAPI({ ready, port, fs, fileUrlFor }) {
       if (!ANDROID) return { ok: false, error: 'The download folder is fixed on iPhone' };
       await ready;
       const move = lastPick && lastPick.text === dir ? lastPick.move : true;
-      if (move && window.MurielCore) window.MurielCore.toast('Moving your songs…', 'info');
+      if (move) toast(Tm('Moving your songs…'), 'info');
       const res = await store.setDownloadDir(dir, { move });
-      if (!res.ok) return res;
+      if (!res.ok) return { ...res, error: Tm(res.error) };
       return { ...res, unlinked: await forgetLinked(), restart: true };
     },
     async resetDownloadDir() {
       if (!ANDROID) return { ok: true };
       await ready;
-      if (window.MurielCore) window.MurielCore.toast('Moving your songs…', 'info');
+      toast(Tm('Moving your songs…'), 'info');
       const res = await store.resetDownloadDir({ move: true });
-      if (!res.ok) return res;
+      if (!res.ok) return { ...res, error: Tm(res.error) };
       return { ...res, unlinked: await forgetLinked(), restart: true };
     },
     ...(ANDROID ? { scanLocalFolders } : {}),
@@ -307,3 +342,6 @@ module.exports = function electronAPI({ ready, port, fs, fileUrlFor }) {
     },
   };
 };
+
+// for test/android-picker.test.js
+module.exports.chooseDownloadFolder = chooseDownloadFolder;

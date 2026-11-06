@@ -70,6 +70,12 @@
     <!-- Android 10 and older: downloaded songs are saved to Music/Muriel Mod on the phone's storage (mobile/shims/store.js;
          asked for on the first download). Android 11+ needs no permission for the files the app saves there.
          requestLegacyExternalStorage above makes such paths writable on Android 10; newer versions ignore it. -->
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
+    <!-- Reading songs the app did not save itself (put in Music / Download with a file manager or from a computer, or
+         left by an earlier install): on Android 11+ they are hidden from the app until it may read music and audio.
+         Asked for by the folder playlists (MediaControlsPlugin.allowAudioAccess, shims/store.js readAccess).
+         READ_EXTERNAL_STORAGE covers Android 10 and older too (there it is also what saving needs); Android 13+ has
+         its own for audio. The app's own folder (Android/data/<package>/files) needs neither. -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
 </manifest>
