@@ -7,7 +7,6 @@
 - **macOS:** `.dmg` / `.zip` below, for Apple Silicon and Intel. The app is unsigned: if macOS blocks it, open System Settings → Privacy & Security → Open Anyway.
 - **Linux:** `.AppImage` below (needs FUSE 2: `fuse2` / `libfuse2`)
 
-Or get it from the website: https://cloverscripts.github.io/riff-muriel/
 **Fixed**
 - **Artist page:** the line under Songs/Albums is a faint divider instead of a dark stripe on bright wallpapers.
 - **No sideways scrolling** in playlists and Favorites.

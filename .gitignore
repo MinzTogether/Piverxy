@@ -17,5 +17,3 @@ www/
 # IPA downloaded from the iOS workflow
 dist-ipa/
 
-# copied in by the pages workflow
-site/play/share-link.js

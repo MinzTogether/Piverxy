@@ -7,7 +7,7 @@
 // Otherwise: "z" + base64url(deflate-raw(JSON)) or, where the browser can't compress, "j" + base64url(JSON).
 // JSON: { v: 1, n: name, t: [[kind, ref, title, artist, seconds], ...] }; kind "y" = YouTube / YouTube Music
 // (ref = video id), "s" = SoundCloud (ref = track URL), "u" = anything else with a URL. Songs from files on
-// the device can't be shared and are left out. Used by the app (app.js), the website (site/play) and tests.
+// the device can't be shared and are left out. Used by the app (app.js) and tests.
 (function (root) {
   const WEB = 'https://cloverscripts.github.io/riff-muriel/play/';
   const MAX_TRACKS = 500;
