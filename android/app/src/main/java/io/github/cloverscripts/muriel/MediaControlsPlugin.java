@@ -444,6 +444,15 @@ public class MediaControlsPlugin extends Plugin {
         call.resolve(audioState());
     }
 
+    // The app's page in Android Settings (Permissions is one tap from there). For the "music access is off" prompt
+    // (mobile/electron-api.js): a permission turned off in Settings is usually not asked for again by the system dialog,
+    // so this page is the way back. Opens it and answers at once with audioState; the page looks again when the app returns.
+    @PluginMethod
+    public void openAppSettings(PluginCall call) {
+        openSettings(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getContext().getPackageName())), null);
+        call.resolve(audioState());
+    }
+
     private boolean unrestricted() {
         PowerManager pm = getContext().getSystemService(PowerManager.class);
         return pm != null && pm.isIgnoringBatteryOptimizations(getContext().getPackageName());

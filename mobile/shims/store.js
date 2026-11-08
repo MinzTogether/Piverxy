@@ -548,6 +548,52 @@ async function readAccessOf({ ask = false, settings = false } = {}) {
   }
 }
 
+// ---- Android: the songs linked in place, and the permission that lets Muriel read them ----
+// Linked songs stay in the folders next to the download folder (shared storage). From Android 11 the app sees them only
+// while it may read music and audio. When that is taken back (Settings -> Apps -> Muriel -> Permissions) the files are
+// untouched and the library and playlists still know them, but Android refuses every read: the songs are LOCKED until the
+// permission is given again. Locked is only ever a state held here, computed from the permission as it is now: nothing is
+// written down for it, so it cannot go stale, and nothing is forgotten, unlinked or deleted because of it.
+// The app's own folder (Android/data/<package>/files) needs no permission, so songs linked from it are never locked.
+const MEDIA_PERMISSION_REQUIRED = 'MEDIA_PERMISSION_REQUIRED';
+let linkedLock = { locked: false, canAsk: false };
+const mediaPermissionError = () => Object.assign(new Error(MEDIA_PERMISSION_REQUIRED), { code: MEDIA_PERMISSION_REQUIRED });
+
+// -> { locked, granted, canAsk } for the permission as it is right now (asks the plugin, which reads Android's answer)
+async function readLinkedAccess() {
+  if (!ANDROID || (pub && pubDir === APPDIR)) return { locked: false, granted: true, canAsk: false };
+  const access = await readAccessOf();
+  return { locked: !access.granted, granted: !!access.granted, canAsk: !!access.canAsk };
+}
+
+// The songs of the linked folders as the file index wants them (what listLinked puts back at every launch). Nothing is
+// written: SIB_KEY and the library are only ever changed by a scan that saw everything.
+async function restoredLinked() {
+  const was = lsGet(SIB_KEY);
+  if (!was || !pub) return [];
+  const found = await collectLinked({ folders: Array.isArray(was.folders) ? was.folders : [], loose: !!was.loose }).catch(() => null);
+  const out = [];
+  for (const g of (found && found.groups) || []) for (const f of g.files) out.push({ vpath: f.vpath, isDir: false, size: f.size, mtimeMs: f.mtimeMs });
+  return out;
+}
+
+// Looks at the permission again (at launch, when the app comes back to the front, after the person was sent to Settings).
+// Taken back: the linked songs lock. Given again: they are put back in the file index first (`register(entries)`, so none
+// is asked for before it is there) and unlock. Never touches the library, the playlists or SIB_KEY.
+// -> { locked, granted, canAsk, changed, restored }
+async function refreshLinkedAccess(register) {
+  const now = await readLinkedAccess();
+  const was = linkedLock;
+  let restored = 0;
+  if (!now.locked && was.locked) {
+    const entries = await restoredLinked();
+    if (typeof register === 'function') register(entries);
+    restored = entries.length;
+  }
+  linkedLock = { locked: now.locked, canAsk: now.canAsk };
+  return { ...now, changed: now.locked !== was.locked || now.canAsk !== was.canAsk, restored };
+}
+
 // `vpath` with " (old)" before its extension, or " (old 2)" ... when that is taken too
 function freeName(vpath, taken) {
   const parts = /^(.*?)(\.[^./]+)?$/.exec(vpath);
@@ -613,13 +659,18 @@ async function collectLinked(only) {
   return { groups: sorted, partial: ctx.partial };
 }
 
-// at launch: the songs of the folders that were linked before are put back in the file index (fs shim), so they play
+// at launch: the songs of the folders that were linked before are put back in the file index (fs shim), so they play.
+// While Muriel may not read music and audio they are not: Android would show the folders as empty or refuse every read,
+// which says nothing about the songs. They stay remembered (SIB_KEY, the library, the playlists) and come back the moment
+// the permission does (refreshLinkedAccess).
 async function listLinked(out) {
-  const was = lsGet(SIB_KEY);
-  if (!was || !pub) return;
-  const found = await collectLinked({ folders: Array.isArray(was.folders) ? was.folders : [], loose: !!was.loose }).catch(() => null);
-  for (const g of (found && found.groups) || []) for (const f of g.files) out.push({ vpath: f.vpath, isDir: false, size: f.size, mtimeMs: f.mtimeMs });
+  if (linkedLock.locked) return;
+  out.push(...(await restoredLinked()));
 }
+
+// true for a song linked in place while Muriel may not read music and audio: nothing under /data/LocalMusic is readable then.
+// The downloads, the songs imported into the app and everything else Muriel keeps are not affected.
+const isLinkedLocked = (vpath) => linkedLock.locked && isLocalLink(vpath);
 
 module.exports = {
   isNative: () => Capacitor.isNativePlatform(),
@@ -631,6 +682,8 @@ module.exports = {
     if (ANDROID) {
       try { APP_ID = (await require('@capacitor/app').App.getInfo()).id || APP_ID; } catch (e) {}
       await listDownloads(out);
+      // never lets this check keep the app from starting: when it fails, nothing is locked (what it always was)
+      try { const a = await readLinkedAccess(); linkedLock = { locked: a.locked, canAsk: a.canAsk }; } catch (e) { linkedLock = { locked: false, canAsk: false }; }
       await listLinked(out);
     }
     return out;
@@ -683,8 +736,14 @@ module.exports = {
   // -> null when downloads are kept inside the app (nothing "next to" them to read); { failed: true } when the folder
   // can't be read; else { parent, groups, partial } (partial: some folder could not be read, or there are too many songs)
   async scanLinked() {
+    // Without the permission a scan sees what Android lets it see, not what is there: it must not become what is remembered
+    // (SIB_KEY), nor what the caller takes for "gone" and forgets. -> { locked: true } and nothing else happens.
+    const shared = ANDROID && !!pub && pubDir === PUBLIC;
+    if (shared && (await readLinkedAccess()).locked) return { locked: true, groups: [], partial: true };
     const found = await collectLinked(null);
     if (!found || found.failed) return found;
+    // the permission can be taken back while the folders are read: such a scan is not to be believed either
+    if (shared && (await readLinkedAccess()).locked) return { locked: true, groups: [], partial: true };
     const { groups, partial } = found;
     // What is remembered for the next launch (listLinked) is exactly what the scan saw only when the scan saw everything.
     // A partial one (a folder it could not read, or the limit) adds what it found and never takes a folder out: a folder
@@ -695,6 +754,14 @@ module.exports = {
     return { parent: ROOT_PREFIX + (pubDir === APPDIR ? `${appFiles()}/` : '') + parentRoot(), groups, partial };
   },
   hasLinkedFolders: () => !!(ANDROID && pub),
+
+  // ---- Android: the permission behind the songs linked in place (see "the songs linked in place" above) ----
+  MEDIA_PERMISSION_REQUIRED,
+  // as it was last looked at: { locked, canAsk }. The server asks this for every linked song it is about to serve.
+  linkedAccess: () => ({ ...linkedLock }),
+  isLinkedLocked,
+  // looks at the permission again; see refreshLinkedAccess
+  refreshLinkedAccess,
 
   // ---- Android: reading songs the app did not save itself ----
   // Android 11+ hides a song the app did not make (a file manager or a computer put it there, or an earlier install of
@@ -797,6 +864,7 @@ module.exports = {
 
   // A URL the WebView can load directly (same origin, so Web Audio can process it).
   async fileUrl(vpath, mime) {
+    if (isLinkedLocked(vpath)) throw mediaPermissionError(); // the WebView would only meet a refused read
     const loc = where(vpath);
     if (isDownload(vpath)) inUse.add(vpath);
     if (Capacitor.isNativePlatform()) {

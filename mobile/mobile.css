@@ -601,3 +601,7 @@ html.is-mobile .app-icon-picker-grid { grid-template-columns: repeat(auto-fill, 
 
 /* song radio (#28): the queue's "Radio · song" label a little roomier for a finger */
 html.is-mobile .queue-radio-label { margin: 2px 0 10px; padding: 6px 12px 6px 10px; }
+
+/* Android: songs linked from the folders next to the download folder while Muriel may not read music and audio (app.js
+   isMediaLocked). Still listed, still in every playlist; shown dimmed until the permission is back. Tapping one explains. */
+html.is-mobile .track-row.is-locked { opacity: 0.5; }

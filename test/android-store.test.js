@@ -157,6 +157,8 @@ beforeEach(() => {
       return { same: files.get(pa) === files.get(pb) };
     },
     audioAccess: async () => ({ granted: audioGranted, canAsk: audioGranted ? false : canAsk }),
+    // MediaControlsPlugin.openAppSettings: the app's page in Android Settings
+    openAppSettings: async () => { opened++; return { granted: audioGranted, canAsk: audioGranted ? false : canAsk }; },
     allowAudioAccess: async ({ settings } = {}) => {
       asked.push({ settings: !!settings });
       if (!audioGranted && canAsk) {
@@ -947,4 +949,476 @@ test('the API: Retry without the permission says so, moves nothing and keeps the
   assert.equal(res.settingsOpened, false);
   assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3'), true);
   assert.ok(journal());
+});
+
+// ---- The music permission taken back (Settings -> Apps -> Muriel Mod -> Permissions) ----
+// The songs linked in place (the folders next to the download folder) stay in the library and in every playlist, but Android
+// refuses to read them: they are LOCKED until the permission is given again. Locked is a state worked out from the permission as
+// it is now; nothing is written down for it, and nothing is unlinked, forgotten or deleted because of it.
+const nodeFs = require('node:fs');
+const vm = require('node:vm');
+
+const FIRST = '/data/LocalMusic/Album One/01 First.mp3';
+const LOOSE = '/data/LocalMusic/loose song.mp3';
+const SIB = 'muriel_local_folders';
+
+// a launch of the app: the storage shim and the API the page talks to, with the events the page would hear
+function launchLive() {
+  const store = launch();
+  const listeners = {};
+  const events = [];
+  global.document = { addEventListener: (t, fn) => { (listeners[t] = listeners[t] || []).push(fn); }, hidden: false };
+  global.window = { dispatchEvent: (e) => { events.push({ type: e.type, detail: e.detail }); return true; } };
+  global.CustomEvent = class { constructor(type, init) { this.type = type; this.detail = init && init.detail; } };
+  delete require.cache[apiId];
+  const registered = [];
+  const fakeFs = { _register: (p) => registered.push(p), _flush: async () => {} };
+  const electron = require(apiId)({ ready: Promise.resolve(), port: 1, fs: fakeFs, fileUrlFor: () => '' });
+  const settle = async () => { for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r)); };
+  // the app comes back to the front (Android: visibilitychange / appStateChange)
+  const foreground = async () => { for (const fn of listeners.visibilitychange || []) fn(); await settle(); };
+  return { store, api: electron, registered, events, foreground, settle };
+}
+const accessEvents = (events) => events.filter((e) => e.type === 'muriel:media-access').map((e) => e.detail);
+const linkedIn = (entries) => entries.map((e) => e.vpath).filter((v) => v.startsWith('/data/LocalMusic/'));
+const refused = (e) => e && e.code === 'MEDIA_PERMISSION_REQUIRED';
+
+test('MP-01: permission granted -> scan -> the linked songs are in the file index and open from where they are', async () => {
+  const { store, api: electron, registered } = launchLive();
+  await store.list();
+  const found = await electron.scanLocalFolders();
+  assert.deepEqual(found.groups.map((g) => g.folder), ['', 'Album One']);
+  assert.ok(registered.includes(FIRST) && registered.includes(LOOSE), 'registered with the file index');
+  assert.deepEqual(store.linkedAccess(), { locked: false, canAsk: false });
+  assert.equal(await store.fileUrl(FIRST), `file://${ROOTS.EXTERNAL_STORAGE}/Music/Album One/01 First.mp3`);
+  // and after a restart, still granted: the same songs are back, nothing locked
+  const again = launchLive();
+  assert.ok(linkedIn(await again.store.list()).includes(FIRST));
+  assert.equal(again.store.linkedAccess().locked, false);
+});
+
+test('MP-02: permission taken back, app restarted: what is remembered and every file are exactly as they were, and the songs are locked', async () => {
+  let live = launchLive();
+  await live.store.list();
+  await live.api.scanLocalFolders();
+  const remembered = ls.get(SIB);
+  assert.ok(remembered, 'the scan remembered the folders');
+
+  audioGranted = false; // turned off in Settings; Android restarts the app
+  live = launchLive();
+  const entries = await live.store.list();
+  assert.deepEqual(linkedIn(entries), [], 'not read: Android would show the folders as empty, which says nothing about the songs');
+  assert.deepEqual(live.store.linkedAccess(), { locked: true, canAsk: true });
+  assert.equal(ls.get(SIB), remembered, 'the folders that were linked are still remembered, byte for byte');
+  assert.deepEqual(deleted, [], 'nothing was deleted');
+  for (const f of ['Music/Album One/01 First.mp3', 'Music/Album One/Disc 2/02 Second.flac', 'Music/loose song.mp3']) assert.equal(has('EXTERNAL_STORAGE', f), true, f);
+  await assert.rejects(live.store.fileUrl(FIRST), refused, 'a locked song is never handed to the WebView');
+});
+
+test('MP-02b: the phone shim tells the server what the storage shim knows (platform.linkedAccessLocked)', async () => {
+  let live = launchLive();
+  await live.store.list();
+  const platform = require('../mobile/shims/platform.js');
+  assert.equal(platform.linkedAccessLocked(), false);
+  audioGranted = false;
+  live = launchLive();
+  await live.store.list();
+  assert.equal(platform.linkedAccessLocked(), true);
+  assert.equal(platform.LOCAL_LINK_DIR, '/data/LocalMusic', 'the folder the server looks for locked songs in is the one the store links from');
+});
+
+test('MP-03: permission taken back, a song is asked for: refused with MEDIA_PERMISSION_REQUIRED, not "file missing"', async () => {
+  let live = launchLive();
+  await live.store.list();
+  await live.api.scanLocalFolders();
+  audioGranted = false;
+  live = launchLive();
+  await live.store.list();
+  await assert.rejects(live.store.fileUrl(LOOSE), (e) => e.code === 'MEDIA_PERMISSION_REQUIRED' && e.message === 'MEDIA_PERMISSION_REQUIRED');
+  assert.equal(live.store.isLinkedLocked(LOOSE), true);
+  assert.equal(live.store.isLinkedLocked('/data/Downloads/x.mp3'), false);
+  assert.equal(live.store.isLinkedLocked('/data/library/local_aaaaaaaaaaaa.mp3'), false);
+});
+
+test('MP-04: the permission given again: the linked songs are back in the file index first, then unlock, and play from where they are', async () => {
+  let live = launchLive();
+  await live.store.list();
+  await live.api.scanLocalFolders();
+  const remembered = ls.get(SIB);
+  audioGranted = false;
+  live = launchLive();
+  await live.store.list();
+  assert.equal((await live.api.getMediaAccess()).locked, true);
+  assert.deepEqual(live.registered, []);
+
+  audioGranted = true; // given again in Settings
+  const seen = [];
+  const hooked = live.store.refreshLinkedAccess;
+  assert.equal(typeof hooked, 'function');
+  await live.foreground();
+  assert.deepEqual(live.store.linkedAccess(), { locked: false, canAsk: false });
+  assert.ok(live.registered.includes(FIRST) && live.registered.includes(LOOSE), 'put back in the file index');
+  assert.ok(live.registered.includes('/data/LocalMusic/Album One/Disc 2/02 Second.flac'));
+  assert.equal(await live.store.fileUrl(FIRST), `file://${ROOTS.EXTERNAL_STORAGE}/Music/Album One/01 First.mp3`);
+  const heard = accessEvents(live.events);
+  assert.deepEqual(heard.map((d) => d.locked), [true, false], 'the page heard it locked, then unlocked');
+  assert.equal(heard[1].restored, 3);
+  assert.equal(ls.get(SIB), remembered, 'what is remembered did not change on the way');
+  assert.deepEqual(seen, []);
+});
+
+test('MP-04b: the songs are registered before the lock lifts (none is asked for while it is not in the file index)', async () => {
+  audioGranted = false;
+  const store = launch();
+  await store.list();
+  put('EXTERNAL_STORAGE', 'Music/Album One/03 Third.mp3');
+  // the folders were remembered by an earlier scan
+  ls.set(SIB, JSON.stringify({ folders: ['Album One'], loose: false }));
+  audioGranted = true;
+  let lockWhenRegistered = null;
+  const r = await store.refreshLinkedAccess((entries) => { lockWhenRegistered = store.linkedAccess().locked; assert.ok(linkedIn(entries).length >= 3); });
+  assert.equal(lockWhenRegistered, true, 'registered while still locked');
+  assert.equal(r.locked, false);
+  assert.equal(store.linkedAccess().locked, false);
+});
+
+test('MP-05: the permission taken back while the app is running: coming back to the front refreshes the state, nothing else changes', async () => {
+  const live = launchLive();
+  await live.store.list();
+  await live.api.scanLocalFolders();
+  assert.deepEqual(await live.api.getMediaAccess(), { locked: false, canAsk: false });
+  const remembered = ls.get(SIB);
+
+  audioGranted = false; // turned off while Muriel is in the background
+  await live.foreground();
+  assert.deepEqual(live.store.linkedAccess(), { locked: true, canAsk: true });
+  assert.deepEqual(accessEvents(live.events).map((d) => d.locked), [false, true], 'the page is told');
+  await assert.rejects(live.store.fileUrl(FIRST), refused);
+  assert.equal(ls.get(SIB), remembered);
+  assert.deepEqual(deleted, []);
+
+  // looking again with nothing changed says nothing again
+  await live.foreground();
+  await live.foreground();
+  assert.equal(accessEvents(live.events).length, 2);
+
+  audioGranted = true;
+  await live.foreground();
+  assert.deepEqual(accessEvents(live.events).map((d) => d.locked), [false, true, false]);
+  assert.equal(await live.store.fileUrl(FIRST), `file://${ROOTS.EXTERNAL_STORAGE}/Music/Album One/01 First.mp3`);
+});
+
+test('MP-05b: two looks at the permission at once are one look (a burst of foreground events)', async () => {
+  const live = launchLive();
+  await live.store.list();
+  let reads = 0;
+  const real = capacitor.Plugins.MurielMedia.audioAccess;
+  capacitor.Plugins.MurielMedia.audioAccess = async () => { reads++; return real(); };
+  const [a, b, c] = await Promise.all([live.api.getMediaAccess(), live.api.getMediaAccess(), live.api.getMediaAccess()]);
+  assert.deepEqual([a, b, c], [{ locked: false, canAsk: false }, { locked: false, canAsk: false }, { locked: false, canAsk: false }]);
+  assert.equal(reads, 1);
+});
+
+test('MP-06: songs kept inside the app (imported into the library) stay playable while the permission is off', async () => {
+  let live = launchLive();
+  await live.store.list();
+  await live.store.writeBytes('/data/library/local_aaaaaaaaaaaa.mp3', new Uint8Array([1, 2, 3, 4]));
+  await live.store.writeText('/data/library.json', '{"local_aaaaaaaaaaaa":{"id":"local_aaaaaaaaaaaa"}}');
+  audioGranted = false;
+  live = launchLive();
+  const entries = await live.store.list();
+  assert.ok(entries.some((e) => e.vpath === '/data/library/local_aaaaaaaaaaaa.mp3'), 'still listed');
+  assert.ok(entries.some((e) => e.vpath === '/data/library.json'));
+  assert.equal(live.store.linkedAccess().locked, true, 'while the linked ones are locked');
+  assert.equal(live.store.isLinkedLocked('/data/library/local_aaaaaaaaaaaa.mp3'), false);
+  assert.match(await live.store.fileUrl('/data/library/local_aaaaaaaaaaaa.mp3'), /^file:\/\/.*\/Muriel\/library\/local_aaaaaaaaaaaa\.mp3$/);
+});
+
+test('MP-07: songs Muriel downloaded itself stay listed and playable while the permission is off', async () => {
+  let live = launchLive();
+  await live.store.list();
+  await live.store.writeBytes('/data/Downloads/Mine - Downloaded.mp3', new Uint8Array([9, 9, 9]));
+  audioGranted = false;
+  live = launchLive();
+  const entries = await live.store.list();
+  assert.ok(entries.some((e) => e.vpath === '/data/Downloads/Mine - Downloaded.mp3'), 'a file the app made is not hidden from it');
+  assert.equal(live.store.isLinkedLocked('/data/Downloads/Mine - Downloaded.mp3'), false);
+  assert.equal(await live.store.fileUrl('/data/Downloads/Mine - Downloaded.mp3'), `file://${ROOTS.EXTERNAL_STORAGE}/Music/Muriel Mod/Mine - Downloaded.mp3`);
+  assert.equal(entries.some((e) => e.vpath === '/data/Downloads/Artist - Song.mp3'), false, 'one a file manager put there is hidden by Android (as before)');
+});
+
+test('MP-08: after the permission is back, scanning again finds the same songs under the same ids (nothing new to make playlists of)', async () => {
+  let live = launchLive();
+  await live.store.list();
+  const first = await live.api.scanLocalFolders();
+  audioGranted = false;
+  live = launchLive();
+  await live.store.list();
+  audioGranted = true;
+  await live.foreground();
+  const second = await live.api.scanLocalFolders();
+  assert.deepEqual(second.groups, first.groups, 'same folders, same songs, same ids');
+});
+
+test('MP-09: scanning without the permission remembers nothing, forgets nothing and deletes nothing', async () => {
+  let live = launchLive();
+  await live.store.list();
+  await live.api.scanLocalFolders();
+  const remembered = ls.get(SIB);
+  audioGranted = false;
+  live = launchLive();
+  await live.store.list();
+  // what the original code did here: a "complete" scan that saw nothing replaced what was remembered and had every song forgotten
+  const scan = await live.store.scanLinked();
+  assert.equal(scan.locked, true);
+  assert.deepEqual(scan.groups, []);
+  assert.equal(ls.get(SIB), remembered);
+  answer = 'deny';
+  assert.deepEqual(await live.api.scanLocalFolders(), { needsPermission: true, settingsOpened: false });
+  assert.equal(ls.get(SIB), remembered);
+  assert.deepEqual(live.registered, []);
+  assert.deepEqual(deleted, []);
+});
+
+test('MP-09b: the permission taken back in the middle of a scan: the scan is not believed, nothing is remembered from it', async () => {
+  let live = launchLive();
+  await live.store.list();
+  await live.api.scanLocalFolders();
+  const remembered = ls.get(SIB);
+  const realReaddir = Filesystem.readdir;
+  let reads = 0;
+  Filesystem.readdir = async (o) => { if (++reads === 1) audioGranted = false; return realReaddir(o); }; // gone as the first folder is read
+  try {
+    const found = await live.api.scanLocalFolders();
+    assert.deepEqual(found, { needsPermission: true, settingsOpened: false });
+  } finally { Filesystem.readdir = realReaddir; }
+  assert.ok(reads >= 1);
+  assert.equal(ls.get(SIB), remembered, 'what a scan that saw hidden folders found is not what is remembered');
+  assert.deepEqual(deleted, []);
+});
+
+test('MP-10: the app\'s own folder needs no permission: its linked songs are never locked', async () => {
+  audioGranted = false;
+  let live = launchLive();
+  await live.store.list();
+  await live.store.setDownloadDir(APPFOLDER, { move: false });
+  live = launchLive();
+  await live.store.list();
+  assert.deepEqual(await live.store.scanLinked().then((f) => f.groups.map((g) => g.folder)), ['music']);
+  assert.deepEqual(live.store.linkedAccess(), { locked: false, canAsk: false });
+  live = launchLive();
+  assert.ok(linkedIn(await live.store.list()).length > 0, 'put back at launch with no permission at all');
+  assert.match(await live.store.fileUrl(linkedIn(await live.store.list())[0]), /Android\/data/);
+});
+
+test('MP-11: an older build of the plugin (no audioAccess) locks nothing: the songs behave as they always did', async () => {
+  let live = launchLive();
+  await live.store.list();
+  await live.api.scanLocalFolders();
+  audioGranted = false;
+  capacitor.Plugins.MurielMedia = { audioAccess: async () => { throw new Error('UNIMPLEMENTED'); } };
+  live = launchLive();
+  await live.store.list();
+  assert.equal(live.store.linkedAccess().locked, false);
+  assert.equal(await live.store.fileUrl(FIRST), `file://${ROOTS.EXTERNAL_STORAGE}/Music/Album One/01 First.mp3`);
+});
+
+test('MP-12: Android 10 and older, storage permission taken back: the linked songs lock, and the scan says what it always said', async () => {
+  let live = launchLive();
+  await live.store.list();
+  await live.api.scanLocalFolders();
+  const remembered = ls.get(SIB);
+  audioGranted = false;
+  const realCheck = Filesystem.checkPermissions;
+  Filesystem.checkPermissions = async () => ({ publicStorage: 'prompt' }); // before Android 11 shared storage needs the real permission
+  try {
+    live = launchLive();
+    await live.store.list();
+    assert.equal(live.store.downloadsFolder(), 'Music/Muriel Mod', 'asked for when the first song is saved');
+    assert.equal(live.store.needsReadAccess(), false, 'no shared folder in use');
+    assert.deepEqual(live.store.linkedAccess(), { locked: true, canAsk: true });
+    assert.equal(await live.store.scanLinked(), null, 'unchanged: nothing next to a download folder that is inside the app');
+    assert.equal(ls.get(SIB), remembered);
+    await assert.rejects(live.store.fileUrl(FIRST), refused);
+  } finally { Filesystem.checkPermissions = realCheck; }
+});
+
+test('MP-13: Settings opens the app\'s page, whatever the dialog would do', async () => {
+  audioGranted = false;
+  canAsk = false;
+  const live = launchLive();
+  await live.store.list();
+  assert.equal(await live.api.openAppSettings(), true);
+  assert.equal(opened, 1);
+  assert.deepEqual(asked, [], 'no dialog: a permission turned off in Settings is usually not asked for again');
+  // an older build of the plugin has no openAppSettings: the dialog method that falls back to the page is used
+  const media = capacitor.Plugins.MurielMedia;
+  delete media.openAppSettings;
+  assert.equal(await live.api.openAppSettings(), true);
+  assert.deepEqual(asked, [{ settings: true }]);
+});
+
+// ---- the page: tapping "Folder playlists" must never empty the playlists because of the permission ----
+const appSource = nodeFs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+function appFn(name) {
+  let at = appSource.indexOf(`function ${name}(`);
+  assert.ok(at >= 0, name);
+  if (appSource.slice(at - 6, at) === 'async ') at -= 6; // keep the async of an async function
+  const open = appSource.indexOf('{', appSource.slice(at).search(/\)\s*\{/) + at);
+  let depth = 0;
+  for (let i = open; i < appSource.length; i++) {
+    if (appSource[i] === '{') depth++;
+    else if (appSource[i] === '}' && --depth === 0) return appSource.slice(at, i + 1);
+  }
+  throw new Error('unbalanced ' + name);
+}
+
+// app.js's importLocalFolders / dropLinkedFromLists / saveAllPlaylists, as they are, against the real API of the phone and a
+// server that behaves like server.js's /api/library-link, -unlink and library (the real server is exercised in
+// media-permission-server.test.js)
+function pagePlaylists(electronAPI) {
+  const library = new Map(); // id -> { id, platform, title, artist, duration, linked }
+  const posts = [];
+  const toasts = [];
+  const ctx = {
+    window: { electronAPI }, document: { getElementById: () => null }, console,
+    localStorage: global.localStorage,
+    state: { serverPort: 1, playlists: [], localTracks: null, currentView: 'discover' },
+    Tm: (s, ...a) => a.reduce((t, v, i) => t.replace(`{${i}}`, v), s),
+    T: (s) => s,
+    showToast: (m) => toasts.push(m),
+    linkFolderSongs: require('../library-tools.js').linkFolderSongs,
+    stampAddedAt: (t) => ({ ...t, addedAt: 1 }),
+    renderPlaylistsList() {}, renderLocalView() {}, probeLinkedDurations: async () => {},
+    createPlaylist(name, tracks) {
+      const pl = { id: `pl_${ctx.state.playlists.length + 1}`, name, tracks: tracks.map(ctx.stampAddedAt) };
+      ctx.state.playlists.push(pl);
+      global.localStorage.setItem('devsize_playlists', JSON.stringify(ctx.state.playlists));
+      return pl;
+    },
+    fetch: async (url, init = {}) => {
+      const route = url.replace('http://127.0.0.1:1', '');
+      const body = init.body ? JSON.parse(init.body) : {};
+      const reply = (json, status = 200) => ({ ok: status < 400, status, json: async () => json });
+      if (init.method === 'POST') posts.push({ route, body });
+      if (route === '/api/library-link') {
+        for (const i of body.items) library.set(i.id, { id: i.id, platform: 'local', title: i.name, artist: 'Unknown artist', duration: 0, linked: true });
+        return reply({ success: true, count: body.items.length });
+      }
+      if (route === '/api/library-unlink') {
+        // server.js: a rescan's unlink (it sends `keep`) is refused while the songs are locked; the hook is the phone's own
+        if (Array.isArray(body.keep) && require('../mobile/shims/platform.js').linkedAccessLocked()) return reply({ success: false, code: 'MEDIA_PERMISSION_REQUIRED' }, 403);
+        const keep = new Set(body.keep || []);
+        const ids = [...library.values()].filter((t) => t.linked && !keep.has(t.id)).map((t) => t.id);
+        for (const id of ids) library.delete(id);
+        return reply({ success: true, ids });
+      }
+      if (route === '/api/library') return reply([...library.values()].map(({ linked, ...t }) => t));
+      throw new Error('unexpected ' + route);
+    },
+  };
+  vm.createContext(ctx);
+  vm.runInContext(['saveAllPlaylists', 'dropLinkedFromLists', 'importLocalFolders'].map(appFn).join('\n') + '\nthis.importLocalFolders = importLocalFolders;', ctx);
+  return { run: () => ctx.importLocalFolders(), ctx, library, posts, toasts, playlists: () => global.localStorage.getItem('devsize_playlists') };
+}
+
+test('MP-14: Folder playlists tapped with the permission off (or taken back mid-scan): no playlist loses a song, nothing is unlinked', async () => {
+  // permission given: playlists made
+  let live = launchLive();
+  await live.store.list();
+  let page = pagePlaylists(live.api);
+  await page.run();
+  assert.deepEqual(page.ctx.state.playlists.map((p) => [p.name, p.tracks.length]), [['Local files', 1], ['Album One', 2]]);
+  const saved = page.playlists();
+  const libraryBefore = JSON.stringify([...page.library.values()]);
+
+  // taken back; the person taps Folder playlists and says no to the dialog
+  audioGranted = false;
+  answer = 'deny';
+  live = launchLive();
+  await live.store.list();
+  const library = page.library;
+  const playlists = page.ctx.state.playlists;
+  page = pagePlaylists(live.api);
+  page.ctx.state.playlists = playlists;
+  for (const [id, t] of library) page.library.set(id, t);
+  await page.run();
+  assert.deepEqual(page.posts, [], 'nothing was linked or forgotten');
+  assert.equal(page.playlists(), saved, 'the playlists are what they were');
+  assert.equal(JSON.stringify([...page.library.values()]), libraryBefore);
+  assert.match(page.toasts.join('|'), /permission/);
+
+  // taken back in the middle of the scan: what the original code did was a "complete" scan that saw nothing, which forgot every song
+  audioGranted = true;
+  live = launchLive();
+  await live.store.list();
+  page = pagePlaylists(live.api);
+  page.ctx.state.playlists = playlists;
+  for (const [id, t] of library) page.library.set(id, t);
+  const realReaddir = Filesystem.readdir;
+  let reads = 0;
+  Filesystem.readdir = async (o) => { if (++reads === 1) audioGranted = false; return realReaddir(o); };
+  try { await page.run(); } finally { Filesystem.readdir = realReaddir; }
+  assert.deepEqual(page.posts, [], 'nothing was linked or forgotten');
+  assert.equal(page.playlists(), saved);
+  assert.equal(JSON.stringify([...page.library.values()]), libraryBefore);
+  assert.deepEqual(deleted, []);
+});
+
+test('MP-15: after the permission is back, Folder playlists again makes no second playlist and takes nothing out', async () => {
+  let live = launchLive();
+  await live.store.list();
+  let page = pagePlaylists(live.api);
+  await page.run();
+  const playlists = page.ctx.state.playlists;
+  const library = page.library;
+  const named = () => playlists.map((p) => p.name);
+
+  audioGranted = false;
+  live = launchLive();
+  await live.store.list();
+  audioGranted = true;
+  await live.foreground();
+  for (let n = 0; n < 2; n++) {
+    page = pagePlaylists(live.api);
+    page.ctx.state.playlists = playlists;
+    for (const [id, t] of library) page.library.set(id, t);
+    await page.run();
+    assert.deepEqual(named(), ['Local files', 'Album One'], `run ${n + 1}: no duplicate playlists`);
+    assert.deepEqual(playlists.map((p) => p.tracks.length), [1, 2]);
+    assert.equal(page.library.size, 3, 'every linked song is still known');
+  }
+});
+
+test('MP-16: a first-time user (permission never given, so locked at launch) allows it in the dialog and the playlists are made: the lock is not stale', async () => {
+  audioGranted = false;
+  answer = 'allow';
+  const live = launchLive();
+  await live.store.list();
+  assert.equal(live.store.linkedAccess().locked, true, 'nothing is linked yet, but the permission is not there');
+  const page = pagePlaylists(live.api);
+  await page.run();
+  assert.deepEqual(page.ctx.state.playlists.map((p) => [p.name, p.tracks.length]), [['Local files', 1], ['Album One', 2]]);
+  assert.deepEqual(page.posts.map((p) => p.route), ['/api/library-link', '/api/library-unlink'], 'the rescan\'s unlink was allowed: the permission is there now');
+  assert.deepEqual(live.store.linkedAccess(), { locked: false, canAsk: false }, 'unlocked the moment it was given, not at the next time the app comes to the front');
+  assert.deepEqual(page.toasts.filter((t) => /Could not/.test(t)), []);
+});
+
+test('MP-17: Retry of a move that waited for the permission: allowed in the dialog, the linked songs unlock at once (not at the next foreground)', async () => {
+  audioGranted = false;
+  answer = 'allow';
+  let live = launchLive();
+  await live.store.list();
+  await live.store.setDownloadDir('Download/Muriel songs', { move: true });
+  assert.equal(journal().last.permission, true, 'the other apps\' songs in the old folder are hidden: the move waits for the permission');
+  live = launchLive();
+  await live.store.list();
+  assert.equal(live.store.linkedAccess().locked, true);
+  assert.equal((await live.api.getMediaAccess()).locked, true, 'the page looks at start');
+  asked.length = 0;
+  const res = await live.api.retryMove();
+  assert.deepEqual(asked, [{ settings: false }], 'the system dialog came first');
+  assert.equal(res.ok, true);
+  assert.deepEqual(live.store.linkedAccess(), { locked: false, canAsk: false });
+  assert.deepEqual(accessEvents(live.events).map((d) => d.locked), [true, false]);
 });

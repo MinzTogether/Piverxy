@@ -132,6 +132,56 @@ function chooseDownloadFolder(current) {
   });
 }
 
+// What a locked song says when it is asked to play (Android): music access is off, nothing was removed, and the way back is the
+// app's page in Settings (a permission turned off there is not asked for again by a system dialog). Resolves 'settings' once
+// that page was opened, or null for "not now". Only one is ever open; `close` shuts it when the permission turns up again.
+const MEDIA_PROMPT_TEXT = "Muriel can't read the songs from your folders because the permission to read music and audio (Files and media on Android 11 and 12) is turned off. Your playlists and files are untouched. Turn it back on in the app settings and the songs play again.";
+let mediaPrompt = null;
+function askForMediaAccess({ openSettings }) {
+  if (mediaPrompt) return mediaPrompt.promise;
+  const mk = (tag, css, text, words) => {
+    const n = document.createElement(tag);
+    if (css) n.style.cssText = css;
+    if (text != null) n.textContent = text;
+    if (words) n.setAttribute('data-i18n', '');
+    return n;
+  };
+  const wrap = document.createElement('div');
+  wrap.className = 'modal-backdrop';
+  wrap.id = 'media-access-prompt';
+  const card = document.createElement('div');
+  card.className = 'dialog-card';
+  card.appendChild(mk('h3', '', 'Music access is off', true));
+  card.appendChild(mk('p', 'margin:8px 0 0;line-height:1.45;',
+    MEDIA_PROMPT_TEXT, true));
+  const actions = document.createElement('div');
+  actions.className = 'dialog-actions';
+  const cancel = mk('button', '', 'Not now', true);
+  cancel.className = 'btn-outline-pill';
+  cancel.id = 'btn-cancel-media-access'; // the Android back button presses this (bridge.js)
+  const open = mk('button', '', 'Open app settings', true);
+  open.className = 'btn-pill-primary';
+  open.id = 'btn-open-app-settings';
+  actions.append(cancel, open);
+  card.appendChild(actions);
+  wrap.appendChild(card);
+  let resolveIt;
+  const promise = new Promise((resolve) => { resolveIt = resolve; });
+  const close = (value) => {
+    if (mediaPrompt && mediaPrompt.wrap === wrap) mediaPrompt = null;
+    wrap.classList.remove('visible');
+    setTimeout(() => wrap.remove(), 220);
+    resolveIt(value);
+  };
+  cancel.addEventListener('click', () => close(null));
+  wrap.addEventListener('click', (e) => { if (e.target === wrap) close(null); });
+  open.addEventListener('click', async () => { try { await openSettings(); } catch (e) {} close('settings'); });
+  mediaPrompt = { wrap, promise, close };
+  document.body.appendChild(wrap);
+  requestAnimationFrame(() => requestAnimationFrame(() => wrap.classList.add('visible')));
+  return promise;
+}
+
 const extOf = (name) => (name.match(/\.([a-z0-9]+)$/i) || [, 'bin'])[1].toLowerCase();
 const noop = () => {};
 
@@ -165,13 +215,20 @@ module.exports = function electronAPI({ ready, port, fs, fileUrlFor }) {
       if (!access.granted) {
         const settings = !access.canAsk;
         access = await store.readAccess({ ask: true, settings });
-        if (!access.granted) return { needsPermission: true, settingsOpened: settings };
+        if (!access.granted) { await syncMediaAccess(); return { needsPermission: true, settingsOpened: settings }; }
         justAllowed = true;
       }
     }
+    // The permission may just have been given (in the dialog above), or have changed some other way since the app last looked: the
+    // linked songs unlock (or lock) now. The server refuses to forget songs while they are locked, so a lock that is out of date
+    // would stop this very scan from finishing.
+    await syncMediaAccess();
     const found = await store.scanLinked();
     if (!found) return { unavailable: true };
     if (found.failed) return { failed: true };
+    // The permission went away between the check above and the scan (or during it). What such a scan saw says nothing about the
+    // songs: nothing is linked, forgotten or remembered from it. The page is told, and says what to do.
+    if (found.locked) return { needsPermission: true, settingsOpened: false };
     const groups = [];
     for (const g of found.groups) {
       const items = [];
@@ -202,11 +259,52 @@ module.exports = function electronAPI({ ready, port, fs, fileUrlFor }) {
       if (!access.granted) {
         const settings = !access.canAsk;
         access = await store.readAccess({ ask: true, settings });
+        await syncMediaAccess(); // given (or refused) just now: the linked songs unlock (or stay locked) at once
         if (!access.granted) return { ok: false, needsPermission: true, settingsOpened: settings, ...store.moveStatus() };
       }
     }
     toast(Tm('Moving your songs…'), 'info');
     return store.retryMove();
+  }
+
+  // ---- Android: the permission behind the songs linked in place (shims/store.js) ----
+  // The linked songs lock while Muriel may not read music and audio, and unlock when it may again; nothing is removed either
+  // way. The page hears of every change as 'muriel:media-access' ({ locked, canAsk, restored }), and can ask at any time
+  // (getMediaAccess). It is looked at again whenever the app comes back to the front: the person may have been in Settings.
+  let lastAccess = null; // what the page was last told
+  let looking = null;    // a look at the permission that is going on: asked again meanwhile, it is the same look
+  async function getMediaAccess() {
+    await ready;
+    if (!looking) {
+      looking = store.refreshLinkedAccess((entries) => { for (const e of entries) fs._register(e.vpath, e.size); })
+        .finally(() => { looking = null; });
+    }
+    const r = await looking;
+    const now = { locked: !!r.locked, canAsk: !!r.canAsk };
+    if (!now.locked && mediaPrompt) mediaPrompt.close(null); // given back while the prompt was up
+    if (!lastAccess || now.locked !== lastAccess.locked || now.canAsk !== lastAccess.canAsk) {
+      lastAccess = now;
+      try { window.dispatchEvent(new CustomEvent('muriel:media-access', { detail: { ...now, restored: r.restored || 0 } })); } catch (e) {}
+    }
+    return now;
+  }
+  // looks at the permission again, and never fails the caller: used after the app itself asked for it
+  const syncMediaAccess = () => getMediaAccess().catch(() => {});
+  // the app's page in Settings, where "Permissions" turns it back on (older builds of the plugin: the dialog, or that page when
+  // the dialog can't come any more)
+  async function openAppSettings() {
+    const media = Capacitor.Plugins && Capacitor.Plugins.MurielMedia;
+    if (!media) return false;
+    try { await media.openAppSettings(); return true; } catch (e) {}
+    try { await media.allowAudioAccess({ settings: true }); return true; } catch (e) { return false; }
+  }
+  if (ANDROID) {
+    const lookAgain = () => { getMediaAccess().catch(() => {}); };
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) lookAgain(); });
+    try {
+      const { App } = require('@capacitor/app');
+      if (App && typeof App.addListener === 'function') App.addListener('appStateChange', (state) => { if (state && state.isActive) lookAgain(); });
+    } catch (e) {}
   }
 
   return {
@@ -312,7 +410,11 @@ module.exports = function electronAPI({ ready, port, fs, fileUrlFor }) {
       if (!res.ok) return { ...res, error: Tm(res.error) };
       return { ...res, unlinked: await forgetLinked(), restart: true };
     },
-    ...(ANDROID ? { scanLocalFolders, getMoveStatus, retryMove } : {}),
+    ...(ANDROID ? {
+      scanLocalFolders, getMoveStatus, retryMove,
+      getMediaAccess, openAppSettings,
+      promptMediaAccess: () => askForMediaAccess({ openSettings: openAppSettings }),
+    } : {}),
     restartApp: () => location.reload(),
     getAppVersion: async () => { const b = window.MURIEL_BUILD || {}; return b.version ? `${b.version}${b.run ? ` (build ${b.run})` : ''}` : '1.1.2'; },
     getHwAccel: async () => true,
@@ -368,3 +470,4 @@ module.exports = function electronAPI({ ready, port, fs, fileUrlFor }) {
 
 // for test/android-picker.test.js
 module.exports.chooseDownloadFolder = chooseDownloadFolder;
+module.exports.MEDIA_PROMPT_TEXT = MEDIA_PROMPT_TEXT;

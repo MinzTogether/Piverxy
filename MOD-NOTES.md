@@ -69,6 +69,18 @@ Từ Android 11, app chỉ thấy tệp do chính nó tạo. Nhạc bạn chép 
 - Được cấp xong thì quét tiếp ngay, và các bài trong thư mục tải mà trước đó bị ẩn cũng hiện ra mà không cần khởi động lại app.
 - Bị từ chối: app báo cần làm gì. Từ chối hẳn thì lần bấm sau mở trang cài đặt của app (bật mục nhạc và âm thanh, hoặc "Tệp và đa phương tiện" trên Android 11-12).
 
+### Quyền bị thu hồi (Settings → Apps → Muriel Mod → Permissions)
+
+Tắt quyền này thì các bài **liên kết tại chỗ** (thư mục ngang hàng với thư mục tải) bị **khoá tạm thời**: Android không cho đọc, nhưng bài vẫn ở trong thư viện và mọi playlist. Không bài nào bị gỡ liên kết, bị quên hay bị xoá vì lỗi quyền; bật lại quyền là phát lại được.
+- Khoá chỉ là trạng thái tính từ quyền *hiện tại* (`store.linkedAccess()`), không lưu ở đâu nên không bao giờ bị kẹt. Được kiểm tra lại: lúc mở app, khi app quay lại màn hình (`visibilitychange` + `appStateChange`), trước mỗi lần quét, và ngay sau mỗi lần app tự xin quyền. Quên bước cuối thì khoá cũ sẽ chặn nhầm lần quét đầu tiên của người mới (test MP-16).
+- Mở app khi chưa có quyền: `listLinked` không quét thư mục (Android chỉ trả về rỗng hoặc một phần) và không đụng vào `SIB_KEY`. Có quyền lại thì các bài được đưa vào chỉ mục tệp **trước**, rồi mới mở khoá (`refreshLinkedAccess`).
+- `scanLinked` không quét và không ghi `SIB_KEY` khi thiếu quyền (trả `{ locked: true }`; kiểm tra lại sau khi quét xong, phòng quyền bị thu hồi giữa chừng). Trước đây một lần quét "đầy đủ nhưng không thấy gì" ghi đè danh sách thư mục đã nhớ và để `/api/library-unlink` quên hết bài, kéo theo mất bài khỏi mọi playlist.
+- `server.js`: bài bị khoá trả `403 { code: "MEDIA_PERMISSION_REQUIRED" }` ở `/api/library-file` (không còn là 404 "File not found"); `/api/library-unlink` có `keep` (kiểu quét lại) bị từ chối khi đang khoá (quên cả loạt có chủ ý khi đổi thư mục tải thì không có `keep` nên vẫn chạy). `/api/library?locked=1` thêm `locked: true`; chỉ khi được hỏi vì danh sách thường được chép nguyên vào playlist và yêu thích, nơi dấu tạm thời sẽ bị lưu lại.
+- Trang (`app.js`): `playTrack` chặn bài bị khoá ngay dòng đầu (không vào hàng đợi, lịch sử hay Audio Engine) và hiện hộp thoại *Music access is off* với nút **Open app settings** (`MediaControlsPlugin.openAppSettings`), vì quyền đã tắt trong Settings thường không được hộp thoại hệ thống hỏi lại. Hàng bị khoá được làm mờ. Lỗi phát của bài bị khoá không còn bị coi là "file missing" và không bị tự nhảy qua bài khác.
+- **Không bao giờ bị khoá:** bài đã nhập vào thư viện (nằm trong thư mục riêng của app), bài app tải về, và mọi thứ của thư mục "App folder".
+- Giới hạn có sẵn từ trước (chưa sửa, không thuộc lỗi này): Android 10 trở xuống mất quyền thì cả thư mục chung đều không dùng được (`listDownloads` đặt `pub = null`), nên cả bài app tự tải vào `Music/Muriel Mod` cũng tạm không phát được; tệp vẫn nguyên trên máy.
+- Chưa thử trên máy thật. Các bước kiểm tra nằm trong `FIX-REPORT-MEDIA-PERMISSION.md`.
+
 ## Dịch thuật
 
 Muriel dịch giao diện bằng máy lúc chạy (`i18n.js`), không có bảng dịch tĩnh. Nhãn trong `index.html` (nút *Folder playlists* và `title` của nó) tự được dịch cùng cả trang. Phần tạo bằng code thì đã nối vào hệ thống:
@@ -79,14 +91,14 @@ Muriel dịch giao diện bằng máy lúc chạy (`i18n.js`), không có bảng
 ## Các tệp đã sửa
 
 - `android/app/build.gradle`, `res/values/strings.xml`, `capacitor.config.json` — tên gói và tên app riêng cho bản mod
-- `android/app/src/main/AndroidManifest.xml`, `MediaControlsPlugin.java` — quyền đọc nhạc; `sameFile` (so sánh byte)
+- `android/app/src/main/AndroidManifest.xml`, `MediaControlsPlugin.java` — quyền đọc nhạc; `sameFile` (so sánh byte); `openAppSettings` (mở trang cài đặt của app)
 - `android/app/src/main/java/.../FileCompare.java` — so sánh hai tệp từng khối 64 KB (thuần Java); `android/app/src/test/java/.../FileCompareTest.java` — 6 test JUnit (`./gradlew testDebugUnitTest`)
-- `mobile/shims/store.js` — vị trí tải cấu hình được, kiểm tra ghi, di chuyển tệp (nhật ký không bao giờ bị bỏ khi còn việc dở), quét thư mục ngang hàng (giới hạn toàn cục, không ghi đè danh sách khi quét dở); `moveStatus`, `retryMove`
-- `mobile/electron-api.js` — bảng chọn thư mục (có dịch); `scanLocalFolders`; `getMoveStatus`, `retryMove`
+- `mobile/shims/store.js` — vị trí tải cấu hình được, kiểm tra ghi, di chuyển tệp (nhật ký không bao giờ bị bỏ khi còn việc dở), quét thư mục ngang hàng (giới hạn toàn cục, không ghi đè danh sách khi quét dở); `moveStatus`, `retryMove`; khoá bài khi mất quyền (`linkedAccess`, `refreshLinkedAccess`, `isLinkedLocked`)
+- `mobile/electron-api.js` — bảng chọn thư mục (có dịch); `scanLocalFolders`; `getMoveStatus`, `retryMove`; `getMediaAccess`, `openAppSettings`, `promptMediaAccess` (hộp thoại khi bài bị khoá)
 - `library-tools.js` — `linkFolderSongs` (liên kết rồi mới quên bài, chỉ khi an toàn)
-- `mobile/shims/platform.js`, `server.js` — `LOCAL_LINK_DIR`, `/api/library-link`, `/api/library-unlink`, đọc tệp theo `item.path`
+- `mobile/shims/platform.js`, `server.js` — `LOCAL_LINK_DIR`, `/api/library-link`, `/api/library-unlink`, đọc tệp theo `item.path`; `linkedAccessLocked` và lỗi `MEDIA_PERMISSION_REQUIRED`
 - `app.js`, `index.html`, `mobile/mobile.css`, `mobile/bridge.js`, `profiles-core.js` — nút, luồng quét/tạo playlist, hiện nút Change trên Android, 2 khoá chỉ-của-máy; dòng trạng thái việc chuyển + nút Retry và các thông báo sau khi đổi thư mục
-- `test/android-store.test.js`, `test/library-link.test.js`, `test/android-picker.test.js`, `test/library-tools.test.js` — test cho app bị đóng giữa chừng, trùng tên (cùng dung lượng khác nội dung), thử lại nhiều lần, đọc thư mục lỗi / thư mục đã mất, xoá bản cũ thất bại, quét đọc dở, giới hạn toàn cục, bảng chọn, quyền đọc nhạc, trạng thái và Retry; `test/phone-store.test.js` — đổi tên thư mục mặc định
+- `test/android-store.test.js`, `test/library-link.test.js`, `test/android-picker.test.js`, `test/library-tools.test.js` — test cho app bị đóng giữa chừng, trùng tên (cùng dung lượng khác nội dung), thử lại nhiều lần, đọc thư mục lỗi / thư mục đã mất, xoá bản cũ thất bại, quét đọc dở, giới hạn toàn cục, bảng chọn, quyền đọc nhạc, trạng thái và Retry; `test/phone-store.test.js` — đổi tên thư mục mặc định; `test/media-permission-server.test.js`, `test/media-permission-page.test.js` (và các test `MP-*` trong `android-store.test.js`) — quyền bị thu hồi: khoá bài, chặn phát, không bài nào bị quên/xoá, mở khoá khi có quyền lại
 
 ## Build
 

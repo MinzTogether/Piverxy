@@ -258,7 +258,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     'Local files', 'Looking for songs next to the download folder...', 'Playlists are up to date',
     'Downloads are kept inside the app, so there is no folder next to them. Pick a download folder in Settings first.',
     'Could not read the folders next to the download folder', 'Some folders could not be read, so songs that are not listed were kept',
-    'No songs found next to the download folder ({0})', 'Added {0} songs, {1} new playlists', 'Added {0} new songs to your folder playlists']);
+    'No songs found next to the download folder ({0})', 'Added {0} songs, {1} new playlists', 'Added {0} new songs to your folder playlists',
+    'Music access is off', "Muriel can't read the songs from your folders because the permission to read music and audio (Files and media on Android 11 and 12) is turned off. Your playlists and files are untouched. Turn it back on in the app settings and the songs play again.",
+    'Not now', 'Open app settings']);
 
   const toastQueue = [];
   const MAX_QUEUED_TOASTS = 10;
@@ -3782,8 +3784,51 @@ document.addEventListener('DOMContentLoaded', async () => {
     return true;
   }
 
+  // ---- Android: songs linked from the folders next to the download folder (mobile/shims/store.js) ----
+  // They are LOCKED while Muriel may not read music and audio (Android 11+: the permission can be taken back in Settings).
+  // Locked is not missing, and nothing is done to them for it: they stay in the library and in every playlist, nothing is
+  // unlinked or deleted, and they play again as soon as the permission is back. state.lockedIds holds the songs the server says
+  // are locked right now; it is never saved.
+  function isMediaLocked(track) {
+    return !!(track && track.platform === 'local' && state.lockedIds && state.lockedIds.has(track.id));
+  }
+
+  // what the person is told when a locked song is asked for: the app's own prompt, with the way to the settings page where the
+  // permission is turned on (mobile/electron-api.js). One at a time. The queue, the history and the player are left alone.
+  function promptMediaAccess() {
+    if (window.electronAPI && window.electronAPI.promptMediaAccess) Promise.resolve(window.electronAPI.promptMediaAccess()).catch(() => {});
+  }
+
+  function markLockedRows() {
+    document.querySelectorAll('.track-row[data-track-id]').forEach((row) => {
+      row.classList.toggle('is-locked', !!state.lockedIds && state.lockedIds.has(row.dataset.trackId));
+    });
+  }
+
+  // The phone's answer about the permission, { locked, canAsk }: at start, whenever the app comes back to the front, and when a
+  // locked song was asked for. Which songs are locked comes from the library list, which marks them when asked (?locked=1).
+  let mediaAccessSeq = 0;
+  async function applyMediaAccess(access) {
+    const mine = ++mediaAccessSeq;
+    const locked = !!(access && access.locked);
+    state.mediaAccess = { locked, canAsk: !!(access && access.canAsk) };
+    const ids = new Set();
+    if (locked) {
+      try {
+        const res = await fetch(`http://127.0.0.1:${state.serverPort}/api/library?locked=1`);
+        if (res.ok) for (const t of await res.json()) if (t && t.locked) ids.add(t.id);
+      } catch (e) {}
+    }
+    if (mine !== mediaAccessSeq) return; // a newer answer came in while the list was on its way
+    state.lockedIds = ids;
+    markLockedRows();
+  }
+
   async function playTrack(track, queueList = null, startIndex = -1, context = null) {
     if (!track || !el.nativeAudio) return;
+    // A locked song is not played, not queued and not counted as played: the prompt says what to do, and whatever is playing goes
+    // on. Before anything of the player is touched, so nothing of it reaches the audio engine without the permission.
+    if (isMediaLocked(track)) { promptMediaAccess(); return; }
     resetLevelWatcher();
     vizPrev = null;
     if (state.currentTrack && state.currentTrack.id !== track.id && !navigatingBack) pushPlayHistory(state.currentTrack);
@@ -6461,6 +6506,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       logPlaybackIssue('Audio element error', null);
       state.isPlaying = false;
       document.body.classList.remove('is-playing');
+      // a locked song (the music permission is off) is not a broken one: no retry, no skipping on through the queue, no "file missing"
+      if (isMediaLocked(state.currentTrack)) { setTrackLoading(false); updatePlayPauseButton(false, false); promptMediaAccess(); return; }
       if (tryProxyFallback(state.loadToken, state.currentTrack)) return;
       if (retryFresh(state.loadToken, state.currentTrack)) return;
       updatePlayPauseButton(false, false);
@@ -7792,6 +7839,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       row.dataset.trackId = track.id || '';
       row.dataset.trackTitle = track.title || '';
       row.dataset.trackArtist = track.artist || '';
+      if (isMediaLocked(track)) row.classList.add('is-locked');
 
       row.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -10503,6 +10551,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     btnScanLocalFolders.addEventListener('click', () => importLocalFolders());
   }
   if (el.btnAddLocalFilesEmpty) el.btnAddLocalFilesEmpty.addEventListener('click', () => importLocalFiles());
+  // Android: locked songs (see isMediaLocked). The phone looks at the permission at start and whenever the app comes back to the
+  // front, and says when it changed; the page asks once now, since it may have missed what was said before it listened.
+  if (isPhoneApp && window.electronAPI && window.electronAPI.getMediaAccess) {
+    const askAccess = () => Promise.resolve(window.electronAPI.getMediaAccess()).then(applyMediaAccess).catch(() => {});
+    window.addEventListener('muriel:media-access', (e) => { applyMediaAccess(e.detail); });
+    // the player's file route said a song is locked before the page knew: that song is locked, whatever the list said
+    window.addEventListener('muriel:media-permission-required', (e) => {
+      const id = e.detail && e.detail.id;
+      if (id) { if (!state.lockedIds) state.lockedIds = new Set(); state.lockedIds.add(id); markLockedRows(); }
+      askAccess();
+    });
+    askAccess();
+  }
 
   if (el.btnAutoRemix) {
     el.btnAutoRemix.addEventListener('click', () => {

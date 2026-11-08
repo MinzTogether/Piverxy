@@ -300,6 +300,30 @@ function saveLibraryIndex() {
 function isLinkedPath(p) {
   return !!LOCAL_LINK_DIR && typeof p === 'string' && p.startsWith(LOCAL_LINK_DIR + '/') && !p.split('/').includes('..');
 }
+
+// Phones (Android 11+): a linked song lives in shared storage, which Muriel can read only while it may read music and audio.
+// When that permission is taken back (Settings -> Apps -> Muriel -> Permissions) the songs are LOCKED: still in the library
+// and in every playlist, never unlinked or deleted for it, but not served. A request for one is answered with the error
+// below, which the page turns into "allow access" instead of a song that fails to load. Computers and iPhones have no such
+// hook (platform.linkedAccessLocked), so nothing there is ever locked. Asked on every use: it changes while the server runs.
+const MEDIA_PERMISSION_REQUIRED = 'MEDIA_PERMISSION_REQUIRED';
+function linkedMediaLocked() {
+  try {
+    const locked = require('./platform').linkedAccessLocked;
+    return typeof locked === 'function' && !!locked();
+  } catch (e) {
+    return false;
+  }
+}
+function sendMediaPermissionRequired(res) {
+  res.writeHead(403, { 'Content-Type': 'application/json' });
+  return res.end(JSON.stringify({
+    success: false,
+    error: MEDIA_PERMISSION_REQUIRED,
+    code: MEDIA_PERMISSION_REQUIRED,
+    message: 'Muriel needs permission to read music and audio to play songs from your folders. Nothing was removed.'
+  }));
+}
 function libraryFilePath(item) {
   if (!item) return null;
   if (item.path) return isLinkedPath(item.path) ? item.path : null;
@@ -2772,6 +2796,8 @@ async function handleLibraryFile(req, res, trackId) {
     res.writeHead(404);
     return res.end('File not found in library');
   }
+  // locked, not missing: the file is still where the person keeps it, Android just refuses the read for now
+  if (isLinkedPath(filePath) && linkedMediaLocked()) return sendMediaPermissionRequired(res);
   try {
     const stat = await fs.promises.stat(filePath);
     const fileSize = stat.size;
@@ -3137,6 +3163,9 @@ async function processLocalCovers() {
       const dest = localCoverPath(id);
       if (fs.existsSync(dest)) continue;
       const coverSrc = libraryFilePath(item);
+      // locked (see linkedMediaLocked): the picture inside the file can't be read now. An online cover found meanwhile would
+      // stay for good and hide it, so this one is left until the next time the library is listed with the songs readable.
+      if (coverSrc && isLinkedPath(coverSrc) && linkedMediaLocked()) { localCoverQueued.delete(id); continue; }
       let ok = coverSrc ? await extractEmbeddedCover(coverSrc, dest) : false;
       if (!ok) {
         // iTunes allows only a few lookups per minute, so space them out
@@ -6746,6 +6775,11 @@ const server = http.createServer(guardHandler(async (req, res) => {
     req.on('end', () => {
       try {
         const payload = JSON.parse(body || '{}');
+        // A rescan sends what it saw as `keep` and the songs that are not in it are forgotten. While the music permission is
+        // off a scan sees nothing of the songs it cannot read, which says nothing about whether they are still there:
+        // nothing is forgotten, and the page says what is wrong. (Forgetting them all on purpose, when the download folder
+        // changes, sends no `keep` and is the person's own doing.)
+        if (Array.isArray(payload.keep) && linkedMediaLocked()) return sendMediaPermissionRequired(res);
         const keep = new Set(Array.isArray(payload.keep) ? payload.keep.filter((x) => typeof x === 'string') : []);
         const ids = [];
         for (const id of Object.keys(libraryIndex)) {
@@ -6788,13 +6822,18 @@ const server = http.createServer(guardHandler(async (req, res) => {
   if (parsedUrl.pathname === '/api/library') {
     const items = Object.values(libraryIndex).sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
     queueLocalCovers(items.map(item => item.id));
+    // Linked songs that can't be read right now (see linkedMediaLocked) say so, and everything else about them is kept as it
+    // is. Only when asked (?locked=1): the list is copied whole into playlists and favorites, which are saved, and a mark that is
+    // true only for a while must not end up in them. Every other caller gets the list exactly as it always was.
+    const locked = parsedUrl.query.locked === '1' && linkedMediaLocked();
     const list = items.map(item => ({
         id: item.id,
         platform: 'local',
         title: item.title,
         artist: item.artist,
         duration: Number(item.duration) || 0,
-        thumbnail: fs.existsSync(localCoverPath(item.id)) ? withToken(`http://127.0.0.1:${PORT}/api/local-cover?id=${encodeURIComponent(item.id)}`) : ''
+        thumbnail: fs.existsSync(localCoverPath(item.id)) ? withToken(`http://127.0.0.1:${PORT}/api/local-cover?id=${encodeURIComponent(item.id)}`) : '',
+        ...(locked && isLinkedPath(item.path) ? { locked: true } : {})
       }));
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify(list));

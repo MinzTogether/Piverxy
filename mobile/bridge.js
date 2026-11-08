@@ -110,9 +110,15 @@ const abortError = () => new DOMException('The operation was aborted.', 'AbortEr
 
 const fileUrls = new Map();
 async function fileUrlFor(vpath) {
+  // A linked song is locked while Muriel may not read music and audio (shims/store.js): never from the cache either, the URL
+  // of a song that could be read a minute ago can't be now. It throws MEDIA_PERMISSION_REQUIRED, which is not a missing file.
+  if (store.isLinkedLocked(vpath)) throw Object.assign(new Error(store.MEDIA_PERMISSION_REQUIRED), { code: store.MEDIA_PERMISSION_REQUIRED });
   if (!fileUrls.has(vpath)) {
     await fs._flush(); // a just-written file must reach disk before the WebView reads it
-    fileUrls.set(vpath, store.fileUrl(vpath, mimeOf(vpath)));
+    // a failure is not kept: the same song asked for again later (the permission given back, say) is tried afresh
+    const url = store.fileUrl(vpath, mimeOf(vpath));
+    fileUrls.set(vpath, url);
+    url.catch(() => { if (fileUrls.get(vpath) === url) fileUrls.delete(vpath); });
   }
   return fileUrls.get(vpath);
 }
@@ -121,6 +127,16 @@ async function fileUrlFor(vpath) {
 async function resolveLocalUrl(u) {
   const r = await call(u);
   if (r.file) return fileUrlFor(r.file);
+  // The server says a linked song is locked (the music permission is off), not missing. The page hears it first, so it can
+  // say what to do instead of "file missing"; the element still gets its error afterwards (the caller's catch below).
+  let body = null;
+  if (r.status === 403) { try { body = JSON.parse(r.body); } catch (e) {} }
+  if (body && body.code === 'MEDIA_PERMISSION_REQUIRED') {
+    let id = '';
+    try { id = new URL(u).searchParams.get('id') || ''; } catch (e) {}
+    try { window.dispatchEvent(new CustomEvent('muriel:media-permission-required', { detail: { id } })); } catch (e) {}
+    throw Object.assign(new Error(`locked: ${u} (music permission is off)`), { code: 'MEDIA_PERMISSION_REQUIRED' });
+  }
   throw new Error(`no file behind ${u} (${r.status})`);
 }
 
