@@ -1,55 +1,145 @@
-# Muriel
+<div align="center">
+  <img src="assets/icon.png" alt="Piverxy app icon" width="112">
+  <h1>Piverxy</h1>
+  <p><strong>A music player for discovery, listening, and managing your personal library.</strong></p>
+  <p>
+    <a href="https://github.com/MinzTogether/Piverxy/releases/latest">Releases</a>
+    ·
+    <a href="https://github.com/MinzTogether/Piverxy/issues">Issues</a>
+    ·
+    <a href="LICENSE">MIT License</a>
+  </p>
+</div>
 
-A lightweight desktop music player for Windows, Linux and macOS. Stream from YouTube, YouTube Music and SoundCloud, download for offline listening, and keep a local library — no account, no subscription.
+---
 
-Muriel is based on [Riff](https://github.com/rootscripts/riff) by rootscripts (MIT).
-
-> Muriel is an independent, non-commercial open-source project and is not affiliated with YouTube, Google,
-> SoundCloud, Spotify or Apple. It hosts no music. Use it for private listening and only download music you
-> have the right to. See [LEGAL.md](LEGAL.md) (also for rights holders).
+Piverxy is a cross-platform music player built around a simple idea: bring music discovery, streaming, local files, and playback tools together in one place. It combines an Electron desktop app with Capacitor-based Android and iOS builds.
 
 ## Features
 
-- **Streaming & downloads** — YouTube, YouTube Music and SoundCloud via yt-dlp and ffmpeg (installed automatically on first run)
-- **Local library** — reads tags and album art, folders and playlists, original files stay untouched
-- **Lyrics** — online synced lyrics, LRC files, manual timing, fullscreen karaoke
-- **Audio** — EQ, presets, real-time speed, reverb, and a small editor for trimming and exporting clips
-- **Compact layout** — slim navigation rail, slide-over drawer for now playing, lyrics and the queue
-- **Custom background** — image, GIF or video, with optional glass blur on the interface; pauses while Muriel is hidden
-- **Performance settings** — lightweight thumbnails, blur on/off, visualizer frame-rate cap, memory trimming in the background, hardware acceleration toggle
+### Discover and listen
+- Search for and play music from **YouTube**, **YouTube Music**, and **SoundCloud**.
+- Save supported tracks for offline listening.
+- Browse recommendations and your listening history.
 
-## Getting started
+### Your music library
+- Play audio files stored on your device.
+- Organize favorites, albums, artists, and playlists.
+- On mobile, create playlists from audio folders without copying or moving the original files.
+- Manage downloads and local music from one library.
 
-Requires Node.js 18 or newer.
+### Lyrics and audio tools
+- Find online lyrics and load local **LRC** files.
+- Follow synchronized lyrics, use manual timing, or open fullscreen karaoke mode.
+- Adjust playback with an equalizer, presets, speed controls, and reverb.
+- Trim tracks and export audio clips.
 
-```bash
-git clone https://github.com/cloverscripts/riff-muriel.git
-cd riff-muriel
-npm install
+### Personalization and convenience
+- Customize the background with an image, GIF, or video.
+- Adjust visual effects, blur, and visualizer settings.
+- Use compact playback and lyrics views.
+- Keep separate profiles, back up and restore app data, and use sharing or sync features.
+- Connect integrations such as Discord Rich Presence and Last.fm.
+
+### Mobile experience
+- Android and iOS builds use Capacitor.
+- Support for background audio and native media controls.
+- Mobile-specific library and file access features.
+- Startup and content caching to make repeat launches smoother.
+
+## Downloads
+
+Choose the build for your device:
+
+| Platform | Available build |
+| --- | --- |
+| Windows | Portable executable and release installer |
+| Linux | AppImage |
+| macOS | DMG and ZIP (Intel and Apple silicon) |
+| Android | APK |
+| iOS | Unsigned IPA for sideloading |
+
+- [Latest desktop release](https://github.com/MinzTogether/Piverxy/releases/latest)
+- [Latest Windows build](https://github.com/MinzTogether/Piverxy/releases/tag/windows-latest)
+- [Latest Android APK](https://github.com/MinzTogether/Piverxy/releases/tag/android-latest)
+- [Latest iOS IPA](https://github.com/MinzTogether/Piverxy/releases/tag/ios-latest)
+
+The Android and iOS rolling builds are published by GitHub Actions. The iOS IPA is unsigned and must be signed for installation with a sideloading tool such as AltStore, SideStore, or Sideloadly. Availability of signing and installation methods depends on your Apple account and device.
+
+## Run from source
+
+### Requirements
+
+- Git
+- **Node.js 22 or newer**
+- npm
+
+### Desktop
+
+~~~bash
+git clone https://github.com/MinzTogether/Piverxy.git
+cd Piverxy
+npm ci
 npm start
-```
+~~~
 
-## Building
+### Run the tests
 
-```bash
+~~~bash
+npm test
+~~~
+
+### Package the desktop app
+
+~~~bash
 npm run dist
-```
+~~~
 
-Installers land in `dist/`. Builds are unsigned: on macOS, right-click Muriel in Applications and choose Open; if macOS says the app is damaged, run `xattr -cr /Applications/Muriel.app`.
+Build output is written to <code>dist/</code>. Desktop packaging is intended to run on the target operating system; Windows, Linux, and macOS use their respective Electron Builder targets.
 
-## Data
+## Build the mobile projects
 
-- Windows: `%LOCALAPPDATA%\Muriel`
-- macOS: `~/Library/Application Support/Muriel`
-- Linux: `~/.cache/muriel` (settings in `~/.config/muriel`)
+First install the npm dependencies as shown above, then generate the mobile web bundle:
 
-## Legal
+~~~bash
+node mobile/build.mjs
+~~~
 
-Muriel is a player: it doesn't host, upload or sell music, has no ads, accounts or tracking, and nobody earns
-money from it. You're responsible for using it in line with copyright and the terms of the services you use.
-Rights holders can reach us through a [rights holder request](https://github.com/cloverscripts/riff-muriel/issues/new?template=rights-holder-request.yml).
-Details, also in German: [LEGAL.md](LEGAL.md).
+Sync the generated bundle into the native project you want to build:
 
-## License
+**Android**
+~~~bash
+npx cap sync android
+~~~
 
-MIT. See [LICENSE](LICENSE). Original Riff code © rootscripts.
+Open the <code>android/</code> project in Android Studio, or build it with the included Gradle wrapper.
+
+**iOS (macOS with Xcode)**
+~~~bash
+npx cap sync ios
+~~~
+
+Open <code>ios/App/App.xcodeproj</code> in Xcode to build the iOS app. The automated iOS workflow creates an unsigned IPA.
+
+## Project structure
+
+| Path | Purpose |
+| --- | --- |
+| <code>index.html</code>, <code>styles.css</code>, <code>app.js</code> | Main user interface |
+| <code>main.js</code>, <code>preload.js</code>, <code>server.js</code> | Electron entry point, secure bridge, and local app server |
+| <code>mobile/</code> | Capacitor bridge, mobile UI, and mobile-specific services |
+| <code>android/</code>, <code>ios/</code> | Native Android and iOS projects |
+| <code>assets/</code> | App icons and bundled frontend assets |
+| <code>test/</code> | Automated tests |
+
+## Credits and license
+
+Piverxy is a modified and independently maintained project based on [Muriel](https://github.com/cloverscripts/riff-muriel), which in turn originated from [Riff](https://github.com/rootscripts/riff).
+
+The upstream MIT license and copyright notice are retained in [LICENSE](LICENSE). Please keep the license and attribution notices with redistributed copies.
+
+## Legal note
+
+Piverxy does not host music. You are responsible for respecting copyright, the terms of the services you use, and the rights of artists and content owners. Only download or keep content that you own or are authorized to download.
+
+Piverxy is an independent project and is not affiliated with, endorsed by, or sponsored by YouTube, YouTube Music, Google, SoundCloud, or their respective owners.
