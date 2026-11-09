@@ -234,6 +234,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // the same for what the Android mod shows from code: the download folder sheet (mobile/electron-api.js), its errors and
   // the playlists made from the folders next to the download folder. The sheet and these toasts are made after the page
   // was read, so they are not picked up from index.html.
+  if (I18N.known) I18N.known(['App cache cleared']);
   if (I18N.known) I18N.known(['Moving your songs…', 'Download folder', 'App folder', 'Another folder', 'Folder name', 'Cancel', 'Use this folder',
     'Move the songs I already downloaded', 'Music apps and file managers find it', 'Next to your other downloads',
     "Needs no permission. File managers on Android 11+ can't open it",
@@ -17587,6 +17588,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     const sig = `${state.history.length}:${state.favorites.length}:${state.history[0] ? state.history[0].id : ''}`;
     if (!force && sig === forYouSig) return;
     forYouSig = sig;
+    // App cache (phone): what the last launch showed is on screen at once; the fresh answer below replaces it, and if
+    // that never comes (offline) it simply stays.
+    const appCache = window.MurielAppCache;
+    if (appCache && appCache.home && !force && !box.childElementCount) {
+      const saved = appCache.home.readForYou();
+      if (saved) { try { paintForYou(box, saved); } catch (e) {} }
+    }
     let data = null;
     try {
       const res = await fetch(`http://127.0.0.1:${state.serverPort}/api/discover`, {
@@ -17598,6 +17606,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     // forget the signature on a failed (or offline, empty) load, or "For you" stayed empty until the history changed
     const empty = !data || !data.success || (!(data.genres || []).length && !(data.sections || []).some((x) => (x.items || x.tracks || []).length));
     if (empty) { if (forYouSig === sig) forYouSig = ''; return; }
+    if (appCache && appCache.home) appCache.home.writeForYou(data);
+    paintForYou(box, data);
+  }
+
+  // draws the "For you" rows: the fresh answer, or the app cache's copy until that arrives
+  function paintForYou(box, data) {
     box.innerHTML = '';
     const section = (title) => {
       const block = document.createElement('div');
@@ -18082,6 +18096,25 @@ document.addEventListener('DOMContentLoaded', async () => {
   spHomeReady = true;
   applyHomeLayout();
 
+  // App cache (phone): the My Wave the last launch ended with, so Home opens with songs instead of a spinner.
+  // Returns what it showed (loadHomePage keeps it if the fresh one can't be had), or null.
+  function restoreCachedWave() {
+    try {
+      const appCache = window.MurielAppCache;
+      if (!appCache || !appCache.home || myWaveCurrentTracks.length || !getAdv('my_wave', true)) return null;
+      const saved = appCache.home.readWave();
+      if (!saved) return null;
+      const tracks = saved.tracks.filter((t) => !isBlocked(t));
+      if (!tracks.length) return null;
+      myWaveCurrentTracks = tracks;
+      state.isHotPicks = !!saved.hot;
+      state.hotPicksTitle = saved.title || '';
+      currentWaveFocusedIndex = 0;
+      if (spHomeReady && isSpotifyHome()) renderMadeForYou();
+      return saved;
+    } catch (e) { return null; }
+  }
+
   async function loadHomePage(isRefresh = false) {
     loadForYou();
     const jumpSection = document.getElementById('section-jump-back');
@@ -18094,8 +18127,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       waveSection.style.display = '';
     }
 
+    let cachedWave = null;
     if (!isRefresh) {
       jumpBackCurrentTracks = getJumpBackTracks();
+      cachedWave = restoreCachedWave();
       initHomeHero();
     }
     if (availableModes().length === 0) return false;
@@ -18176,6 +18211,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       if (uniqueTracks.length === 0) {
+        if (cachedWave) { // offline or YouTube down: the saved wave stays rather than an error
+          state.isHotPicks = !!cachedWave.hot;
+          state.hotPicksTitle = cachedWave.title || '';
+          return false;
+        }
         if (!isRefresh) {
           myWaveCurrentTracks = [];
           if (homeMode === 'wave') {
@@ -18204,8 +18244,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       // blocked artists and songs never make it into My Wave (the server leaves them out too; this is the safety net)
-      myWaveCurrentTracks = uniqueTracks.filter(t => !isBlocked(t));
-      if (!myWaveCurrentTracks.length) myWaveCurrentTracks = uniqueTracks;
+      let freshWave = uniqueTracks.filter(t => !isBlocked(t));
+      if (!freshWave.length) freshWave = uniqueTracks;
+      if (window.MurielAppCache && window.MurielAppCache.home) window.MurielAppCache.home.writeWave({ tracks: freshWave, hot: state.isHotPicks, title: state.hotPicksTitle });
+      // the saved wave is on screen and someone is already browsing it: leave it (nothing jumps under their finger);
+      // the fresh one is saved and opens next time
+      if (cachedWave && (currentWaveFocusedIndex !== 0 || (vibeGrid && (vibeGrid.scrollLeft > 0 || vibeGrid._focusedIndex > 0)))) {
+        state.isHotPicks = !!cachedWave.hot;
+        state.hotPicksTitle = cachedWave.title || '';
+        return true;
+      }
+      myWaveCurrentTracks = freshWave;
       currentWaveFocusedIndex = 0;
       if (spHomeReady && isSpotifyHome()) renderMadeForYou();
       if (homeMode === 'wave') {
@@ -18229,6 +18278,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
       return true;
     } catch (err) {
+      if (cachedWave) {
+        state.isHotPicks = !!cachedWave.hot;
+        state.hotPicksTitle = cachedWave.title || '';
+        return false;
+      }
       if (!isRefresh) {
         myWaveCurrentTracks = [];
         if (homeMode === 'wave') {

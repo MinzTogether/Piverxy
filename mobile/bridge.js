@@ -27,6 +27,21 @@ window.addEventListener('error', (e) => murielLog('error', `${e.message} @ ${(e.
 window.addEventListener('unhandledrejection', (e) => murielLog('error', `unhandled: ${(e.reason && (e.reason.stack || e.reason.message)) || e.reason}`));
 // for mobile-ui.js (a plain script): trim the song cache right after the limit is lowered
 window.MurielCache = { enforceLimit: () => enforceCacheLimit() };
+// App cache (app-cache.js, home-cache.js): app.js paints My Wave / For you from it, Settings and Clear cache show and clear it
+{
+  const { appCache } = require('./app-cache');
+  const { createHomeCache } = require('./home-cache');
+  // looked up on every call: the open profile's view of localStorage, never a reference kept from startup
+  const page = { getItem: (k) => localStorage.getItem(k), setItem: (k, v) => localStorage.setItem(k, v), removeItem: (k) => localStorage.removeItem(k) };
+  const home = createHomeCache({ storage: page, enabled: () => appCache.isOn() });
+  window.MurielAppCache = {
+    home,
+    isOn: () => appCache.isOn(),
+    setOn: async (on) => { const r = await appCache.setOn(on); if (!on) home.clear(); return r; },
+    stats: async () => { const s = await appCache.stats(); s.homeBytes = home.bytes(); s.bytes += s.homeBytes; return s; },
+    clear: async () => { home.clear(); return appCache.clear(); },
+  };
+}
 window.MurielLog = {
   add: murielLog,
   text: () => [`Muriel ${navigator.userAgent}`, `platform: ${Capacitor.getPlatform()}`, ...logLines].join('\n'),

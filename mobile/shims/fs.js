@@ -3,8 +3,14 @@
 // through to the store in the background. init() must finish before server.js is required.
 const path = require('path');
 const store = require('./store');
+const { appCache } = require('../app-cache');
 
 const TEXT_EXT = /\.(json|lrc|txt)$/i;
+// A text file changed in the last few seconds (or listed without a real time) is not remembered by the app cache:
+// it may still be written to, and size + time would then not tell the copies apart.
+const SETTLE_MS = 2000;
+let cacheSaved = Promise.resolve(); // the app cache's last background save (tests wait on it)
+const note = (msg) => { try { if (globalThis.MurielLog) globalThis.MurielLog.add('info', msg); } catch (_) {} };
 const nodes = new Map(); // vpath -> { isDir, size, mtimeMs, text? }
 let chain = Promise.resolve();
 // a failed write (storage full) used to look saved until the next launch: log it and tell the app
@@ -71,13 +77,34 @@ const fs = {
   constants: { F_OK: 0, R_OK: 4, W_OK: 2, X_OK: 1 },
 
   async init() {
+    const t0 = Date.now();
     const entries = await store.list();
+    const listed = Date.now();
     nodes.set('/data', { isDir: true, size: 0, mtimeMs: Date.now() });
     for (const e of entries) nodes.set(e.vpath, { isDir: e.isDir, size: e.size, mtimeMs: e.mtimeMs });
-    await Promise.all(entries.filter((e) => !e.isDir && TEXT_EXT.test(e.vpath)).map(async (e) => {
-      try { nodes.get(e.vpath).text = await store.readText(e.vpath); } catch (x) {}
+    const texts = entries.filter((e) => !e.isDir && TEXT_EXT.test(e.vpath));
+    // App cache: a text file whose size and time are what they were when it was last read is not read over the
+    // bridge again (one call per file, every launch, and lyrics pile up with use). Anything else is read as before.
+    const cached = await appCache.loadTexts();
+    const misses = [];
+    for (const e of texts) {
+      const hit = cached.get(e.vpath);
+      if (hit && hit.size === e.size && hit.mtimeMs === e.mtimeMs) nodes.get(e.vpath).text = hit.text;
+      else misses.push(e);
+    }
+    const fresh = [];
+    await Promise.all(misses.map(async (e) => {
+      try {
+        const text = await store.readText(e.vpath);
+        nodes.get(e.vpath).text = text;
+        if (typeof text === 'string' && e.mtimeMs <= t0 - SETTLE_MS) fresh.push({ p: e.vpath, size: e.size, mtimeMs: e.mtimeMs, text });
+      } catch (x) {}
     }));
+    // remembered in the background: the start never waits for it
+    cacheSaved = appCache.saveTexts(fresh, new Set(texts.map((e) => e.vpath))).catch(() => false);
+    note(`start: ${entries.length} entries listed in ${listed - t0} ms; ${texts.length} text files, ${texts.length - misses.length} from the app cache, ${misses.length} read; ready in ${Date.now() - t0} ms`);
   },
+  _cacheSaved: () => cacheSaved,
 
   // Called by the stream bridge after a native download lands on disk.
   _register(p, size) {

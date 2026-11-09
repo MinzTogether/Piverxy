@@ -368,13 +368,17 @@ module.exports = function electronAPI({ ready, port, fs, fileUrlFor }) {
       await ready;
       let audio = 0;
       try { for (const n of fs.readdirSync('/data/tracks')) audio += fs.statSync(`/data/tracks/${n}`).size; } catch (e) {}
-      return { audio, web: 0, total: audio };
+      // "Web & App Data": the app cache (mobile/app-cache.js and the home page's saved rows)
+      let web = 0;
+      try { if (globalThis.MurielAppCache) web = (await globalThis.MurielAppCache.stats()).bytes || 0; } catch (e) {}
+      return { audio, web, total: audio + web };
     },
     // like desktop: delete the cached songs and thumbnails (via the in-app server), then wait for the disk.
     // It used to only report success, so the cache never shrank.
     clearCache: async () => {
       await ready;
       try { await fetch('http://127.0.0.1:38472/api/clear-offline-library', { method: 'POST' }); } catch (e) {}
+      try { if (globalThis.MurielAppCache) await globalThis.MurielAppCache.clear(); } catch (e) {} // it rebuilds itself on the next launch
       await fs._flush();
       return true;
     },

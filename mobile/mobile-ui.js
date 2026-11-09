@@ -221,6 +221,50 @@
       // a lower limit applies now, not only after the next download
       if (window.MurielCache) window.MurielCache.enforceLimit();
     }));
+    // the app cache (mobile/app-cache.js): on/off, what it holds, clear. Its size is measured when this row is first
+    // on screen, not at startup (it reads the whole store).
+    let cacheRow = null;
+    const AC = window.MurielAppCache;
+    if (AC) {
+      const hintCss = 'font-size: calc(12px * var(--font-scale, 1)); color: var(--md-sys-color-outline);';
+      cacheRow = document.createElement('div');
+      cacheRow.className = 'setting-item';
+      cacheRow.innerHTML = `
+        <div class="setting-item-top" style="align-items: center;">
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <span class="setting-name" data-i18n>App cache</span>
+            <span style="${hintCss}" data-i18n>Keeps what the app would otherwise rebuild at every start, so it opens faster.</span>
+            <span class="app-cache-size" style="${hintCss}"></span>
+          </div>
+          <button class="effect-switch-btn${AC.isOn() ? ' active' : ''}" type="button" aria-label="App cache" data-i18n-attr="aria-label"><span class="thumb"></span></button>
+        </div>
+        <div style="margin-top: 10px;"><button class="btn-outline-pill" type="button" data-i18n>Clear app cache</button></div>`;
+      const sizeEl = cacheRow.querySelector('.app-cache-size');
+      const sw = cacheRow.querySelector('.effect-switch-btn');
+      const clearBtn = cacheRow.querySelector('.btn-outline-pill');
+      const fmt = (n) => (n < 1048576 ? `${Math.max(0, Math.round(n / 1024))} KB` : `${(n / 1048576).toFixed(1)} MB`);
+      const showSize = async () => {
+        try { sizeEl.textContent = AC.isOn() ? fmt((await AC.stats()).bytes) : ''; } catch (e) { sizeEl.textContent = ''; }
+      };
+      sw.addEventListener('click', async () => {
+        const on = !sw.classList.contains('active');
+        sw.classList.toggle('active', on);
+        await AC.setOn(on); // off also empties it
+        showSize();
+      });
+      clearBtn.addEventListener('click', async () => {
+        clearBtn.disabled = true;
+        try { await AC.clear(); } catch (e) {}
+        clearBtn.disabled = false;
+        showSize();
+        if (window.MurielCore) window.MurielCore.toast((window.MurielI18n || { Tm: (x) => x }).Tm('App cache cleared'), 'info');
+      });
+      if (typeof IntersectionObserver === 'function') {
+        new IntersectionObserver((entries) => { if (entries.some((x) => x.isIntersecting)) showSize(); }).observe(cacheRow);
+      } else {
+        setTimeout(showSize, 10000);
+      }
+    }
     const logRow = document.createElement('div');
     logRow.className = 'setting-item';
     logRow.innerHTML = `
@@ -236,6 +280,7 @@
       if (res === 'copied' && window.MurielCore) window.MurielCore.toast((window.MurielI18n || { T: (x) => x, Tm: (x) => x }).Tm('Log copied to clipboard'), 'info');
     });
     storageGroup.append(limitRow);
+    if (cacheRow) storageGroup.append(cacheRow);
     if (aboutGroup) aboutGroup.insertBefore(logRow, aboutGroup.lastElementChild); else storageGroup.append(logRow);
   }
 

@@ -59,6 +59,33 @@ Nút **Folder playlists** ở màn hình *My files* (chỉ hiện trên Android)
 
 Ví dụ: tải về `Music/Muriel Mod` thì quét ra các thư mục trong `Music/`. Chọn App folder thì quét ra các thư mục nằm cạnh `.../files/download`.
 
+## 3. App cache — mở app nhanh hơn từ lần thứ hai
+
+**Vì sao mở app chậm.** Giao diện chờ `getServerPort()`, mà hàm này chờ `fs.init()` và server chạy xong. Cho nên mọi thứ dưới đây đều nằm trên đường mở app:
+
+- `fs.init()` liệt kê toàn bộ `/data` rồi đọc từng tệp `.json/.lrc/.txt` qua cầu nối Capacitor, mỗi tệp một lần gọi, ở **mọi** lần mở. Mỗi bài từng xem lời có một tệp `.lrc`, nên app càng dùng lâu càng mở chậm.
+- Client YouTube (`youtubei.js`) không có cache: mỗi lần mở lại gọi `/v1/config`, `/iframe_api`, tải tệp player `base.js` (~2,5 MB) rồi phân tích nó, trước khi tìm kiếm hay gợi ý chạy được.
+- Trang chủ hỏi lại My Wave (`/api/vibe`) và For you (`/api/discover`) ở mỗi lần mở và hiện vòng quay trong lúc chờ. Các cache của server (`searchCache`, `vibeCache`, …) nằm trong RAM nên mất khi app bị tắt.
+
+**Cái gì được cache.** Tất cả nằm trong IndexedDB của WebView (không đi qua cầu nối) hoặc localStorage:
+
+| Phần | Nằm ở | Dùng khi nào |
+| --- | --- | --- |
+| Nội dung tệp văn bản trong `/data` (`mobile/app-cache.js`, kho `texts`) | IndexedDB `muriel-app-cache` | `fs.init()` chỉ dùng bản lưu nếu **dung lượng và giờ sửa** của tệp y hệt lúc đọc trước. Khác một trong hai thì đọc lại như cũ. Tệp bị xoá thì bị bỏ khỏi cache; tệp sửa trong 2 giây cuối (hoặc không có giờ thật) không được nhớ |
+| Player của YouTube (`mobile/extract.js`, kho `blobs`) | IndexedDB, khoá có kèm phiên bản `youtubei.js` | Vẫn gọi `/iframe_api` mỗi lần để biết player hiện hành nên player mới được nhận ngay; chỉ bỏ qua bước tải + phân tích khi đã có. Giữ 3 player mới nhất. Phiên (session) vẫn tạo mới mỗi lần như trước (`enable_session_cache: false`) |
+| My Wave và For you (`mobile/home-cache.js`) | localStorage `muriel_appcache_wave`, `muriel_appcache_foryou` (theo hồ sơ) | Trang chủ hiện bản lưu ngay, rồi xin bản mới ở nền và thay vào. Mất mạng thì bản lưu ở lại thay vì báo lỗi. Quá 7 ngày, sai định dạng hoặc hỏng thì coi như không có. Nếu bạn đã cuộn My Wave thì bản mới chỉ được lưu cho lần sau, không giật màn hình |
+
+**Nguyên tắc an toàn.**
+
+- Cache chỉ là bộ tăng tốc. Không hàm nào trong `app-cache.js` / `home-cache.js` ném lỗi: IndexedDB thiếu, hỏng, treo hay bị tắt đều đọc ra "chưa có gì" và mọi nơi gọi làm đúng như trước khi có cache.
+- Cố ý **không** cache danh sách tệp/thư mục (`store.list()`, `listDownloads`, thư mục liên kết). Đó là cách app biết tệp bị xoá, bị đổi hay mất quyền ở bên ngoài, và các quy tắc ở mục 1 và 2 dựa vào nó. Cũng không cache URL phát nhạc (hết hạn sau vài giờ) hay phiên YouTube.
+- Tắt/bật ở Settings → Storage → **App cache** (khoá `muriel_app_cache`, `'0'` là tắt, dùng chung mọi hồ sơ). Tắt thì cache bị xoá sạch. Nút *Clear app cache* xoá ngay; hộp thoại *Clear cache* cũng xoá nó và hiện dung lượng ở dòng *Web & App Data*.
+- `muriel_appcache_*` nằm trong `NEVER` của `backup-core.js`: không vào bản sao lưu hồ sơ.
+
+**Kiểm tra trên máy.** Mỗi lần mở app ghi một dòng vào nhật ký (Settings → About → Share error log), ví dụ `start: 812 entries listed in 140 ms; 460 text files, 455 from the app cache, 5 read; ready in 210 ms`. Lần mở đầu tiên sau khi cập nhật bản mod thì `0 from the app cache` (cache còn trống, chậm như cũ); từ lần thứ hai gần hết tệp phải đến từ cache. Việc đo tốc độ thật trên điện thoại chưa làm được trong môi trường phát triển này.
+
+**Chưa làm.** `getServerPort()` vẫn chờ `fs.init()`, tức là mở app vẫn phải liệt kê thư mục dữ liệu (một lần gọi cho mỗi thư mục) và quét thư mục nhạc; phần đó không đổi.
+
 ## Quyền đọc nhạc
 
 Từ Android 11, app chỉ thấy tệp do chính nó tạo. Nhạc bạn chép vào `Music/` hay `Download/` bằng file manager hoặc từ máy tính, hoặc bài do bản cài trước của app tải, sẽ bị ẩn cho tới khi app được phép đọc nhạc và âm thanh. Plugin Filesystem coi như luôn "đã cấp" từ Android 11 nên không bao giờ hỏi quyền này.
@@ -99,6 +126,8 @@ Muriel dịch giao diện bằng máy lúc chạy (`i18n.js`), không có bảng
 - `mobile/shims/platform.js`, `server.js` — `LOCAL_LINK_DIR`, `/api/library-link`, `/api/library-unlink`, đọc tệp theo `item.path`; `linkedAccessLocked` và lỗi `MEDIA_PERMISSION_REQUIRED`
 - `app.js`, `index.html`, `mobile/mobile.css`, `mobile/bridge.js`, `profiles-core.js` — nút, luồng quét/tạo playlist, hiện nút Change trên Android, 2 khoá chỉ-của-máy; dòng trạng thái việc chuyển + nút Retry và các thông báo sau khi đổi thư mục
 - `test/android-store.test.js`, `test/library-link.test.js`, `test/android-picker.test.js`, `test/library-tools.test.js` — test cho app bị đóng giữa chừng, trùng tên (cùng dung lượng khác nội dung), thử lại nhiều lần, đọc thư mục lỗi / thư mục đã mất, xoá bản cũ thất bại, quét đọc dở, giới hạn toàn cục, bảng chọn, quyền đọc nhạc, trạng thái và Retry; `test/phone-store.test.js` — đổi tên thư mục mặc định; `test/media-permission-server.test.js`, `test/media-permission-page.test.js` (và các test `MP-*` trong `android-store.test.js`) — quyền bị thu hồi: khoá bài, chặn phát, không bài nào bị quên/xoá, mở khoá khi có quyền lại
+- App cache (mục 3): `mobile/app-cache.js`, `mobile/home-cache.js` (mới); `mobile/shims/fs.js` (`init()` dùng cache, ghi dòng thời gian khởi động); `mobile/extract.js` (cache player YouTube); `mobile/bridge.js` (`window.MurielAppCache`); `mobile/electron-api.js` (`getCacheSize`/`clearCache` tính cả app cache); `mobile/mobile-ui.js` (dòng *App cache* ở Settings → Storage); `app.js` (My Wave và For you hiện từ cache); `profiles-core.js` (khoá chỉ-của-máy `muriel_app_cache`); `backup-core.js` (`muriel_appcache_*` không sao lưu)
+- `test/app-cache.test.js`, `test/home-cache.test.js`, `test/app-cache-start.test.js`, `test/youtube-player-cache.test.js` — test cho cache (kho IndexedDB, `fs.init()` qua nhiều lần mở, thư viện `youtubei.js` thật với mạng giả); thêm devDependency `fake-indexeddb`
 
 ## Build
 

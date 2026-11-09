@@ -2,6 +2,9 @@
 // SoundCloud search, and resolving a track page to a direct audio URL.
 // All network calls go through globalThis.__murielFetch (native HTTP in the app, dev proxy in a browser).
 const { Innertube, Platform, Constants } = require('youtubei.js/web');
+const { appCache } = require('./app-cache');
+let ytjsVersion = '';
+try { ytjsVersion = String(require('youtubei.js/package.json').version || ''); } catch (e) {}
 
 const DESKTOP_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
 
@@ -16,7 +19,11 @@ Platform.shim.eval = async (data, env) => {
 let ytPromise = null;
 function yt() {
   if (!ytPromise) {
-    ytPromise = Innertube.create({ generate_session_locally: true, fetch: (...a) => globalThis.__murielFetch(...a) })
+    // App cache: given a cache, youtubei.js keeps the YouTube player script it has analysed (~2.5 MB to download and take
+    // apart on every cold start otherwise; it still asks YouTube which player is current, so a new one is picked up at
+    // once). The session itself stays as it was: made fresh each launch, so enable_session_cache is off.
+    const cache = appCache.youtubeCache(ytjsVersion);
+    ytPromise = Innertube.create({ generate_session_locally: true, fetch: (...a) => globalThis.__murielFetch(...a), ...(cache ? { cache, enable_session_cache: false } : {}) })
       .catch((e) => { ytPromise = null; throw e; });
   }
   return ytPromise;
