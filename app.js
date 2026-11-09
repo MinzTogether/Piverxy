@@ -20164,7 +20164,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ---- the icon on the Home button: the classic glyph, Muriel's app icon or one of its styles, or your own ----
   var HOME_ICONS = [
     { id: 'classic', label: 'Classic' },
-    { id: 'muriel', label: 'Muriel', src: 'assets/icon.svg' },
+    { id: 'muriel', label: 'Piverxy', src: 'assets/icon.png' },
     { id: '01-default', label: 'Default' },
     { id: '02-editor', label: 'Editor' },
     { id: '03-orbit', label: 'Orbit' },
@@ -20217,7 +20217,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         setHomeAppIcon(url);
       });
     }
-    applyHomeAppIcon(localStorage.getItem('muriel_app_icon') || 'classic');
+    applyHomeAppIcon(localStorage.getItem('muriel_app_icon') || 'muriel');
   })();
 
   // ---- playbar visualizer: compact (right of the bar) or wide behind the bar; bars or one liquid wave ----
