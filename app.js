@@ -17580,6 +17580,27 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
 
+  function markTiming(name, detail) {
+    try {
+      if (typeof performance !== 'undefined' && performance.mark) {
+        performance.mark(name);
+      }
+    } catch (_) {}
+    try {
+      const isDev = (typeof process !== 'undefined' && process.env && process.env.NODE_ENV !== 'production')
+        || (typeof location !== 'undefined' && (location.hostname === 'localhost' || location.hostname === '127.0.0.1'))
+        || (typeof localStorage !== 'undefined' && localStorage.getItem('muriel_dev_timing') === '1');
+      if (isDev) {
+        const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        const msg = detail ? `[timing] ${name} (${detail}) @ ${now.toFixed(1)}ms` : `[timing] ${name} @ ${now.toFixed(1)}ms`;
+        console.debug(msg);
+        if (window.MurielLog && window.MurielLog.add) {
+          window.MurielLog.add('debug', msg);
+        }
+      }
+    } catch (_) {}
+  }
+
   // "For you": genres, similar artists and picks from /api/discover (iTunes genres + Deezer related/charts)
   let forYouSig = '';
   async function loadForYou(force) {
@@ -17596,6 +17617,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (saved) { try { paintForYou(box, saved); } catch (e) {} }
     }
     let data = null;
+    markTiming('discover:request-start');
     try {
       const res = await fetch(`http://127.0.0.1:${state.serverPort}/api/discover`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -17603,6 +17625,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
       data = await res.json();
     } catch (e) {}
+    markTiming('discover:request-end');
     // forget the signature on a failed (or offline, empty) load, or "For you" stayed empty until the history changed
     const empty = !data || !data.success || (!(data.genres || []).length && !(data.sections || []).some((x) => (x.items || x.tracks || []).length));
     if (empty) { if (forYouSig === sig) forYouSig = ''; return; }
@@ -18102,20 +18125,36 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const appCache = window.MurielAppCache;
       if (!appCache || !appCache.home || myWaveCurrentTracks.length || !getAdv('my_wave', true)) return null;
+      markTiming('wave-cache:read-start');
       const saved = appCache.home.readWave();
-      if (!saved) return null;
+      if (!saved) {
+        markTiming('wave-cache:read-end', 'miss');
+        return null;
+      }
       const tracks = saved.tracks.filter((t) => !isBlocked(t));
-      if (!tracks.length) return null;
+      if (!tracks.length) {
+        markTiming('wave-cache:read-end', 'empty');
+        return null;
+      }
+      markTiming('wave-cache:read-end', `hit:${tracks.length}`);
       myWaveCurrentTracks = tracks;
       state.isHotPicks = !!saved.hot;
       state.hotPicksTitle = saved.title || '';
       currentWaveFocusedIndex = 0;
-      if (spHomeReady && isSpotifyHome()) renderMadeForYou();
+      if (spHomeReady && isSpotifyHome()) {
+        renderMadeForYou();
+        markTiming('wave-cache:rendered', `spotify:${tracks.length}`);
+      } else if (homeMode === 'wave' && !isSpotifyHome()) {
+        renderHomeCarousel('wave');
+        currentWaveFocusedIndex = 0;
+        markTiming('wave-cache:rendered', `muriel:${tracks.length}`);
+      }
       return saved;
     } catch (e) { return null; }
   }
 
   async function loadHomePage(isRefresh = false) {
+    markTiming('home:start');
     loadForYou();
     const jumpSection = document.getElementById('section-jump-back');
     if (jumpSection) {
@@ -18140,6 +18179,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderHomeCarousel('recent');
       }
       return false;
+    }
+
+    // Render cache trước computeTasteProfile() và mọi request mạng.
+    if (cachedWave && homeMode === 'wave' && !isSpotifyHome()) {
+      renderHomeCarousel('wave');
+      currentWaveFocusedIndex = 0;
     }
 
     const vibeGrid = document.getElementById('home-vibe-grid');
@@ -18172,6 +18217,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         vibePayload.refresh = true;
       }
       let uniqueTracks = [];
+      markTiming('vibe:request-start');
       try {
         const res = await fetch(`http://127.0.0.1:${state.serverPort}/api/vibe`, {
           method: 'POST',
@@ -18194,11 +18240,13 @@ document.addEventListener('DOMContentLoaded', async () => {
           }
         }
       } catch (_) {}
+      markTiming('vibe:request-end', `tracks:${uniqueTracks.length}`);
 
       state.isHotPicks = false;
       state.hotPicksTitle = '';
 
       if (uniqueTracks.length < 5) {
+        markTiming('hot:request-start');
         try {
           const hotRes = await fetch(`http://127.0.0.1:${state.serverPort}/api/hot?limit=12`);
           const hotData = await hotRes.json();
@@ -18208,6 +18256,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             state.hotPicksTitle = hotData.title || `Hot picks ${new Date().getFullYear()}`;
           }
         } catch (_) {}
+        markTiming('hot:request-end', `tracks:${uniqueTracks.length}`);
       }
 
       if (uniqueTracks.length === 0) {
@@ -18276,6 +18325,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           vibeGrid.style.opacity = '1';
         }
       }
+      markTiming('wave:fresh-rendered', `tracks:${freshWave.length}`);
       return true;
     } catch (err) {
       if (cachedWave) {
