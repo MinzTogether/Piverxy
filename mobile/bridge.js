@@ -207,13 +207,24 @@ HTMLMediaElement.prototype.play = function () {
 };
 
 // <img src="..."> written as HTML strings never hit the setter above.
+const patchImgNode = (n) => {
+  if (n.tagName === 'IMG' && n.__murielSrc === undefined) {
+    const raw = n.getAttribute('src') || '';
+    if (raw.startsWith(BASE)) n.src = raw;
+  }
+};
 new MutationObserver((muts) => {
   for (const m of muts) {
-    const nodes = m.type === 'attributes' ? [m.target] : [...m.addedNodes].flatMap((n) => (n.querySelectorAll ? [n, ...n.querySelectorAll('img')] : []));
-    for (const n of nodes) {
-      if (n.tagName === 'IMG' && n.__murielSrc === undefined) {
-        const raw = n.getAttribute('src') || '';
-        if (raw.startsWith(BASE)) n.src = raw;
+    if (m.type === 'attributes') {
+      patchImgNode(m.target);
+      continue;
+    }
+    for (const n of m.addedNodes) {
+      if (n.nodeType !== 1) continue;
+      if (n.tagName === 'IMG') patchImgNode(n);
+      else if (n.firstElementChild && n.getElementsByTagName) {
+        const imgs = n.getElementsByTagName('img');
+        for (let i = 0; i < imgs.length; i++) patchImgNode(imgs[i]);
       }
     }
   }

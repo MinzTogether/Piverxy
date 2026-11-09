@@ -9,7 +9,7 @@ const assert = require('node:assert/strict');
 const Module = require('node:module');
 const path = require('node:path');
 
-const APP = 'io.github.murielmod';
+const APP = 'io.github.piverxy';
 const ROOTS = {
   DATA: `/data/user/0/${APP}/files`,
   EXTERNAL_STORAGE: '/storage/emulated/0',

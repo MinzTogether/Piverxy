@@ -1280,13 +1280,27 @@ document.addEventListener('DOMContentLoaded', async () => {
             coverAnalysisCache.delete(oldestKey);
           }
           coverAnalysisCache.set(imgSrc, result);
+          canvas.width = 0;
+          canvas.height = 0;
+          img.onload = null;
+          img.onerror = null;
           resolve(result);
         } catch (err) {
-          resolve({ accent: '#6750A4', accent2: '#9A82DB', luminance: 0.2, saturation: 0.5 });
+          const fb = { accent: '#6750A4', accent2: '#9A82DB', luminance: 0.2, saturation: 0.5 };
+          if (coverAnalysisCache.size >= 50) coverAnalysisCache.delete(coverAnalysisCache.keys().next().value);
+          coverAnalysisCache.set(imgSrc, fb);
+          img.onload = null;
+          img.onerror = null;
+          resolve(fb);
         }
       };
       img.onerror = () => {
-        resolve({ accent: '#6750A4', accent2: '#9A82DB', luminance: 0.2, saturation: 0.5 });
+        const fb = { accent: '#6750A4', accent2: '#9A82DB', luminance: 0.2, saturation: 0.5 };
+        if (coverAnalysisCache.size >= 50) coverAnalysisCache.delete(coverAnalysisCache.keys().next().value);
+        coverAnalysisCache.set(imgSrc, fb);
+        img.onload = null;
+        img.onerror = null;
+        resolve(fb);
       };
       img.src = imgSrc;
     });
@@ -1354,12 +1368,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       layers.forEach(l => l.classList.remove('on'));
       return;
     }
+    if (activeCoverBgUrl === url && document.body.classList.contains('cover-bg-on')) return;
 
     activeCoverBgUrl = url;
     document.body.classList.add('cover-bg-on');
 
     const img = new Image();
-    img.crossOrigin = 'Anonymous';
     img.onload = () => {
       if (activeCoverBgUrl !== url) return;
       if (layers.length < 2) return;
@@ -7626,7 +7640,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     row._wheelBound = true;
     row.addEventListener('wheel', (e) => wheelRowSideways(row, e), { passive: false });
 
-    row.addEventListener('scroll', () => updateRowFade(row), { passive: true });
+    row.addEventListener('scroll', () => {
+      if (row._fadeRaf) return;
+      row._fadeRaf = requestAnimationFrame(() => {
+        row._fadeRaf = 0;
+        updateRowFade(row);
+      });
+    }, { passive: true });
+    if (fadeRows.size > 30) {
+      fadeRows.forEach((r) => { if (!r.isConnected) fadeRows.delete(r); });
+    }
     fadeRows.add(row);
     updateRowFade(row);
   }
@@ -8207,8 +8230,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.addEventListener('click', closeTrackContextMenu);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeTrackContextMenu(); });
   window.addEventListener('blur', closeTrackContextMenu);
-  window.addEventListener('resize', closeTrackContextMenu);
-  document.addEventListener('scroll', closeTrackContextMenu, true);
+  window.addEventListener('resize', closeTrackContextMenu, { passive: true });
+  document.addEventListener('scroll', closeTrackContextMenu, { capture: true, passive: true });
 
   function renderTracks(container, tracks, context = 'search') {
     if (!container) return;
@@ -8240,6 +8263,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     function renderChunk() {
       if (!scrollParent || container._isDraggingReorder) return;
+      if (container._hasInitialRendered && container.offsetParent === null) return;
       const parentRect = scrollParent.getBoundingClientRect();
       const containerRect = container.getBoundingClientRect();
       const relativeTop = containerRect.top - parentRect.top + scrollParent.scrollTop;
@@ -8789,7 +8813,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   if (el.favoritesSearchInput) {
-    el.favoritesSearchInput.addEventListener('input', () => renderFavoritesView());
+    let favSearchTimer = 0;
+    el.favoritesSearchInput.addEventListener('input', () => {
+      clearTimeout(favSearchTimer);
+      favSearchTimer = setTimeout(() => renderFavoritesView(), 60);
+    });
   }
 
   // Sort menus of Favorites and playlists: a Material dropdown in front of the <select> (still the value), with
@@ -8976,7 +9004,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   if (el.localSearchInput) {
-    el.localSearchInput.addEventListener('input', () => renderLocalView(false));
+    let localSearchTimer = 0;
+    el.localSearchInput.addEventListener('input', () => {
+      clearTimeout(localSearchTimer);
+      localSearchTimer = setTimeout(() => renderLocalView(false), 60);
+    });
   }
 
   async function importLocalFiles(opts) {
@@ -9764,12 +9796,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     return newPl;
   }
 
-  function openPlaylistDetail(playlistId) {
+  function openPlaylistDetail(playlistId, { filterOnly = false } = {}) {
     const pl = state.playlists.find(p => p.id === playlistId);
     if (!pl) return;
     // the page shares its scroll with the view it was opened from: opened from "Your playlists" low on the
     // home screen, it showed up halfway down its song list with the header out of sight
-    const opening = state.currentView !== 'playlist-detail' || state.currentPlaylistId !== playlistId;
+    const switchingPlaylist = state.currentPlaylistId !== playlistId;
+    const opening = state.currentView !== 'playlist-detail' || switchingPlaylist;
+    if (switchingPlaylist && el.playlistSearchInput) el.playlistSearchInput.value = '';
+    if (state.currentView !== 'playlist-detail') state.previousView = state.currentView;
     state.currentPlaylistId = playlistId;
     if (el.playlistDetailTitle) el.playlistDetailTitle.textContent = pl.name;
     const query = el.playlistSearchInput ? normalizeSearch(el.playlistSearchInput.value) : '';
@@ -9784,6 +9819,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const totalSec = (pl.tracks || []).reduce((acc, t) => acc + (t.duration || 0), 0);
     const durStr = totalSec > 0 ? ` • ${formatDuration(totalSec)}` : '';
     if (el.playlistDetailCount) el.playlistDetailCount.textContent = (query ? `${filtered.length} of ${pl.tracks.length} tracks` : `${pl.tracks.length} tracks`) + durStr;
+    if (filterOnly && !opening) {
+      if (el.playlistTracksList) renderTracks(el.playlistTracksList, filtered, 'playlist');
+      return;
+    }
     const detailCover = document.getElementById('playlist-detail-cover');
     if (detailCover) renderPlaylistCover(detailCover, pl, 160);
     const coverSrc = (pl && pl.cover) ? pl.cover : ((pl.tracks && pl.tracks[0]) ? getTrackThumbUrl(pl.tracks[0]) : '');
@@ -9807,7 +9846,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     if (opening) { const main = document.querySelector('.main-content'); if (main) main.scrollTop = 0; }
     if (el.playlistTracksList) renderTracks(el.playlistTracksList, filtered, 'playlist');
-    switchView('playlist-detail');
+    if (opening) switchView('playlist-detail');
     renderPlaylistsList();
   }
 
@@ -10282,6 +10321,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function applyStackedRadius(container, itemSelector, horizontal) {
     if (!container) return;
+    if (!Array.isArray(container) && container.offsetParent === null) return;
     const raw = Array.isArray(container) ? container : [...container.querySelectorAll(itemSelector)];
     const items = raw.filter((n) => n.getBoundingClientRect().height > 1 && getComputedStyle(n).display !== 'none');
     const stackClasses = ['stack-only', 'stack-first', 'stack-mid', 'stack-last'];
@@ -11047,11 +11087,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   if (el.playlistSearchInput) {
+    let plSearchTimer = 0;
     el.playlistSearchInput.addEventListener('input', () => {
-      if (state.currentPlaylistId) openPlaylistDetail(state.currentPlaylistId);
+      clearTimeout(plSearchTimer);
+      plSearchTimer = setTimeout(() => {
+        if (state.currentPlaylistId) openPlaylistDetail(state.currentPlaylistId, { filterOnly: true });
+      }, 60);
     });
   }
-  if (el.btnBackPlaylists) el.btnBackPlaylists.addEventListener('click', () => switchView('discover'));
+  if (el.btnBackPlaylists) {
+    el.btnBackPlaylists.addEventListener('click', () => {
+      const target = (state.previousView && state.previousView !== 'playlist-detail') ? state.previousView : 'discover';
+      switchView(target);
+    });
+  }
 
   const deletePlaylistModal = document.getElementById('delete-playlist-modal');
   const deletePlaylistMsg = document.getElementById('delete-playlist-msg');
@@ -12561,9 +12610,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   enhanceSliders();
   let sliderRaf = 0;
-  // text-only changes (the playbar clock, counters) can't add a slider or a switch: skip the document scan for them
+  // text-only changes (the playbar clock, counters) and track rows without sliders/switches skip full-document scans
   const addsElements = (muts) => muts.some((m) => Array.prototype.some.call(m.addedNodes, (n) => n.nodeType === 1));
-  new MutationObserver((muts) => { if (sliderRaf || !addsElements(muts)) return; sliderRaf = requestAnimationFrame(() => { sliderRaf = 0; enhanceSliders(); }); }).observe(document.body, { childList: true, subtree: true });
+  const hasMatchingDescendant = (muts, sel) => muts.some((m) => Array.prototype.some.call(m.addedNodes, (n) => n.nodeType === 1 && ((n.matches && n.matches(sel)) || (n.querySelector && n.querySelector(sel)))));
+  new MutationObserver((muts) => { if (sliderRaf || !hasMatchingDescendant(muts, 'input[type="range"]:not(.sl-done)')) return; sliderRaf = requestAnimationFrame(() => { sliderRaf = 0; enhanceSliders(); }); }).observe(document.body, { childList: true, subtree: true });
 
   (function initHueSegments() {
     const input = document.getElementById('slider-theme-hue');
@@ -13508,7 +13558,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
   let swRaf = 0;
-  new MutationObserver((muts) => { if (swRaf || !addsElements(muts)) return; swRaf = requestAnimationFrame(() => { swRaf = 0; decorateSwitches(); }); }).observe(document.body, { childList: true, subtree: true });
+  new MutationObserver((muts) => { if (swRaf || !hasMatchingDescendant(muts, '.effect-switch-btn .thumb:not(.has-icon)')) return; swRaf = requestAnimationFrame(() => { swRaf = 0; decorateSwitches(); }); }).observe(document.body, { childList: true, subtree: true });
   decorateSwitches();
 
   const settingWinMediaKeys = document.getElementById('setting-win-media-keys');
@@ -16949,11 +16999,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       };
       img.onerror = () => {
-        if (img.crossOrigin) {
-          img.crossOrigin = null;
-          img.src = url;
-          return;
-        }
         const fallback = ['rgb(80, 100, 140)', 'rgb(140, 80, 100)'];
         dominantColorsCache.set(url, fallback);
         img.onload = null;
@@ -17205,6 +17250,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       row._targetIndex = undefined;
     }
 
+    const prevFocused = (typeof row._focusedIndex === 'number') ? row._focusedIndex : -1;
+    if (newFocused === prevFocused) return;
+
     cards.forEach((card, j) => {
       const dist = Math.abs(j - newFocused);
       card.classList.remove('near', 'far');
@@ -17219,8 +17267,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     });
 
-    const prevFocused = (typeof row._focusedIndex === 'number') ? row._focusedIndex : -1;
-    if (newFocused !== prevFocused && tracks[newFocused]) {
+    if (tracks[newFocused]) {
       row._focusedIndex = newFocused;
       if (row.id === 'home-vibe-grid') {
         currentWaveFocusedIndex = newFocused;
@@ -17233,7 +17280,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateTextFade(artistEl);
       }
       const thumb = (typeof getTrackThumbUrl === 'function' ? getTrackThumbUrl(track) : '') || track.thumbnail || track.cover || track.image || '';
-      updateAmbientLight(ambientEl, thumb);
+      if (prevFocused === -1) {
+        updateAmbientLight(ambientEl, thumb);
+      } else {
+        clearTimeout(row._ambientTimer);
+        row._ambientTimer = setTimeout(() => updateAmbientLight(ambientEl, thumb), 120);
+      }
     }
   }
 
@@ -17555,28 +17607,35 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     let touchStartY = 0;
     let touchStartX = 0;
+    let touchStartCardIdx = -1;
     viewDiscoverEl.addEventListener('touchstart', (e) => {
-      if (!isDiscoverActive()) return;
+      touchStartCardIdx = -1;
+      if (!isDiscoverActive() || isSpotifyHome()) return;
       if (el.searchResultsContainer && !el.searchResultsContainer.classList.contains('hidden')) return;
+      if (e.target && e.target.closest && e.target.closest('.fy-row, .sp-row, .home-pl-row, .suggestion-chips, .chips-row')) return;
       if (e.touches.length > 0) {
         touchStartY = e.touches[0].clientY;
         touchStartX = e.touches[0].clientX;
+        const row = document.getElementById('home-vibe-grid');
+        touchStartCardIdx = (row && typeof row._focusedIndex === 'number' && row._focusedIndex >= 0) ? row._focusedIndex : 0;
       }
     }, { passive: true });
 
     viewDiscoverEl.addEventListener('touchend', (e) => {
-      if (!isDiscoverActive()) return;
+      if (!isDiscoverActive() || isSpotifyHome() || touchStartCardIdx < 0) return;
       if (el.searchResultsContainer && !el.searchResultsContainer.classList.contains('hidden')) return;
       if (e.changedTouches.length > 0) {
         const touchEndY = e.changedTouches[0].clientY;
         const touchEndX = e.changedTouches[0].clientX;
         const diffY = touchStartY - touchEndY;
         const diffX = touchStartX - touchEndX;
-        // vertical swipes scroll the page; sideways swipes flip cards
+        // vertical swipes scroll the page; sideways swipes flip exactly one card from the starting index
         if (Math.abs(diffX) > 40 && Math.abs(diffX) > Math.abs(diffY)) {
-          stepCarouselFocus(diffX > 0 ? 1 : -1);
+          const row = document.getElementById('home-vibe-grid');
+          if (row) scrollCarouselTo(row, touchStartCardIdx + (diffX > 0 ? 1 : -1));
         }
       }
+      touchStartCardIdx = -1;
     }, { passive: true });
   }
 
@@ -18392,16 +18451,26 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const vibeGridEl = document.getElementById('home-vibe-grid');
   if (vibeGridEl) {
+    let vibeScrollRaf = 0;
     vibeGridEl.addEventListener('scroll', () => {
-      const curTracks = (homeMode === 'recent') ? jumpBackCurrentTracks : myWaveCurrentTracks;
-      updateCoverflowCards(vibeGridEl, document.getElementById('my-wave-focused-title'), document.getElementById('my-wave-focused-artist'), document.getElementById('my-wave-ambient-light'), curTracks);
+      if (vibeScrollRaf) return;
+      vibeScrollRaf = requestAnimationFrame(() => {
+        vibeScrollRaf = 0;
+        const curTracks = (homeMode === 'recent') ? jumpBackCurrentTracks : myWaveCurrentTracks;
+        updateCoverflowCards(vibeGridEl, document.getElementById('my-wave-focused-title'), document.getElementById('my-wave-focused-artist'), document.getElementById('my-wave-ambient-light'), curTracks);
+      });
     }, { passive: true });
   }
 
   const quickRowEl = document.getElementById('home-quick-play-row');
   if (quickRowEl) {
+    let quickScrollRaf = 0;
     quickRowEl.addEventListener('scroll', () => {
-      updateCoverflowCards(quickRowEl, document.getElementById('jump-focused-title'), document.getElementById('jump-focused-artist'), document.getElementById('jump-ambient-light'), jumpBackCurrentTracks);
+      if (quickScrollRaf) return;
+      quickScrollRaf = requestAnimationFrame(() => {
+        quickScrollRaf = 0;
+        updateCoverflowCards(quickRowEl, document.getElementById('jump-focused-title'), document.getElementById('jump-focused-artist'), document.getElementById('jump-ambient-light'), jumpBackCurrentTracks);
+      });
     }, { passive: true });
   }
 

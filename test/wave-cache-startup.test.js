@@ -455,3 +455,54 @@ test('mobile electronAPI: getServerPort resolves immediately without blocking on
     'getServerPort must return port immediately without waiting on ready'
   );
 });
+
+test("Piverxy branding and appId (io.github.piverxy) are applied across Capacitor, Android, iOS, Electron, and HTML", () => {
+  const cap = JSON.parse(fs.readFileSync(path.join(__dirname, "../capacitor.config.json"), "utf8"));
+  assert.equal(cap.appId, "io.github.piverxy");
+  assert.equal(cap.appName, "Piverxy");
+
+  const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "../package.json"), "utf8"));
+  assert.equal(pkg.name, "piverxy");
+  assert.equal(pkg.build.appId, "io.github.piverxy");
+  assert.equal(pkg.build.productName, "Piverxy");
+
+  const gradle = fs.readFileSync(path.join(__dirname, "../android/app/build.gradle"), "utf8");
+  assert.ok(gradle.includes("applicationId \"io.github.piverxy\""), "build.gradle has applicationId io.github.piverxy");
+  assert.ok(gradle.includes("namespace = \"io.github.cloverscripts.muriel\""), "build.gradle preserves Java namespace");
+
+  const stringsXml = fs.readFileSync(path.join(__dirname, "../android/app/src/main/res/values/strings.xml"), "utf8");
+  assert.ok(stringsXml.includes("<string name=\"app_name\">Piverxy</string>"));
+  assert.ok(stringsXml.includes("<string name=\"package_name\">io.github.piverxy</string>"));
+  assert.ok(stringsXml.includes("<string name=\"custom_url_scheme\">io.github.piverxy</string>"));
+
+  const plist = fs.readFileSync(path.join(__dirname, "../ios/App/App/Info.plist"), "utf8");
+  assert.ok(plist.includes("<string>Piverxy</string>"));
+
+  const pbxproj = fs.readFileSync(path.join(__dirname, "../ios/App/App.xcodeproj/project.pbxproj"), "utf8");
+  assert.ok(pbxproj.includes("PRODUCT_BUNDLE_IDENTIFIER = io.github.piverxy;"));
+
+  const indexHtml = fs.readFileSync(path.join(__dirname, "../index.html"), "utf8");
+  assert.ok(indexHtml.includes("<title>Piverxy</title>"));
+  assert.ok(indexHtml.includes("<span class=\"logo-text\">Piverxy</span>"));
+});
+
+test("UI, bug, and performance fixes are present in app.js, mobile/bridge.js, mobile/mobile-ui.js, styles.css, and mobile/mobile.css", () => {
+  const bridgeSrc = fs.readFileSync(path.join(__dirname, "../mobile/bridge.js"), "utf8");
+  assert.ok(bridgeSrc.includes("const patchImgNode = (n) =>"), "bridge MutationObserver avoids array flatMap allocations");
+
+  const mobileUiSrc = fs.readFileSync(path.join(__dirname, "../mobile/mobile-ui.js"), "utf8");
+  assert.ok(mobileUiSrc.includes("}, { passive: true });"), "mobile-ui touchend listeners are passive");
+
+  const cssSrc = fs.readFileSync(path.join(__dirname, "../styles.css"), "utf8");
+  assert.ok(cssSrc.includes(".my-wave-track-card:not(.far)"), "will-change is scoped to non-far cards");
+
+  const mobileCssSrc = fs.readFileSync(path.join(__dirname, "../mobile/mobile.css"), "utf8");
+  assert.ok(mobileCssSrc.includes("body.np-open .toast-container"), "toast-container avoids overlapping Now Playing controls");
+  assert.ok(mobileCssSrc.includes("html.is-mobile .my-wave-track-card.near { filter: none !important; }"), "mobile removes expensive blur filter on .near coverflow cards");
+
+  assert.ok(appSource.includes("if (container._hasInitialRendered && container.offsetParent === null) return;"), "virtual scroll skips rebuilding hidden views");
+  assert.ok(appSource.includes("if (switchingPlaylist && el.playlistSearchInput) el.playlistSearchInput.value = '';"), "openPlaylistDetail clears stale search input when switching playlists");
+  assert.ok(appSource.includes("if (filterOnly && !opening) {"), "openPlaylistDetail supports filterOnly mode on keystroke");
+  assert.ok(appSource.includes("let touchStartCardIdx = -1;"), "discover touch swipe anchors to touchStartCardIdx to prevent double-skipping cards");
+  assert.ok(appSource.includes("if (newFocused === prevFocused) return;"), "updateCoverflowCards skips redundant card class loop when focused card has not changed");
+});

@@ -248,18 +248,17 @@ html.is-mobile body.np-open .app-layout { z-index: 3400 !important; }
 html.is-mobile body.np-open .titlebar,
 html.is-mobile body.np-open .top-nav { visibility: hidden !important; }
 /* a desktop small-window rule hides the drawer; on the phone it is the playlists sheet */
-html.is-mobile #rail-drawer:not(.hidden) { display: flex !important; flex-direction: column !important; overflow-y: auto !important; padding: 16px !important; background: var(--md-sys-color-surface-container-solid, #1E1F22) !important; box-shadow: 0 -8px 30px rgba(0,0,0,.45) !important; }
 html.is-mobile #rail-drawer:not(.hidden) {
-  position: fixed !important; width: auto !important; left: 8px !important; right: 8px !important; top: auto !important;
-  bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 8px) !important;
-  min-height: 45vh !important; max-height: 70vh !important; border-radius: 24px !important; transform: none !important;
-}
-html.is-mobile #rail-drawer .playlists-list { flex: 1 1 auto; overflow-y: auto; }
-html.is-mobile #rail-drawer:not(.hidden) {
+  display: flex !important; flex-direction: column !important; overflow-y: auto !important;
+  position: fixed !important; left: 8px !important; right: 8px !important; top: auto !important;
   width: calc(100vw - 16px) !important; max-width: none !important; min-width: 0 !important;
   bottom: calc(var(--tabbar-h) + var(--mini-h) + var(--safe-bottom) + 14px) !important;
-  min-height: 40vh !important; max-height: 60vh !important;
+  min-height: 40vh !important; max-height: 60vh !important; padding: 16px !important;
+  border-radius: 24px !important; transform: none !important;
+  background: var(--md-sys-color-surface-container-solid, #1E1F22) !important;
+  box-shadow: 0 -8px 30px rgba(0,0,0,.45) !important;
 }
+html.is-mobile #rail-drawer .playlists-list { flex: 1 1 auto; overflow-y: auto; }
 html.is-mobile #rail-drawer .playlists-list:empty::after {
   content: 'No playlists yet. Tap + to make one, or use + on any song.';
   display: block; padding: 24px 8px; text-align: center; color: var(--md-sys-color-on-surface-variant); font-size: 14px; line-height: 1.5;
@@ -331,9 +330,8 @@ html.is-mobile .toast-container {
   top: auto !important; bottom: calc(var(--tabbar-h) + var(--mini-h) + var(--safe-bottom) + 18px) !important;
   left: 12px !important; right: 12px !important; transform: none !important; align-items: center !important; z-index: 6000 !important;
 }
-html.is-mobile body.np-open .toast-container { bottom: calc(var(--safe-bottom) + 250px) !important; }
-/* sheet: hints sit at the very bottom, under the popup content rather than on it */
-html.is-mobile body.np-open .toast-container { bottom: calc(var(--safe-bottom) + 12px) !important; }
+/* keep toasts clear of the Now Playing transport controls */
+html.is-mobile body.np-open .toast-container { bottom: calc(var(--safe-bottom) + 180px) !important; }
 /* sync popup header stays on one line: title shrinks, close button keeps its spot */
 html.is-mobile .sync-mode-card .settings-card-header { flex-wrap: nowrap !important; align-items: center !important; }
 html.is-mobile .sync-mode-card .settings-title-group { flex: 1 1 auto !important; min-width: 0 !important; flex-wrap: wrap !important; gap: 4px 8px !important; }
@@ -605,3 +603,6 @@ html.is-mobile .queue-radio-label { margin: 2px 0 10px; padding: 6px 12px 6px 10
 /* Android: songs linked from the folders next to the download folder while Muriel may not read music and audio (app.js
    isMediaLocked). Still listed, still in every playlist; shown dimmed until the permission is back. Tapping one explains. */
 html.is-mobile .track-row.is-locked { opacity: 0.5; }
+
+/* Carousel & scroll performance on mobile: avoid per-frame Gaussian blur filter on side cards */
+html.is-mobile .my-wave-track-card.near { filter: none !important; }

@@ -1,5 +1,5 @@
 {
-  "name": "muriel",
+  "name": "piverxy",
   "version": "1.3.10",
   "main": "main.js",
   "bin": {
@@ -16,7 +16,7 @@
   "keywords": [],
   "author": "cloverscripts",
   "license": "MIT",
-  "description": "Muriel - a lightweight music player.",
+  "description": "Piverxy - a lightweight music player.",
   "devDependencies": {
     "@capacitor/android": "^8.5.3",
     "@capacitor/app": "^8.1.2",
@@ -41,7 +41,7 @@
     "hls.js": "^1.7.1",
     "tone": "^15.1.22"
   },
-  "productName": "Muriel",
+  "productName": "Piverxy",
   "homepage": "https://github.com/cloverscripts/riff-muriel",
   "repository": {
     "type": "git",
@@ -51,8 +51,8 @@
     "url": "https://github.com/cloverscripts/riff-muriel/issues"
   },
   "build": {
-    "appId": "io.github.cloverscripts.muriel",
-    "productName": "Muriel",
+    "appId": "io.github.piverxy",
+    "productName": "Piverxy",
     "artifactName": "${name}-${version}-${os}-${arch}.${ext}",
     "directories": {
       "output": "dist"

@@ -1,6 +1,6 @@
 {
-  "appId": "io.github.murielmod",
-  "appName": "Muriel Mod",
+  "appId": "io.github.piverxy",
+  "appName": "Piverxy",
   "webDir": "www",
   "backgroundColor": "#121214",
   "ios": {
@@ -9,6 +9,8 @@
     "limitsNavigationsToAppBoundDomains": false
   },
   "plugins": {
-    "CapacitorHttp": { "enabled": true }
+    "CapacitorHttp": {
+      "enabled": true
+    }
   }
 }

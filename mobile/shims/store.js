@@ -36,7 +36,7 @@ let asked = false;
 // The choice is kept as text: 'Music/Muriel Mod' (shared storage) or 'Android/data/<package>/files/download' (the app's
 // own folder). Shared storage only takes the folders Android lets an app write to, and a folder of its own inside one.
 // the package name; replaced by the real one at launch (list below), because a rebuilt app may carry another
-let APP_ID = 'io.github.murielmod';
+let APP_ID = 'io.github.piverxy';
 const appFiles = () => `Android/data/${APP_ID}/files`;
 const SHARED_TOPS = ['Music', 'Documents', 'Download', 'Podcasts', 'Audiobooks'];
 const LOC_KEY = 'muriel_download_location';

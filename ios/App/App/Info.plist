@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-        <string>Muriel</string>
+        <string>Piverxy</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -27,7 +27,7 @@
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>io.github.cloverscripts.muriel</string>
+			<string>io.github.piverxy</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>muriel</string>

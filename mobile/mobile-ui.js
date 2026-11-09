@@ -65,7 +65,7 @@
     panel.style.transform = '';
     startY = null;
     if (dy > 110) closeSheet();
-  });
+  }, { passive: true });
 
   // Picked images and videos (background, banner, song covers) are saved as file URLs, and those change when
   // iOS moves the app container (every update or reinstall). Rebuild each saved one from its file name, then
@@ -146,11 +146,7 @@
     mirror();
   }
 
-  // slowly drifting colour glow behind Now Playing (cover colours, plain gradients: cheap to draw)
-  const ambient = document.createElement('div');
-  ambient.className = 'np-ambient';
-  ambient.innerHTML = '<i></i><i></i><i></i>';
-  panel.prepend(ambient);
+  // Now Playing sheet uses a single lightweight gradient wash on mobile (see mobile.css)
 
   // swipe the cover left/right to skip, with the cover following your finger
   const cover = document.getElementById('cover-container');
@@ -182,7 +178,7 @@
       } else {
         cover.style.transform = '';
       }
-    });
+    }, { passive: true });
   }
 
   // mini player progress line
