@@ -25,7 +25,7 @@ Piverxy is a cross-platform music player built around a simple idea: bring music
 ### Your music library
 - Play audio files stored on your device.
 - Organize favorites, albums, artists, and playlists.
-- On mobile, create playlists from audio folders without copying or moving the original files.
+- On Android, create playlists from audio folders without copying or moving the original files.
 - Manage downloads and local music from one library.
 
 ### Lyrics and audio tools
