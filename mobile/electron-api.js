@@ -311,7 +311,7 @@ module.exports = function electronAPI({ ready, port, fs, fileUrlFor }) {
     isWindows: false,
     isMobile: true,
     minimizeWindow: noop, maximizeWindow: noop, closeWindow: noop,
-    getServerPort: () => ready.then(() => port),
+    getServerPort: async () => port,
     getGpuCompositing: async () => 'enabled',
     onWindowVisibility: (cb) => visibilityListeners.push(cb),
     setZoomFactor: noop,

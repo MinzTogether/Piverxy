@@ -78,6 +78,7 @@ const fs = {
 
   async init() {
     const t0 = Date.now();
+    const cachedPromise = appCache.loadTexts();
     const entries = await store.list();
     const listed = Date.now();
     nodes.set('/data', { isDir: true, size: 0, mtimeMs: Date.now() });
@@ -85,7 +86,7 @@ const fs = {
     const texts = entries.filter((e) => !e.isDir && TEXT_EXT.test(e.vpath));
     // App cache: a text file whose size and time are what they were when it was last read is not read over the
     // bridge again (one call per file, every launch, and lyrics pile up with use). Anything else is read as before.
-    const cached = await appCache.loadTexts();
+    const cached = await cachedPromise;
     const misses = [];
     for (const e of texts) {
       const hit = cached.get(e.vpath);

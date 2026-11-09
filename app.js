@@ -16981,6 +16981,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function setHomeAmbient(url) {
     const box = document.getElementById('home-ambient');
     if (!box) return;
+    if (typeof isSpotifyHome === 'function' && isSpotifyHome()) return;
+    if (typeof getAdv === 'function' && !getAdv('my_wave_ambient', true)) return;
     const layers = box.querySelectorAll('.home-ambient-layer');
     if (!url) {
       currentAmbientUrl = null;
@@ -17261,14 +17263,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     card.className = 'my-wave-track-card';
     if (typeof idx === 'number') card.dataset.index = String(idx);
     const thumbUrl = (typeof getTrackThumbUrl === 'function' ? getTrackThumbUrl(track) : '') || track.thumbnail || track.cover || track.image || '';
+    const isEager = typeof idx === 'number' && idx < 3;
+    const loadingAttr = isEager ? 'eager' : 'lazy';
+    const priorityAttr = idx === 0 ? ' fetchpriority="high"' : '';
     card.innerHTML = `
       <div class="my-wave-track-cover-wrap">
-        <img class="my-wave-track-cover" loading="lazy" decoding="async" src="${escapeHtml(thumbUrl)}" alt="" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'280\\' height=\\'280\\' fill=\\'%23555\\'><rect width=\\'100%\\' height=\\'100%\\'/></svg>'">
+        <img class="my-wave-track-cover" loading="${loadingAttr}"${priorityAttr} decoding="async" src="${escapeHtml(thumbUrl)}" alt="" onload="this.classList.add('is-loaded')" onerror="this.classList.add('is-loaded');this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'280\\' height=\\'280\\' fill=\\'%23555\\'><rect width=\\'100%\\' height=\\'100%\\'/></svg>'">
         <div class="my-wave-track-play-overlay">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
         </div>
       </div>
     `;
+    const coverImg = card.querySelector('.my-wave-track-cover');
+    if (coverImg) {
+      coverImg.addEventListener('load', () => coverImg.classList.add('is-loaded'), { once: true });
+      coverImg.addEventListener('error', () => coverImg.classList.add('is-loaded'), { once: true });
+      if (coverImg.complete) coverImg.classList.add('is-loaded');
+    }
 
     card.addEventListener('click', () => {
       const row = document.getElementById('home-vibe-grid');
@@ -17343,9 +17354,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     const source = (mode === 'recent') ? jumpBackCurrentTracks : myWaveCurrentTracks;
 
+    if (source && source.length > 0 && vibeGrid._renderedMode === mode && vibeGrid._renderedSource === source && vibeGrid.children && vibeGrid.children.length === source.length) {
+      return;
+    }
+
     vibeGrid.innerHTML = '';
 
     if (!source || source.length === 0) {
+      vibeGrid._renderedMode = '';
+      vibeGrid._renderedSource = null;
       if (focusedMeta) focusedMeta.innerHTML = '';
       if (mode === 'recent') {
         vibeGrid.innerHTML = `<div class="vibe-empty-hint" data-i18n>Play some tracks to see them here</div>`;
@@ -17361,8 +17378,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       fragment.appendChild(buildHomeCard(track, mode, idx));
     });
     vibeGrid.appendChild(fragment);
-
-    const firstThumb = (typeof getTrackThumbUrl === 'function' ? getTrackThumbUrl(source[0]) : '') || source[0].thumbnail || source[0].cover || source[0].image || '';
+    vibeGrid._renderedMode = mode;
+    vibeGrid._renderedSource = source;
 
     if (focusedMeta && source[0]) {
       focusedMeta.innerHTML = `
@@ -17373,7 +17390,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       const artistEl = document.getElementById('my-wave-focused-artist');
       if (titleEl) updateTextFade(titleEl);
       if (artistEl) updateTextFade(artistEl);
-      updateAmbientLight('my-wave-ambient-light', firstThumb);
     }
 
     vibeGrid.scrollLeft = 0;
@@ -18102,8 +18118,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const btnMu = document.getElementById('home-layout-riff');
     if (btnSp) btnSp.classList.toggle('active', sp);
     if (btnMu) btnMu.classList.toggle('active', !sp);
-    renderFollowedArtists();
     if (sp) renderSpotifyHome();
+    else {
+      renderFollowedArtists();
+      if (typeof initHomeHero === 'function') initHomeHero();
+    }
     if (typeof syncHomeAmbientVisibility === 'function') syncHomeAmbientVisibility();
   }
   document.querySelectorAll('#home-layout-toggle .theme-mode-btn').forEach((btn) => {
@@ -18155,7 +18174,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   async function loadHomePage(isRefresh = false) {
     markTiming('home:start');
-    loadForYou();
     const jumpSection = document.getElementById('section-jump-back');
     if (jumpSection) {
       jumpSection.style.display = 'none';
@@ -18172,12 +18190,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       cachedWave = restoreCachedWave();
       initHomeHero();
     }
-    if (availableModes().length === 0) return false;
+    if (availableModes().length === 0) {
+      loadForYou();
+      return false;
+    }
 
     if (!getAdv('my_wave', true)) {
       if (homeMode === 'recent') {
         renderHomeCarousel('recent');
       }
+      loadForYou();
       return false;
     }
 
@@ -18186,6 +18208,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       renderHomeCarousel('wave');
       currentWaveFocusedIndex = 0;
     }
+
+    loadForYou();
 
     const vibeGrid = document.getElementById('home-vibe-grid');
     const focusedMeta = document.getElementById('my-wave-focused-meta');
@@ -18217,6 +18241,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         vibePayload.refresh = true;
       }
       let uniqueTracks = [];
+      let freshHot = false;
+      let freshTitle = '';
       markTiming('vibe:request-start');
       try {
         const res = await fetch(`http://127.0.0.1:${state.serverPort}/api/vibe`, {
@@ -18242,9 +18268,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       } catch (_) {}
       markTiming('vibe:request-end', `tracks:${uniqueTracks.length}`);
 
-      state.isHotPicks = false;
-      state.hotPicksTitle = '';
-
       if (uniqueTracks.length < 5) {
         markTiming('hot:request-start');
         try {
@@ -18252,8 +18275,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           const hotData = await hotRes.json();
           if (hotData && hotData.success && Array.isArray(hotData.tracks) && hotData.tracks.length > 0) {
             uniqueTracks = hotData.tracks;
-            state.isHotPicks = true;
-            state.hotPicksTitle = hotData.title || `Hot picks ${new Date().getFullYear()}`;
+            freshHot = true;
+            freshTitle = hotData.title || `Hot picks ${new Date().getFullYear()}`;
           }
         } catch (_) {}
         markTiming('hot:request-end', `tracks:${uniqueTracks.length}`);
@@ -18265,6 +18288,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           state.hotPicksTitle = cachedWave.title || '';
           return false;
         }
+        state.isHotPicks = false;
+        state.hotPicksTitle = '';
         if (!isRefresh) {
           myWaveCurrentTracks = [];
           if (homeMode === 'wave') {
@@ -18295,7 +18320,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       // blocked artists and songs never make it into My Wave (the server leaves them out too; this is the safety net)
       let freshWave = uniqueTracks.filter(t => !isBlocked(t));
       if (!freshWave.length) freshWave = uniqueTracks;
-      if (window.MurielAppCache && window.MurielAppCache.home) window.MurielAppCache.home.writeWave({ tracks: freshWave, hot: state.isHotPicks, title: state.hotPicksTitle });
+      if (window.MurielAppCache && window.MurielAppCache.home) window.MurielAppCache.home.writeWave({ tracks: freshWave, hot: freshHot, title: freshTitle });
       // the saved wave is on screen and someone is already browsing it: leave it (nothing jumps under their finger);
       // the fresh one is saved and opens next time
       if (cachedWave && (currentWaveFocusedIndex !== 0 || (vibeGrid && (vibeGrid.scrollLeft > 0 || vibeGrid._focusedIndex > 0)))) {
@@ -18303,11 +18328,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         state.hotPicksTitle = cachedWave.title || '';
         return true;
       }
+      state.isHotPicks = freshHot;
+      state.hotPicksTitle = freshTitle;
       myWaveCurrentTracks = freshWave;
       currentWaveFocusedIndex = 0;
       if (spHomeReady && isSpotifyHome()) renderMadeForYou();
       if (homeMode === 'wave') {
-        if (vibeGrid) {
+        if (vibeGrid && !cachedWave) {
           vibeGrid.style.transition = 'none';
           vibeGrid.style.opacity = '0';
         }
@@ -18320,8 +18347,10 @@ document.addEventListener('DOMContentLoaded', async () => {
           if (firstCard && document.activeElement && document.activeElement.closest('#home-vibe-grid')) {
             firstCard.focus();
           }
-          vibeGrid.offsetHeight;
-          vibeGrid.style.transition = 'opacity 250ms ease';
+          if (!cachedWave) {
+            vibeGrid.offsetHeight;
+            vibeGrid.style.transition = 'opacity 250ms ease';
+          }
           vibeGrid.style.opacity = '1';
         }
       }
@@ -19536,7 +19565,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   loadPlugins();
   loadHomePage();
-  initHomeHero();
   resizeCanvases();
   updateOfflineStorageUI();
   updateMusicFolderUI();

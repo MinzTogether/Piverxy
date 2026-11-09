@@ -33,9 +33,14 @@ function createHarness({ isSpotify = false, advWave = true, advJump = true, cach
       innerHTML: '',
       scrollLeft: 0,
       _focusedIndex: 0,
+      children: [],
       querySelector: () => null,
       querySelectorAll: () => [],
-      appendChild: () => {},
+      appendChild: (frag) => {
+        if (frag && Array.isArray(frag._children)) {
+          domElements['home-vibe-grid'].children = frag._children;
+        }
+      },
     },
     'my-wave-focused-meta': { innerHTML: '' },
     'home-hero': { style: {} },
@@ -48,13 +53,26 @@ function createHarness({ isSpotify = false, advWave = true, advJump = true, cach
   const document = {
     getElementById: (id) => domElements[id] || { style: {}, innerHTML: '' },
     querySelector: (sel) => {
-      if (sel.includes('home-pane-label')) return { style: {} };
+      if (sel.includes('home-pane-label')) return { style: {}, addEventListener: () => {} };
       if (sel.includes('my-wave-actions')) return { style: {} };
       return null;
     },
     querySelectorAll: () => [],
-    createDocumentFragment: () => ({ appendChild: () => {} }),
-    createElement: () => ({ style: {}, innerHTML: '' }),
+    createDocumentFragment: () => {
+      const frag = { _children: [], appendChild: (c) => frag._children.push(c) };
+      return frag;
+    },
+    createElement: () => ({
+      style: {},
+      dataset: {},
+      innerHTML: '',
+      addEventListener: () => {},
+      querySelector: () => ({
+        complete: true,
+        classList: { add: () => {} },
+        addEventListener: () => {},
+      }),
+    }),
     activeElement: null,
   };
 
@@ -125,7 +143,9 @@ function createHarness({ isSpotify = false, advWave = true, advJump = true, cach
       renderedCarouselMode = mode;
       events.push({ type: 'renderHomeCarousel', mode, count: ctx.myWaveCurrentTracks.length });
     },
-    loadForYou: () => {},
+    loadForYou: () => {
+      events.push({ type: 'loadForYou' });
+    },
     computeTasteProfile: async () => {
       events.push({ type: 'computeTasteProfile' });
       return { trackCount: 10, seeds: [] };
@@ -137,6 +157,9 @@ function createHarness({ isSpotify = false, advWave = true, advJump = true, cach
     escapeHtml: (s) => String(s),
     I18N: { text: () => {} },
     updateAmbientLight: () => {},
+    updateTextFade: () => {},
+    updateCoverflowCards: () => {},
+    getTrackThumbUrl: (t) => (t && t.thumbnail) || '',
     fetch: async () => ({ ok: true, json: async () => ({ success: true, tracks: [] }) }),
   };
 
@@ -247,7 +270,7 @@ test('restoreCachedWave: returns null and does not render when my_wave is disabl
   assert.equal(events.length, 0);
 });
 
-test('loadHomePage: renders cached wave BEFORE computeTasteProfile and network requests', async () => {
+test('loadHomePage: renders cached wave BEFORE loadForYou, computeTasteProfile, and network requests, without blanking opacity', async () => {
   const cachedData = {
     tracks: [{ id: 'cached1', title: 'Cached Song', artist: 'Cached Artist' }],
     hot: false,
@@ -256,8 +279,17 @@ test('loadHomePage: renders cached wave BEFORE computeTasteProfile and network r
 
   let tasteProfileCalled = false;
   let renderBeforeTasteProfile = false;
+  let opacityZeroSeen = false;
 
-  const { ctx, events, marks } = createHarness({ isSpotify: false, cachedData, homePane: 'wave' });
+  const { ctx, events, marks, domElements } = createHarness({ isSpotify: false, cachedData, homePane: 'wave' });
+
+  Object.defineProperty(domElements['home-vibe-grid'].style, 'opacity', {
+    get() { return this._op; },
+    set(v) {
+      if (v === '0') opacityZeroSeen = true;
+      this._op = v;
+    },
+  });
 
   ctx.renderHomeCarousel = (mode) => {
     if (!tasteProfileCalled) {
@@ -293,13 +325,16 @@ test('loadHomePage: renders cached wave BEFORE computeTasteProfile and network r
   await ctx.loadHomePage(false);
 
   assert.equal(renderBeforeTasteProfile, true, 'Cached carousel must be rendered BEFORE computeTasteProfile');
+  assert.equal(opacityZeroSeen, false, 'vibeGrid must not be blanked to opacity 0 when cachedWave was already displayed');
 
-  // Verify sequence of events
+  // Verify sequence of events: My Wave cache renders BEFORE loadForYou and computeTasteProfile
   const eventTypes = events.map((e) => e.type);
   const firstRenderIdx = eventTypes.indexOf('renderHomeCarousel');
+  const loadForYouIdx = eventTypes.indexOf('loadForYou');
   const tasteProfileIdx = eventTypes.indexOf('computeTasteProfile');
   const fetchVibeIdx = eventTypes.indexOf('fetchVibe');
 
+  assert.ok(firstRenderIdx < loadForYouIdx, 'My Wave cache renders before loadForYou');
   assert.ok(firstRenderIdx < tasteProfileIdx, 'first render before taste profile');
   assert.ok(tasteProfileIdx < fetchVibeIdx, 'taste profile before network fetch');
 
@@ -364,4 +399,59 @@ test('loadHomePage: does not jump carousel if user scrolled while network reques
   const writeEvt = ctx.events.find((e) => e.type === 'writeWave');
   assert.ok(writeEvt, 'fresh tracks should be written to cache');
   assert.equal(writeEvt.data.tracks[0].id, 'fresh1');
+});
+
+test('renderHomeCarousel & buildHomeCard: skips redundant DOM wipe for identical source and sets eager loading + is-loaded on hero card', () => {
+  const cachedData = {
+    tracks: [
+      { id: '1', title: 'Song 1', artist: 'Artist 1', thumbnail: 'https://img/1.jpg' },
+      { id: '2', title: 'Song 2', artist: 'Artist 2', thumbnail: 'https://img/2.jpg' },
+    ],
+    hot: false,
+    title: '',
+  };
+
+  const { ctx, domElements } = createHarness({ isSpotify: false, cachedData, homePane: 'wave' });
+  const buildCardFn = extractFn(appSource, 'buildHomeCard');
+  const renderCarouselFn = extractFn(appSource, 'renderHomeCarousel');
+
+  let createdCount = 0;
+  let lastCardHtml = '';
+  let loadedClassAdded = false;
+  ctx.document.createElement = () => {
+    createdCount++;
+    return {
+      style: {},
+      dataset: {},
+      get innerHTML() { return lastCardHtml; },
+      set innerHTML(v) { lastCardHtml = v; },
+      addEventListener: () => {},
+      querySelector: () => ({
+        complete: true,
+        classList: { add: (c) => { if (c === 'is-loaded') loadedClassAdded = true; } },
+        addEventListener: () => {},
+      }),
+    };
+  };
+
+  vm.runInContext(`${buildCardFn}\n${renderCarouselFn}`, ctx);
+  ctx.myWaveCurrentTracks = cachedData.tracks;
+
+  // First call builds 2 cards
+  ctx.renderHomeCarousel('wave');
+  assert.equal(createdCount, 2);
+  assert.equal(loadedClassAdded, true, 'completed image must immediately receive is-loaded class');
+  assert.ok(lastCardHtml.includes('onload="this.classList.add(\'is-loaded\')"'), 'inline onload handler present');
+
+  // Second call with identical source and mode does NOT wipe or recreate DOM cards
+  ctx.renderHomeCarousel('wave');
+  assert.equal(createdCount, 2, 'must not destroy and recreate DOM cards when called again with same source');
+});
+
+test('mobile electronAPI: getServerPort resolves immediately without blocking on ready (fs.init)', async () => {
+  const electronApiSource = fs.readFileSync(path.join(__dirname, '..', 'mobile', 'electron-api.js'), 'utf8');
+  assert.ok(
+    electronApiSource.includes('getServerPort: async () => port'),
+    'getServerPort must return port immediately without waiting on ready'
+  );
 });

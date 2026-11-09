@@ -84,7 +84,7 @@ Ví dụ: tải về `Music/Muriel Mod` thì quét ra các thư mục trong `Mus
 
 **Kiểm tra trên máy.** Mỗi lần mở app ghi một dòng vào nhật ký (Settings → About → Share error log), ví dụ `start: 812 entries listed in 140 ms; 460 text files, 455 from the app cache, 5 read; ready in 210 ms`. Lần mở đầu tiên sau khi cập nhật bản mod thì `0 from the app cache` (cache còn trống, chậm như cũ); từ lần thứ hai gần hết tệp phải đến từ cache. Việc đo tốc độ thật trên điện thoại chưa làm được trong môi trường phát triển này.
 
-**Chưa làm.** `getServerPort()` vẫn chờ `fs.init()`, tức là mở app vẫn phải liệt kê thư mục dữ liệu (một lần gọi cho mỗi thư mục) và quét thư mục nhạc; phần đó không đổi.
+**Tối ưu đường khởi động.** `getServerPort()` trên mobile trả cổng ngay lập tức thay vì chặn `DOMContentLoaded` chờ `fs.init()` (mọi lời gọi `fetch` / `electronAPI` cần file index đều tự đợi `ready` ở dưới nền). Nhờ vậy giao diện, theme và cache của My Wave / For you được vẽ ngay ở frame đầu tiên; đồng thời `fs.init()` nạp IndexedDB song song với `store.list()` và duyệt các thư mục con song song.
 
 ## Quyền đọc nhạc
 

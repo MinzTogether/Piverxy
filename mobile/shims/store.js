@@ -248,13 +248,15 @@ async function writeInPieces(vpath, size, piece) {
 async function walk(rpath, directory, toV, out) {
   let res;
   try { res = await Filesystem.readdir({ path: rpath, directory }); } catch (e) { return; }
+  const subdirs = [];
   for (const f of res.files) {
     if (f.name.startsWith(PART)) continue; // a song still being copied by a move
     const child = `${rpath}/${f.name}`;
     const isDir = f.type === 'directory';
     out.push({ vpath: toV(child), rpath: child, isDir, size: f.size || 0, mtimeMs: Number(f.mtime) || Date.now() });
-    if (isDir) await walk(child, directory, toV, out);
+    if (isDir) subdirs.push(child);
   }
+  if (subdirs.length) await Promise.all(subdirs.map((d) => walk(d, directory, toV, out)));
 }
 
 // ---- Android: moving the downloads to another folder ----

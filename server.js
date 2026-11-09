@@ -847,10 +847,12 @@ async function dzRelatedTracks(artist) {
         const topTracks = topData?.data || [];
         const match = 1 - (relatedIndex / 12) * 0.6;
         return topTracks.map(item => ({
+          ...deezerTrackToTrack({ ...item, artist: item.artist || relArtist }),
           artist: item.artist?.name || relArtist.name || 'unknown artist',
           title: item.title || 'untitled',
           match,
-          source: 'deezer'
+          source: 'deezer',
+          playable: !!(item && item.id)
         }));
       } catch (_) {
         return [];
@@ -870,10 +872,12 @@ async function dzRadioTracks(artist) {
     const radData = await httpGetJson(radUrl, 6000);
     const items = radData?.data || [];
     return items.map(item => ({
+      ...deezerTrackToTrack(item),
       artist: item.artist?.name || 'unknown artist',
       title: item.title || 'untitled',
       match: 0.7,
-      source: 'deezer'
+      source: 'deezer',
+      playable: !!(item && item.id)
     }));
   } catch (_) {
     return [];
@@ -1038,14 +1042,17 @@ async function gatherCandidates(seeds) {
   const seedList = (Array.isArray(seeds) ? seeds : []).slice(0, 4);
   const perSeed = await Promise.all(seedList.map(async (seed) => {
     const weight = Number(seed?.weight) || 1;
-    const [radio, similar, dzRel, dzRad] = await Promise.all([
+    const [radio, dzRad] = await Promise.all([
       ytmRadioTracks(seed).catch(() => []),
-      lastfmSimilarTracks(seed).catch(() => []),
-      dzRelatedTracks(seed?.artist).catch(() => []),
       dzRadioTracks(seed?.artist).catch(() => [])
     ]);
+    const enoughFast = ((radio ? radio.length : 0) + (dzRad ? dzRad.length : 0)) >= 10;
+    const [similar, dzRel] = enoughFast ? [[], []] : await Promise.all([
+      lastfmSimilarTracks(seed).catch(() => []),
+      dzRelatedTracks(seed?.artist).catch(() => [])
+    ]);
     // the yt-dlp mix only when YouTube Music's radio had nothing (it costs a yt-dlp run, and phones have none)
-    const ytmix = radio && radio.length ? [] : await ytMixTracks(seed).catch(() => []);
+    const ytmix = (radio && radio.length) || enoughFast ? [] : await ytMixTracks(seed).catch(() => []);
     const list = [];
     (radio || []).forEach(t => {
       list.push({ ...t, match: (Number(t.match) || 0.7) * 1.4, seedWeight: weight });
@@ -5776,35 +5783,49 @@ async function handleHotPicks(req, res, parsedUrl) {
   try {
     const data = await fetchItunesJson('https://api.deezer.com/chart/0/tracks?limit=40');
     const rawItems = (data && Array.isArray(data.data)) ? data.data : [];
-    const candidates = rawItems
-      .filter(item => item && item.title && item.artist && item.artist.name)
-      .map(item => ({ artist: item.artist.name, title: item.title, isExplicit: !!(item.explicit_lyrics || item.explicit_content_lyrics === 1) }));
-    if (candidates.length === 0) {
+    const validItems = rawItems.filter(item => item && item.title && item.artist && item.artist.name);
+    if (validItems.length === 0) {
       return sendResponse(200, { success: false });
     }
 
     const resolvedTracks = [];
     const seenIds = new Set();
-    let cIdx = 0;
-
-    const worker = async () => {
-      while (cIdx < candidates.length && resolvedTracks.length < 12) {
-        const c = candidates[cIdx++];
-        if (!c) break;
-        try {
-          const track = await resolveCandidate(c);
-          if (track && !seenIds.has(track.id)) {
-            if (c.isExplicit) track.isExplicit = true;
-            seenIds.add(track.id);
-            if (resolvedTracks.length < 12) {
-              resolvedTracks.push(track);
-            }
-          }
-        } catch (_) {}
+    for (const item of validItems) {
+      if (resolvedTracks.length >= 25) break;
+      if (item.id || (item.album && (item.album.cover_big || item.album.cover_medium))) {
+        const track = deezerTrackToTrack(item);
+        if (item.explicit_lyrics || item.explicit_content_lyrics === 1) track.isExplicit = true;
+        if (track && !seenIds.has(track.id)) {
+          seenIds.add(track.id);
+          resolvedTracks.push(track);
+        }
       }
-    };
+    }
 
-    await Promise.all([worker(), worker(), worker(), worker()]);
+    if (resolvedTracks.length < 12) {
+      const candidates = validItems
+        .map(item => ({ artist: item.artist.name, title: item.title, isExplicit: !!(item.explicit_lyrics || item.explicit_content_lyrics === 1) }));
+      let cIdx = 0;
+
+      const worker = async () => {
+        while (cIdx < candidates.length && resolvedTracks.length < 12) {
+          const c = candidates[cIdx++];
+          if (!c) break;
+          try {
+            const track = await resolveCandidate(c);
+            if (track && !seenIds.has(track.id)) {
+              if (c.isExplicit) track.isExplicit = true;
+              seenIds.add(track.id);
+              if (resolvedTracks.length < 12) {
+                resolvedTracks.push(track);
+              }
+            }
+          } catch (_) {}
+        }
+      };
+
+      await Promise.all([worker(), worker(), worker(), worker()]);
+    }
 
     if (resolvedTracks.length === 0) {
       return sendResponse(200, { success: false });
@@ -5819,7 +5840,7 @@ async function handleHotPicks(req, res, parsedUrl) {
     return sendResponse(200, {
       success: true,
       title,
-      tracks: resolvedTracks
+      tracks: resolvedTracks.slice(0, limit)
     });
   } catch (err) {
     return sendResponse(200, { success: false });
