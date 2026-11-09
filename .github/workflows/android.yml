@@ -1,6 +1,6 @@
 name: Android build
 
-# Builds a signed Muriel.apk and publishes it to the rolling "android-latest" release.
+# Builds a signed Piverxy.apk and publishes it to the rolling "android-latest" release.
 # Signed with the same release key every time (GitHub secrets), so new builds install as updates.
 on:
   push:
@@ -47,25 +47,31 @@ jobs:
 
       - name: Build signed APK
         env:
-          MURIEL_KEYSTORE_B64: ${{ secrets.MURIEL_KEYSTORE_B64 }}
-          MURIEL_KEYSTORE_PASSWORD: ${{ secrets.MURIEL_KEYSTORE_PASSWORD }}
-          MURIEL_KEY_PASSWORD: ${{ secrets.MURIEL_KEYSTORE_PASSWORD }}
-          MURIEL_KEY_ALIAS: muriel
-          MURIEL_VERSION_CODE: ${{ github.run_number }}
+          PIVERXY_KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          PIVERXY_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          PIVERXY_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          PIVERXY_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          PIVERXY_VERSION_CODE: ${{ github.run_number }}
         run: |
-          echo "$MURIEL_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/muriel-release.p12"
-          export MURIEL_KEYSTORE="$RUNNER_TEMP/muriel-release.p12"
-          export MURIEL_VERSION_NAME="$(node -p "require('./package.json').version")"
+          test -n "$PIVERXY_KEYSTORE_BASE64" || { echo "Missing KEYSTORE_BASE64 secret"; exit 1; }
+          test -n "$PIVERXY_KEYSTORE_PASSWORD" || { echo "Missing KEYSTORE_PASSWORD secret"; exit 1; }
+          test -n "$PIVERXY_KEY_PASSWORD" || { echo "Missing KEY_PASSWORD secret"; exit 1; }
+          test -n "$PIVERXY_KEY_ALIAS" || { echo "Missing KEY_ALIAS secret"; exit 1; }
+          printf '%s' "$PIVERXY_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/piverxy-release.p12"
+          keytool -list -keystore "$RUNNER_TEMP/piverxy-release.p12" -storetype PKCS12 \
+            -storepass "$PIVERXY_KEYSTORE_PASSWORD" -alias "$PIVERXY_KEY_ALIAS" >/dev/null
+          export PIVERXY_KEYSTORE="$RUNNER_TEMP/piverxy-release.p12"
+          export PIVERXY_VERSION_NAME="$(node -p "require('./package.json').version")"
           cd android
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon
-          cp app/build/outputs/apk/release/app-release.apk ../Muriel.apk
-          ls -lh ../Muriel.apk
+          cp app/build/outputs/apk/release/app-release.apk ../Piverxy.apk
+          ls -lh ../Piverxy.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Muriel-apk
-          path: Muriel.apk
+          name: Piverxy-apk
+          path: Piverxy.apk
 
       - name: Publish to the android-latest release
         if: github.ref == 'refs/heads/main'
@@ -79,8 +85,8 @@ jobs:
           # website adds this to the new file's count). 3530 = downloads counted before this existed
           ver="$(node -p "require('./package.json').version")"
           gh release delete android-latest --cleanup-tag --yes 2>/dev/null || true
-          gh release create android-latest Muriel.apk \
+          gh release create android-latest Piverxy.apk \
             --prerelease \
             --target "$GITHUB_SHA" \
-            --title "Muriel for Android (latest build)" \
-            --notes "Muriel $ver. Build of ${GITHUB_SHA::7} (run ${{ github.run_number }}). Download Muriel.apk on your phone and open it to install. Allow installs from your browser/files app if Android asks.<!-- muriel-version: $ver -->"
+            --title "Piverxy for Android (latest build)" \
+            --notes "Piverxy $ver. Build of ${GITHUB_SHA::7} (run ${{ github.run_number }}). Download Piverxy.apk on your phone and open it to install. Allow installs from your browser/files app if Android asks.<!-- muriel-version: $ver -->"

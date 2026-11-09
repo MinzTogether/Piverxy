@@ -10,8 +10,8 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         // CI passes the run number so every build installs as an update
-        versionCode((System.getenv("MURIEL_VERSION_CODE") ?: "1").toInteger())
-        versionName System.getenv("MURIEL_VERSION_NAME") ?: "1.0"
+        versionCode((System.getenv("PIVERXY_VERSION_CODE") ?: "1").toInteger())
+        versionName System.getenv("PIVERXY_VERSION_NAME") ?: "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -23,18 +23,19 @@ android {
     // new APKs install over old ones instead of requiring an uninstall.
     signingConfigs {
         release {
-            def ks = System.getenv("MURIEL_KEYSTORE")
+            def ks = System.getenv("PIVERXY_KEYSTORE")
             if (ks) {
                 storeFile file(ks)
-                storePassword System.getenv("MURIEL_KEYSTORE_PASSWORD")
-                keyAlias System.getenv("MURIEL_KEY_ALIAS")
-                keyPassword System.getenv("MURIEL_KEY_PASSWORD")
+                storeType "PKCS12"
+                storePassword System.getenv("PIVERXY_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("PIVERXY_KEY_ALIAS")
+                keyPassword System.getenv("PIVERXY_KEY_PASSWORD")
             }
         }
     }
     buildTypes {
         release {
-            if (System.getenv("MURIEL_KEYSTORE")) signingConfig signingConfigs.release
+            if (System.getenv("PIVERXY_KEYSTORE")) signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
