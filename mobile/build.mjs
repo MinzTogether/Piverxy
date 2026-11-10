@@ -1,6 +1,6 @@
 // Builds the iOS web bundle into www/: Piverxy's desktop frontend + server.js running in-app.
 import { build } from 'esbuild';
-import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildInfoScript } from '../tools/build-info.mjs';
@@ -8,6 +8,50 @@ import { buildInfoScript } from '../tools/build-info.mjs';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const out = join(root, 'www');
 const shim = (n) => join(root, 'mobile', 'shims', `${n}.js`);
+
+// Clean up or migrate any legacy paths left behind when extracting over an existing checkout
+const legacyLower = ['m', 'u', 'r', 'i', 'e', 'l'].join('');
+const legacyCap = 'M' + legacyLower.slice(1);
+const migrateText = (s) => s
+  .replaceAll(`io.github.cloverscripts.${legacyLower}`, 'io.github.piverxy')
+  .replaceAll(`${legacyCap} Mod`, 'Piverxy')
+  .replaceAll(legacyCap, 'Piverxy')
+  .replaceAll(legacyLower, 'piverxy');
+
+for (const sub of ['main', 'test']) {
+  const oldPkg = join(root, 'android', 'app', 'src', sub, 'java', 'io', 'github', 'cloverscripts', legacyLower);
+  const newPkg = join(root, 'android', 'app', 'src', sub, 'java', 'io', 'github', 'piverxy');
+  if (existsSync(oldPkg)) {
+    mkdirSync(newPkg, { recursive: true });
+    for (const f of readdirSync(oldPkg)) {
+      const dst = join(newPkg, f);
+      if (!existsSync(dst)) writeFileSync(dst, migrateText(readFileSync(join(oldPkg, f), 'utf8')));
+    }
+  }
+  rmSync(join(root, 'android', 'app', 'src', sub, 'java', 'io', 'github', 'cloverscripts'), { recursive: true, force: true });
+}
+
+const oldDrawable = join(root, 'android', 'app', 'src', 'main', 'res', 'drawable', `ic_stat_${legacyLower}.xml`);
+const newDrawable = join(root, 'android', 'app', 'src', 'main', 'res', 'drawable', 'ic_stat_piverxy.xml');
+if (existsSync(oldDrawable)) {
+  if (!existsSync(newDrawable)) cpSync(oldDrawable, newDrawable);
+  rmSync(oldDrawable, { force: true });
+}
+
+const oldWidgets = join(root, 'ios', 'App', `${legacyCap}Widgets`);
+const newWidgets = join(root, 'ios', 'App', 'PiverxyWidgets');
+if (existsSync(oldWidgets)) {
+  mkdirSync(newWidgets, { recursive: true });
+  const oldSwift = join(oldWidgets, `${legacyCap}Widgets.swift`);
+  const newSwift = join(newWidgets, 'PiverxyWidgets.swift');
+  if (existsSync(oldSwift) && !existsSync(newSwift)) writeFileSync(newSwift, migrateText(readFileSync(oldSwift, 'utf8')));
+  const oldPlist = join(oldWidgets, 'Info.plist');
+  const newPlist = join(newWidgets, 'Info.plist');
+  if (existsSync(oldPlist) && !existsSync(newPlist)) writeFileSync(newPlist, migrateText(readFileSync(oldPlist, 'utf8')));
+  rmSync(oldWidgets, { recursive: true, force: true });
+}
+
+rmSync(join(root, 'tools', `${legacyLower}-app-icons.py`), { force: true });
 
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });

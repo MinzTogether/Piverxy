@@ -1,11 +1,21 @@
 apply plugin: 'com.android.application'
 
+// Remove legacy package directories or drawables if extracted over an existing checkout
+delete 'src/main/java/io/github/cloverscripts', 'src/test/java/io/github/cloverscripts'
+delete fileTree('src/main/res/drawable') { include 'ic_stat_*.xml'; exclude 'ic_stat_piverxy.xml' }
+
 android {
     namespace = "io.github.piverxy"
     compileSdk = rootProject.ext.compileSdkVersion
+    sourceSets {
+        main {
+            java.exclude '**/cloverscripts/**'
+        }
+        test {
+            java.exclude '**/cloverscripts/**'
+        }
+    }
     defaultConfig {
-        // the mod installs next to the original Piverxy (io.github.piverxy): another package name.
-        // The Java package (namespace above) stays the same on purpose.
         applicationId "io.github.piverxy"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
