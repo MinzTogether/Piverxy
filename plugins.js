@@ -1,87 +1,122 @@
-const { dialog, ipcMain, shell } = require('electron');
 const fs = require('fs');
 const path = require('path');
+const { dialog, ipcMain, shell } = require('electron');
 const { DATA_DIR } = require('./platform');
 
 const PLUGINS_DIR = path.join(DATA_DIR, 'plugins');
-const STATE_PATH = path.join(PLUGINS_DIR, 'plugins.json');
-const MAX_BYTES = 1024 * 1024;
-const safeName = (n) => /^[\w.\- ]+\.js$/.test(String(n)) && !String(n).includes('..');
-
-const EXAMPLE = '/**\n * @name Hello plugin\n * @author Piverxy\n * @version 1.0.0\n * @description Shows a message when the track changes. Edit or delete this file.\n */\nconst off = Piverxy.on(\'trackchange\', (track) => Piverxy.toast(\'Now playing: \' + track.title));\nreturn { stop() { off(); } };\n';
+const STATE_FILE = path.join(PLUGINS_DIR, 'state.json');
 
 function ensureDir() {
-  if (fs.existsSync(PLUGINS_DIR)) return;
-  fs.mkdirSync(PLUGINS_DIR, { recursive: true });
-  try { fs.writeFileSync(path.join(PLUGINS_DIR, 'example-hello.js'), EXAMPLE); } catch (e) {}
+  try { fs.mkdirSync(PLUGINS_DIR, { recursive: true }); } catch (e) {}
 }
 
 function readState() {
-  try {
-    const j = JSON.parse(fs.readFileSync(STATE_PATH, 'utf8'));
-    return j && typeof j.enabled === 'object' && j.enabled ? j.enabled : {};
-  } catch (e) { return {}; }
+  try { return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')) || {}; } catch (e) { return {}; }
 }
 
-function writeState(enabled) {
+function writeState(state) {
   ensureDir();
-  fs.writeFileSync(STATE_PATH, JSON.stringify({ enabled }));
+  try { fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2), 'utf8'); } catch (e) {}
 }
 
-function parseMeta(code, fallbackName) {
-  const block = code.match(/\/\*[\s\S]*?\*\//);
-  const text = block ? block[0] : '';
-  const pick = (key) => {
-    const m = text.match(new RegExp('@' + key + '[ \\t]+([^\\r\\n*]+)'));
-    return m ? m[1].trim() : '';
+function parseMeta(code, file) {
+  const meta = { name: file.replace(/\.js$/i, ''), author: '', version: '', description: '' };
+  const head = code.slice(0, 2048);
+  for (const key of ['name', 'author', 'version', 'description']) {
+    const m = head.match(new RegExp(`@${key}\\s+([^\\r\\n*]+)`, 'i'));
+    if (m) meta[key] = m[1].trim();
+  }
+  return meta;
+}
+
+function isSafePluginFile(file) {
+  return typeof file === 'string' && file === path.basename(file) && /\.js$/i.test(file) && !file.startsWith('.');
+}
+
+function listPlugins() {
+  ensureDir();
+  const state = readState();
+  let files = [];
+  try { files = fs.readdirSync(PLUGINS_DIR).filter((f) => f.toLowerCase().endsWith('.js')); } catch (e) {}
+  return files.map((file) => {
+    let code = '';
+    try { code = fs.readFileSync(path.join(PLUGINS_DIR, file), 'utf8'); } catch (e) {}
+    return { file, ...parseMeta(code, file), enabled: !!state[file], code };
+  });
+}
+
+function register(getWin) {
+  const isAppWindow = (event) => {
+    const win = typeof getWin === 'function' ? getWin() : null;
+    if (!win || win.isDestroyed() || !event || event.sender !== win.webContents) return false;
+    if (event.senderFrame && event.senderFrame !== win.webContents.mainFrame) return false;
+    return true;
   };
-  return { name: pick('name') || fallbackName, author: pick('author'), version: pick('version'), description: pick('description') };
-}
 
-function listAll() {
-  ensureDir();
-  const enabled = readState();
-  return fs.readdirSync(PLUGINS_DIR).filter((f) => f.toLowerCase().endsWith('.js') && safeName(f)).map((f) => {
-    try {
-      const full = path.join(PLUGINS_DIR, f);
-      if (fs.statSync(full).size > MAX_BYTES) return null;
-      const code = fs.readFileSync(full, 'utf8');
-      return { file: f, ...parseMeta(code, f.replace(/\.js$/i, '')), enabled: !!enabled[f], code };
-    } catch (e) { return null; }
-  }).filter(Boolean);
-}
+  ipcMain.removeHandler('list-plugins');
+  ipcMain.removeHandler('set-plugin-enabled');
+  ipcMain.removeHandler('remove-plugin');
+  ipcMain.removeHandler('disable-all-plugins');
+  ipcMain.removeHandler('import-plugins');
 
-function register(getWindow) {
-  ipcMain.handle('plugins-list', () => listAll());
-  ipcMain.on('plugins-set-enabled', (e, file, on) => {
-    if (!safeName(file)) return;
-    const s = readState();
-    if (on) s[file] = true; else delete s[file];
-    writeState(s);
+  ipcMain.handle('list-plugins', (event) => {
+    if (!isAppWindow(event)) return [];
+    return listPlugins();
   });
-  ipcMain.on('plugins-disable-all', () => writeState({}));
-  ipcMain.on('plugins-open-folder', () => { ensureDir(); shell.openPath(PLUGINS_DIR); });
-  ipcMain.on('plugins-remove', (e, file) => {
-    if (!safeName(file)) return;
-    try { fs.unlinkSync(path.join(PLUGINS_DIR, file)); } catch (err) {}
-    const s = readState();
-    delete s[file];
-    writeState(s);
+
+  ipcMain.handle('set-plugin-enabled', (event, { file, enabled } = {}) => {
+    if (!isAppWindow(event) || !isSafePluginFile(file)) return false;
+    const state = readState();
+    state[file] = !!enabled;
+    writeState(state);
+    return true;
   });
-  ipcMain.handle('plugins-import', async () => {
+
+  ipcMain.handle('remove-plugin', (event, file) => {
+    if (!isAppWindow(event) || !isSafePluginFile(file)) return false;
+    const safe = path.basename(String(file || ''));
+    try { fs.unlinkSync(path.join(PLUGINS_DIR, safe)); } catch (e) {}
+    const state = readState();
+    delete state[safe];
+    writeState(state);
+    return true;
+  });
+
+  ipcMain.handle('disable-all-plugins', (event) => {
+    if (!isAppWindow(event)) return false;
+    writeState({});
+    return true;
+  });
+
+  ipcMain.handle('import-plugins', async (event) => {
+    if (!isAppWindow(event)) return 0;
     ensureDir();
-    const result = await dialog.showOpenDialog(getWindow(), { title: 'Add plugin', properties: ['openFile', 'multiSelections'], filters: [{ name: 'JavaScript plugin', extensions: ['js'] }] });
-    if (result.canceled) return 0;
-    let added = 0;
-    for (const file of result.filePaths) {
+    const res = await dialog.showOpenDialog(getWin(), {
+      title: 'Add Plugin',
+      filters: [{ name: 'Piverxy Plugin (.js)', extensions: ['js'] }],
+      properties: ['openFile', 'multiSelections']
+    });
+    if (res.canceled || !res.filePaths.length) return 0;
+    const state = readState();
+    let count = 0;
+    for (const src of res.filePaths) {
+      const name = path.basename(src);
+      if (!name.toLowerCase().endsWith('.js')) continue;
       try {
-        const name = path.basename(file);
-        if (!safeName(name) || fs.statSync(file).size > MAX_BYTES) continue;
-        fs.copyFileSync(file, path.join(PLUGINS_DIR, name));
-        added++;
+        fs.copyFileSync(src, path.join(PLUGINS_DIR, name));
+        if (!(name in state)) state[name] = false;
+        count++;
       } catch (e) {}
     }
-    return added;
+    writeState(state);
+    return count;
+  });
+
+  ipcMain.removeAllListeners('open-plugins-folder');
+  ipcMain.on('open-plugins-folder', (event) => {
+    if (!isAppWindow(event)) return;
+    ensureDir();
+    shell.openPath(PLUGINS_DIR);
   });
 }
 

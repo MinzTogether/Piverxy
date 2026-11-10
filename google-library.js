@@ -4,7 +4,9 @@
 // for the first one), apart from the app's own pages: Piverxy's window never gets the Google cookies, and the
 // login window gets neither Piverxy's preload API nor its server token. Only "logged in or not" and the songs
 // (checked and capped here) go back to the page.
-const { BrowserWindow, ipcMain, session, shell } = require('electron');
+let electron = {};
+try { electron = require('electron') || {}; } catch (_) {}
+const { BrowserWindow, ipcMain, session, shell } = electron;
 const crypto = require('crypto');
 
 const PROFILE_RE = /^(?:default|[a-z0-9]{4,16})$/;
@@ -243,13 +245,15 @@ function login(parent, profile) {
       modal: !!parent,
       title: 'Log in to Google',
       autoHideMenuBar: true,
-      webPreferences: { session: s, contextIsolation: true, nodeIntegration: false, sandbox: true, webviewTag: false },
+      webPreferences: { session: s, contextIsolation: true, nodeIntegration: false, sandbox: true, webSecurity: true, allowRunningInsecureContent: false, webviewTag: false },
     });
     const wc = win.webContents;
     try { wc.setUserAgent(CHROME_UA); } catch (e) {}
     // help links and the like open in the browser; the login itself only ever shows https pages
     wc.setWindowOpenHandler(({ url }) => { try { if (new URL(url).protocol === 'https:') shell.openExternal(url); } catch (e) {} return { action: 'deny' }; });
+    wc.on('will-attach-webview', (e) => e.preventDefault());
     wc.on('will-navigate', (e, url) => { try { if (new URL(url).protocol !== 'https:') e.preventDefault(); } catch (x) { e.preventDefault(); } });
+    wc.on('will-redirect', (e, url) => { try { if (new URL(url).protocol !== 'https:') e.preventDefault(); } catch (x) { e.preventDefault(); } });
     const finish = (loggedIn) => {
       if (finished) return;
       finished = true;
@@ -272,14 +276,28 @@ function login(parent, profile) {
 }
 
 function register(getMainWindow) {
+  const isAppWindow = (event) => {
+    const win = typeof getMainWindow === 'function' ? getMainWindow() : null;
+    if (!win || win.isDestroyed() || !event || event.sender !== win.webContents) return false;
+    if (event.senderFrame && event.senderFrame !== win.webContents.mainFrame) return false;
+    return true;
+  };
   for (const ch of ['google-auth-status', 'google-login', 'google-logout', 'google-import-library']) ipcMain.removeHandler(ch);
-  ipcMain.handle('google-auth-status', async (e, profile) => ({ loggedIn: !!(await sapisid(googleSession(profile))) }));
-  ipcMain.handle('google-login', (e, profile) => login(BrowserWindow.fromWebContents(e.sender) || getMainWindow(), profile));
+  ipcMain.handle('google-auth-status', async (e, profile) => {
+    if (!isAppWindow(e)) return { loggedIn: false };
+    return { loggedIn: !!(await sapisid(googleSession(profile))) };
+  });
+  ipcMain.handle('google-login', (e, profile) => {
+    if (!isAppWindow(e)) return { success: false, loggedIn: false };
+    return login(BrowserWindow.fromWebContents(e.sender) || getMainWindow(), profile);
+  });
   ipcMain.handle('google-logout', async (e, profile) => {
+    if (!isAppWindow(e)) return { success: false, error: 'Unauthorized' };
     try { await googleSession(profile).clearStorageData(); return { success: true }; } catch (err) { return { success: false, error: 'Logout failed' }; }
   });
   let running = false;
   ipcMain.handle('google-import-library', async (e, opts) => {
+    if (!isAppWindow(e)) return { success: false, error: 'Unauthorized' };
     if (running) return { success: false, error: 'An import is already running' };
     running = true;
     try { return await importLibrary(opts && typeof opts === 'object' ? opts : {}); } finally { running = false; }

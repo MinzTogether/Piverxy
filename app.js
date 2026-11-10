@@ -1088,7 +1088,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     return new Promise((resolve) => {
       if (!imgSrc) return resolve('#6750A4');
       const img = new Image();
-      img.crossOrigin = 'Anonymous';
+      if (!/^(?:file|data|blob|capacitor):/i.test(imgSrc)) img.crossOrigin = 'Anonymous';
       img.onload = () => {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
@@ -1140,7 +1140,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       const img = new Image();
-      img.crossOrigin = 'Anonymous';
+      if (!/^(?:file|data|blob|capacitor):/i.test(imgSrc)) img.crossOrigin = 'Anonymous';
       img.onload = () => {
         try {
           const canvas = document.createElement('canvas');
@@ -13171,18 +13171,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (settingsSearchClear) settingsSearchClear.addEventListener('click', () => { clearSettingsSearch(); settingsSearchInput.focus(); });
   }
 
-  let customThemes = [];
-  let appCssCache = null;
-
   function applyCustomStyles() {
-    document.querySelectorAll('style[data-piverxy-custom]').forEach((n) => n.remove());
-    customThemes.filter((t) => t.enabled).forEach((t) => {
-      const s = document.createElement('style');
-      s.dataset.piverxyCustom = 'theme';
-      s.dataset.themeId = t.id;
-      s.textContent = t.css;
-      document.head.appendChild(s);
-    });
+    document.querySelectorAll('style[data-piverxy-custom="user"]').forEach((n) => n.remove());
     const userCss = localStorage.getItem('piverxy_custom_css') || '';
     if (userCss.trim()) {
       const s = document.createElement('style');
@@ -13197,15 +13187,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const userCss = localStorage.getItem('piverxy_custom_css') || '';
     if (userCss.trim()) localStorage.setItem('piverxy_custom_css_backup', userCss);
     localStorage.removeItem('piverxy_custom_css');
-    customThemes.forEach((t) => { t.enabled = false; });
-    if (window.electronAPI && window.electronAPI.disableAllThemes) window.electronAPI.disableAllThemes();
-    if (typeof cssEditorInstance !== 'undefined' && cssEditorInstance) cssEditorInstance.setValue('');
     if (window.electronAPI && window.electronAPI.disableAllPlugins) window.electronAPI.disableAllPlugins();
     pluginsCache.forEach((p) => { p.enabled = false; stopPlugin(p, true); });
     renderPluginCards();
     applyCustomStyles();
-    renderThemeCards();
-    showToast(Tm('Custom CSS, themes and plugins reset (Ctrl+Shift+R)'), 'info');
+    showToast(Tm('Custom CSS and plugins reset (Ctrl+Shift+R)'), 'info');
   }
 
   window.addEventListener('keydown', (e) => {
@@ -13215,99 +13201,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       resetCustomStyling();
     }
   }, true);
-
-  async function mountThemePreview(host, themeCss) {
-    if (!window.electronAPI || !window.electronAPI.getAppCss) return;
-    if (appCssCache === null) appCssCache = (await window.electronAPI.getAppCss()) || '';
-    const rewrite = (css) => css
-      .replace(/:root/g, ':host')
-      .replace(/(^|[\s,{};])html(?![\w-])/g, '$1:host')
-      .replace(/(^|[\s,{};])body(?![\w-])/g, '$1.ct-mini');
-    const root = host.shadowRoot || host.attachShadow({ mode: 'open' });
-    root.textContent = '';
-    const addStyle = (css) => {
-      const styleEl = document.createElement('style');
-      styleEl.textContent = css;
-      root.appendChild(styleEl);
-    };
-    addStyle('.ct-mini{position:absolute;left:0;top:0;transform-origin:0 0;overflow:hidden;}');
-    addStyle(rewrite(appCssCache));
-    addStyle(rewrite(themeCss));
-    const mini = document.createElement('div');
-    mini.className = `ct-mini ${document.body.className}`;
-    mini.style.width = `${window.innerWidth}px`;
-    mini.style.height = `${window.innerHeight}px`;
-    [...document.body.children].forEach((n) => {
-      if (/^(SCRIPT|STYLE|LINK)$/.test(n.tagName) || n.classList.contains('modal-backdrop') || n.id === 'css-editor' || n.id === 'custom-bg') return;
-      mini.appendChild(n.cloneNode(true));
-    });
-    mini.querySelectorAll('video, audio, canvas, iframe').forEach((n) => n.remove());
-    root.appendChild(mini);
-    const fit = () => { const w = host.clientWidth; if (w) mini.style.transform = `scale(${w / window.innerWidth})`; };
-    new ResizeObserver(fit).observe(host);
-    fit();
-  }
-
-  function renderThemeCards() {
-    const list = document.getElementById('custom-themes-list');
-    if (!list) return;
-    list.innerHTML = '';
-    if (!customThemes.length) {
-      const empty = document.createElement('div');
-      empty.className = 'ct-empty';
-      empty.textContent = 'No themes yet. Click Add and choose a .css file.';
-      empty.dataset.i18n = '';
-      list.appendChild(empty);
-      return;
-    }
-    customThemes.forEach((t) => {
-      const card = document.createElement('div');
-      card.className = 'ct-card';
-      card.innerHTML = '<div class="ct-preview"></div><div class="ct-info"><div class="ct-name"></div><div class="ct-meta"></div></div><button class="btn-icon-pill ct-remove" title="Remove" data-i18n-attr="title"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button><button class="effect-switch-btn"><span class="thumb"></span></button>';
-      card.querySelector('.ct-name').textContent = t.name;
-      card.querySelector('.ct-meta').textContent = [t.author && `by ${t.author}`, t.description].filter(Boolean).join(' · ');
-      const preview = card.querySelector('.ct-preview');
-      preview.style.aspectRatio = `${window.innerWidth} / ${window.innerHeight}`;
-      const toggle = card.querySelector('.effect-switch-btn');
-      toggle.classList.toggle('active', !!t.enabled);
-      toggle.addEventListener('click', () => {
-        t.enabled = !t.enabled;
-        toggle.classList.toggle('active', t.enabled);
-        window.electronAPI.setThemeEnabled(t.id, t.enabled);
-        applyCustomStyles();
-      });
-      card.querySelector('.ct-remove').addEventListener('click', () => {
-        window.electronAPI.removeTheme(t.id);
-        customThemes = customThemes.filter((x) => x.id !== t.id);
-        applyCustomStyles();
-        renderThemeCards();
-        showToast(Tm('Theme removed'), 'info');
-      });
-      list.appendChild(card);
-      mountThemePreview(preview, t.css);
-    });
-  }
-
-  async function loadCustomThemes() {
-    if (!window.electronAPI || !window.electronAPI.listThemes) {
-      applyCustomStyles();
-      return;
-    }
-    customThemes = await window.electronAPI.listThemes();
-    applyCustomStyles();
-    renderThemeCards();
-  }
-
-  const btnAddTheme = document.getElementById('btn-add-theme');
-  if (btnAddTheme && window.electronAPI && window.electronAPI.importThemes) {
-    btnAddTheme.addEventListener('click', async () => {
-      const added = await window.electronAPI.importThemes();
-      if (!added.length) return;
-      customThemes.push(...added);
-      renderThemeCards();
-      showToast(added.length > 1 ? Tm('Added {0} themes. Turn one on to try it', added.length) : Tm('Added 1 theme. Turn it on to try it'), 'info');
-    });
-  }
 
   const loadedPlugins = new Map();
   const pluginListeners = [];
@@ -13427,96 +13320,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       showToast(added > 1 ? Tm('Added {0} plugins. Turn one on to run it', added) : Tm('Added 1 plugin. Turn it on to run it'), 'info');
     });
   }
-
-  let cssEditorInstance = null;
-  let cssEditorLoading = null;
-
-  function loadMonaco() {
-    if (window.monaco) return Promise.resolve(window.monaco);
-    if (cssEditorLoading) return cssEditorLoading;
-    cssEditorLoading = new Promise((resolve, reject) => {
-      const link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.href = 'vendor/monaco/vs/editor/editor.main.css';
-      document.head.appendChild(link);
-      const s = document.createElement('script');
-      s.src = 'vendor/monaco/vs/loader.js';
-      s.onload = () => {
-        window.require.config({ paths: { vs: 'vendor/monaco/vs' } });
-        window.require(['vs/editor/editor.main'], () => resolve(window.monaco), reject);
-      };
-      s.onerror = reject;
-      document.head.appendChild(s);
-    });
-    return cssEditorLoading;
-  }
-
-  function defineRiffMonacoTheme(monaco) {
-    const cs = getComputedStyle(document.documentElement);
-    const hex = (name, fallback) => { const v = cs.getPropertyValue(name).trim(); return /^#[0-9a-f]{6}$/i.test(v) ? v : fallback; };
-    const bg = hex('--md-sys-color-surface-container-lowest-solid', '#141218');
-    const high = hex('--md-sys-color-surface-container-high-solid', '#2b2930');
-    const primary = hex('--md-sys-color-primary', '#d0bcff');
-    const lum = (h) => { const n = parseInt(h.slice(1), 16); return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255; };
-    monaco.editor.defineTheme('piverxy', { base: lum(bg) < 0.5 ? 'vs-dark' : 'vs', inherit: true, rules: [], colors: { 'editor.background': bg, 'editorGutter.background': bg, 'minimap.background': bg, 'editor.lineHighlightBackground': high, 'editorCursor.foreground': primary, 'editor.selectionBackground': primary + '55' } });
-    monaco.editor.setTheme('piverxy');
-  }
-
-  async function openCssEditor() {
-    const overlay = document.getElementById('css-editor');
-    overlay.classList.remove('hidden');
-    let monaco;
-    try { monaco = await loadMonaco(); } catch (e) { overlay.classList.add('hidden'); showToast(Tm('Could not load the CSS editor'), 'error'); return; }
-    defineRiffMonacoTheme(monaco);
-    if (cssEditorInstance) { cssEditorInstance.focus(); return; }
-    cssEditorInstance = monaco.editor.create(document.getElementById('css-editor-host'), {
-      value: localStorage.getItem('piverxy_custom_css') || '/* Your CSS goes here. Example:\n.btn-pill-primary { border-radius: 8px; }\n*/\n',
-      language: 'css',
-      theme: 'riff',
-      automaticLayout: true,
-      minimap: { enabled: true },
-      fontSize: 14,
-      fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
-      fontLigatures: true,
-      roundedSelection: true,
-      scrollBeyondLastLine: false,
-      smoothScrolling: true,
-      cursorSmoothCaretAnimation: 'on',
-      padding: { top: 12 },
-      tabSize: 2,
-      wordWrap: 'on',
-      bracketPairColorization: { enabled: true },
-      colorDecorators: true
-    });
-    let saveTimer = 0;
-    cssEditorInstance.onDidChangeModelContent(() => {
-      clearTimeout(saveTimer);
-      saveTimer = setTimeout(() => {
-        localStorage.setItem('piverxy_custom_css', cssEditorInstance.getValue());
-        applyCustomStyles();
-      }, 350);
-    });
-    cssEditorInstance.focus();
-  }
-
-  const btnOpenCssEditor = document.getElementById('btn-open-css-editor');
-  if (btnOpenCssEditor) btnOpenCssEditor.addEventListener('click', openCssEditor);
-  const btnCssClose = document.getElementById('btn-css-close');
-  if (btnCssClose) btnCssClose.addEventListener('click', () => document.getElementById('css-editor').classList.add('hidden'));
-  const btnCssClear = document.getElementById('btn-css-clear');
-  if (btnCssClear) btnCssClear.addEventListener('click', () => {
-    const current = localStorage.getItem('piverxy_custom_css') || '';
-    if (current.trim()) localStorage.setItem('piverxy_custom_css_backup', current);
-    if (cssEditorInstance) cssEditorInstance.setValue('');
-    else { localStorage.removeItem('piverxy_custom_css'); applyCustomStyles(); }
-  });
-  const btnCssRestore = document.getElementById('btn-css-restore');
-  if (btnCssRestore) btnCssRestore.addEventListener('click', () => {
-    const backup = localStorage.getItem('piverxy_custom_css_backup');
-    if (!backup) { showToast(Tm('Nothing to restore'), 'info'); return; }
-    if (cssEditorInstance) cssEditorInstance.setValue(backup);
-    else { localStorage.setItem('piverxy_custom_css', backup); applyCustomStyles(); }
-  });
 
   function addSliderTicks(input) {
     const item = input.closest('.setting-item') || input.parentElement;
@@ -16952,7 +16755,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     return new Promise((resolve) => {
       const img = new Image();
-      img.crossOrigin = 'Anonymous';
+      if (!/^(?:file|data|blob|capacitor):/i.test(url)) img.crossOrigin = 'Anonymous';
       img.onload = () => {
         try {
           const canvas = document.createElement('canvas');
@@ -19641,7 +19444,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   checkToolsStatus(false);
   setLyricsEmpty(true);
   updateLyricsTranslationUI();
-  loadCustomThemes();
   applyCustomStyles();
   enterSettings();
   refreshStacks();
@@ -20306,7 +20108,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (tvkPaletteCache.has(src)) return Promise.resolve(tvkPaletteCache.get(src));
     return new Promise((resolve) => {
       const img = new Image();
-      img.crossOrigin = 'Anonymous';
+      if (!/^(?:file|data|blob|capacitor):/i.test(src)) img.crossOrigin = 'Anonymous';
       img.onload = () => {
         let out = mono;
         try {

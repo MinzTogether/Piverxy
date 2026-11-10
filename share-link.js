@@ -1,6 +1,6 @@
 // Shared playlists: the whole playlist travels inside the link (after the #, so it never reaches a server).
 // https://minztogether.github.io/Piverxy/play/#p=<payload>  — opens the web player
-// piverxy://playlist?p=<payload>                                   — opens the app
+// piverxy://playlist?p=<payload>                            — opens the app
 // payload, when every song is on YouTube (the usual case): "y" + base64url(name length byte, name, then each
 // video id as its 8 bytes). Titles aren't in the link; fillInfo() looks them up from YouTube. That keeps a
 // 10-song link around 170 characters.
@@ -11,6 +11,8 @@
 (function (root) {
   const WEB = 'https://minztogether.github.io/Piverxy/play/';
   const MAX_TRACKS = 500;
+  // Maximum decompressed/raw JSON payload size (512 KB) to prevent deflate-raw decompression bombs.
+  const MAX_BYTES = 512 * 1024;
   const clip = (s, n) => String(s == null ? '' : s).slice(0, n);
   const YT_ID = /^[A-Za-z0-9_-]{11}$/;
 
@@ -59,10 +61,74 @@
       return out;
     },
   };
-  const canZip = typeof CompressionStream === 'function' && typeof DecompressionStream === 'function';
-  async function pipe(bytes, Stream, fmt) {
-    const res = new Response(new Blob([bytes]).stream().pipeThrough(new Stream(fmt)));
-    return new Uint8Array(await res.arrayBuffer());
+
+  const hasRawStream = (() => {
+    try {
+      if (typeof CompressionStream !== 'function' || typeof DecompressionStream !== 'function') return false;
+      new CompressionStream('deflate-raw');
+      new DecompressionStream('deflate-raw');
+      return true;
+    } catch (_) {
+      return false;
+    }
+  })();
+
+  const nodeZlib = (() => {
+    try {
+      if (typeof process !== 'undefined' && process.versions && process.versions.node && typeof require === 'function') {
+        return require('zlib');
+      }
+    } catch (_) {}
+    return null;
+  })();
+
+  const canZip = hasRawStream || !!nodeZlib;
+
+  async function deflateRaw(bytes) {
+    if (hasRawStream) {
+      const res = new Response(new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate-raw')));
+      return new Uint8Array(await res.arrayBuffer());
+    }
+    if (nodeZlib) return new Uint8Array(nodeZlib.deflateRawSync(bytes));
+    throw new Error('this browser is too old to open the link');
+  }
+
+  // Decompresses deflate-raw bytes while enforcing a strict upper bound on decompressed output size.
+  async function inflateRaw(bytes, max = MAX_BYTES) {
+    if (hasRawStream) {
+      const reader = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader();
+      const chunks = [];
+      let size = 0;
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          size += value.byteLength;
+          if (size > max) {
+            try { await reader.cancel(); } catch (_) {}
+            throw new Error('playlist link is too big');
+          }
+          chunks.push(value);
+        }
+      } finally {
+        try { reader.releaseLock(); } catch (_) {}
+      }
+      const out = new Uint8Array(size);
+      let at = 0;
+      for (const c of chunks) { out.set(c, at); at += c.byteLength; }
+      return out;
+    }
+    if (nodeZlib) {
+      try {
+        return new Uint8Array(nodeZlib.inflateRawSync(bytes, { maxOutputLength: max }));
+      } catch (e) {
+        if (e && (e.code === 'ERR_BUFFER_TOO_SMALL' || /maxOutputLength|Cannot create a Buffer/i.test(e.message))) {
+          throw new Error('playlist link is too big');
+        }
+        throw e;
+      }
+    }
+    throw new Error('this browser is too old to open the link');
   }
 
   // a YouTube id is 64 bits: 11 base64url characters whose last one carries 2 unused bits
@@ -90,19 +156,22 @@
     if (short) return { payload: short, count: rows.length };
     const json = JSON.stringify({ v: 1, n: name, t: rows });
     const bytes = new TextEncoder().encode(json);
-    const payload = canZip ? 'z' + b64url.enc(await pipe(bytes, CompressionStream, 'deflate-raw')) : 'j' + b64url.enc(bytes);
+    const payload = canZip ? 'z' + b64url.enc(await deflateRaw(bytes)) : 'j' + b64url.enc(bytes);
     return { payload, count: rows.length };
   }
 
   // payload string -> { name, tracks } (throws on anything that isn't a Piverxy playlist)
-  async function decode(payload) {
+  async function decode(payload, opts) {
+    const maxBytes = (opts && Number.isFinite(opts.maxBytes) && opts.maxBytes > 0) ? opts.maxBytes : MAX_BYTES;
     const p = String(payload || '').trim();
     if (p.length < 2 || p.length > 400000) throw new Error('not a playlist link');
     let bytes = b64url.dec(p.slice(1));
+    if (bytes.byteLength > maxBytes) throw new Error('playlist link is too big');
     if (p[0] === 'y') {
       const len = bytes[0];
       const rest = bytes.length - 1 - len;
       if (!(bytes.length > 1 + len) || rest % 8) throw new Error('not a playlist link');
+      if (rest / 8 > MAX_TRACKS) throw new Error('playlist link is too big');
       const name = clip(new TextDecoder().decode(bytes.subarray(1, 1 + len)), 100) || 'Shared playlist';
       const tracks = [];
       for (let o = 1 + len; o < bytes.length && tracks.length < MAX_TRACKS; o += 8) {
@@ -113,7 +182,7 @@
     }
     if (p[0] === 'z') {
       if (!canZip) throw new Error('this browser is too old to open the link');
-      bytes = await pipe(bytes, DecompressionStream, 'deflate-raw');
+      bytes = await inflateRaw(bytes, maxBytes);
     } else if (p[0] !== 'j') throw new Error('not a playlist link');
     const data = JSON.parse(new TextDecoder().decode(bytes));
     if (!data || data.v !== 1 || !Array.isArray(data.t)) throw new Error('not a playlist link');
@@ -170,7 +239,7 @@
   const webLink = (payload) => `${WEB}#p=${payload}`;
   const appLink = (payload) => `piverxy://playlist?p=${payload}`;
 
-  const api = { encode, decode, payloadFrom, fillInfo, tidy, webLink, appLink, packTrack, unpackTrack, WEB };
+  const api = { encode, decode, payloadFrom, fillInfo, tidy, webLink, appLink, packTrack, unpackTrack, inflateRaw, WEB, MAX_TRACKS, MAX_BYTES };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.PiverxyShare = api;
 })(typeof window !== 'undefined' ? window : globalThis);

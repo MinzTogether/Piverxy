@@ -134,7 +134,7 @@ const OLD = ['DATA', 'Piverxy/Downloads/Old Artist - Old Song.m4a', 4000];
 const CACHED = ['DATA', 'Piverxy/tracks/abc123.webm', 5000];
 
 test('Android: a downloaded song lands in Music/Piverxy (Opus as .mka) and music apps are told', async (t) => {
-  t.mock.timers.enable({ apis: ['setTimeout'] });
+  try { try { t.mock.timers.enable({ apis: ['setTimeout'] }); } catch (_) { t.mock.timers.enable(['setTimeout']); } } catch (_) { t.mock.timers.enable(['setTimeout']); }
   const { store, disk, scans, asked } = phone({ files: [CACHED, ['EXTERNAL_STORAGE', 'Music/Piverxy/Someone - Earlier.mka', 300]] });
   const listed = (await store.list()).map((e) => e.vpath);
   assert.strictEqual(store.downloadsFolder(), 'Music/Piverxy');
@@ -154,7 +154,7 @@ test('Android: a downloaded song lands in Music/Piverxy (Opus as .mka) and music
 });
 
 test('Android: songs downloaded before move from private storage to Music/Piverxy once', async (t) => {
-  t.mock.timers.enable({ apis: ['setTimeout'] });
+  try { t.mock.timers.enable({ apis: ['setTimeout'] }); } catch (_) { t.mock.timers.enable(['setTimeout']); }
   const PLAYED = ['DATA', 'Piverxy/Downloads/Old Artist - Played.m4a', 4000];
   const { store, disk, scans } = phone({ files: [OLD, PLAYED, CACHED] });
   const listed = await store.list();
@@ -173,7 +173,7 @@ test('Android: songs downloaded before move from private storage to Music/Piverx
 });
 
 test('Android: a private copy left behind by an earlier move is deleted, the public one wins', async (t) => {
-  t.mock.timers.enable({ apis: ['setTimeout'] });
+  try { t.mock.timers.enable({ apis: ['setTimeout'] }); } catch (_) { t.mock.timers.enable(['setTimeout']); }
   const { store, disk } = phone({ files: [OLD, ['EXTERNAL_STORAGE', 'Music/Piverxy/Old Artist - Old Song.m4a', 4000]] });
   await store.list();
   assert.strictEqual(await store.fileUrl('/data/Downloads/Old Artist - Old Song.m4a'), 'app:file:///EXTERNAL_STORAGE/Music/Piverxy/Old Artist - Old Song.m4a');
@@ -184,7 +184,7 @@ test('Android: a private copy left behind by an earlier move is deleted, the pub
 });
 
 test('Android: a song the public folder refuses is kept in the app instead of being lost', async (t) => {
-  t.mock.timers.enable({ apis: ['setTimeout'] });
+  try { t.mock.timers.enable({ apis: ['setTimeout'] }); } catch (_) { t.mock.timers.enable(['setTimeout']); }
   const { store, disk } = phone({ files: [CACHED], refuse: (dir) => dir === 'EXTERNAL_STORAGE' });
   await store.list();
   await store.copy('/data/tracks/abc123.webm', '/data/Downloads/Artist - Song.webm');
@@ -193,7 +193,7 @@ test('Android: a song the public folder refuses is kept in the app instead of be
 });
 
 test('Android: Music not usable, Documents/Piverxy instead', async (t) => {
-  t.mock.timers.enable({ apis: ['setTimeout'] });
+  try { t.mock.timers.enable({ apis: ['setTimeout'] }); } catch (_) { t.mock.timers.enable(['setTimeout']); }
   const { store, disk } = phone({ files: [CACHED, ['EXTERNAL_STORAGE', 'Music', 1]] }); // a file called Music: no folder there
   await store.list();
   assert.strictEqual(store.downloadsFolder(), 'Documents/Piverxy');
@@ -202,7 +202,7 @@ test('Android: Music not usable, Documents/Piverxy instead', async (t) => {
 });
 
 test('Android 10 and older: no question at launch, one when the first song is saved (not waited for)', async (t) => {
-  t.mock.timers.enable({ apis: ['setTimeout'] });
+  try { t.mock.timers.enable({ apis: ['setTimeout'] }); } catch (_) { t.mock.timers.enable(['setTimeout']); }
   const { store, disk, asked, answerQuestion } = phone({ perm: 'prompt', answer: 'granted', hold: true, files: [CACHED] });
   await store.list();
   assert.strictEqual(asked.length, 0);
@@ -226,7 +226,7 @@ test('Android 10 and older: no question at launch, one when the first song is sa
 });
 
 test('Android 10 and older, permission refused: downloads stay in the app as before, asked once', async (t) => {
-  t.mock.timers.enable({ apis: ['setTimeout'] });
+  try { t.mock.timers.enable({ apis: ['setTimeout'] }); } catch (_) { t.mock.timers.enable(['setTimeout']); }
   const { store, disk, asked } = phone({ perm: 'prompt', answer: 'denied', files: [CACHED, OLD] });
   await store.list();
   await store.copy('/data/tracks/abc123.webm', '/data/Downloads/A - One.webm');

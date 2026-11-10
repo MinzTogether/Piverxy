@@ -1,5 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
+const zlib = require('node:zlib');
 const share = require('../share-link.js');
 
 const yt = (id, title, artist, duration, platform = 'youtube') => ({ id, title, artist, duration, platform, url: `https://www.youtube.com/watch?v=${id}`, thumbnail: 'x' });
@@ -85,4 +86,13 @@ test('junk is refused instead of half-imported', async () => {
   // rows that aren't valid are dropped, the rest kept
   const p = 'j' + Buffer.from(JSON.stringify({ v: 1, n: 'x', t: [['y', 'nac6B__nFl0', 'ok', 'a', 1], ['y', 'not-an-id', 'bad', 'a', 1], ['u', 'javascript:alert(1)', 'bad', 'a', 1]] })).toString('base64url');
   assert.deepStrictEqual((await share.decode(p)).tracks.map((t) => t.title), ['ok']);
+});
+
+test('deflate-raw decompression bomb is rejected before exhausting memory', async () => {
+  // 2 MB of repeated JSON-like data compresses to a tiny < 5 KB payload, but exceeds share.MAX_BYTES (512 KB)
+  const hugeRaw = Buffer.alloc(2 * 1024 * 1024, 'A');
+  const compressed = zlib.deflateRawSync(hugeRaw);
+  assert.ok(compressed.length < 10000, `compressed bomb is small (${compressed.length} bytes)`);
+  const bombPayload = 'z' + compressed.toString('base64url');
+  await assert.rejects(share.decode(bombPayload), /playlist link is too big/);
 });

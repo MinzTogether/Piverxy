@@ -1,6 +1,52 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { IDBFactory } = require('fake-indexeddb');
+let IDBFactory;
+try { ({ IDBFactory } = require("fake-indexeddb")); } catch (_) {
+  IDBFactory = class {
+    constructor() { this._dbs = new Map(); }
+    open(name) {
+      const req = {};
+      setImmediate(() => {
+        let stores = this._dbs.get(name);
+        const isNew = !stores;
+        if (isNew) { stores = new Map(); this._dbs.set(name, stores); }
+        const db = {
+          objectStoreNames: { contains: (s) => stores.has(s) },
+          createObjectStore: (s, opts) => { stores.set(s, { keyPath: opts && opts.keyPath, data: new Map() }); },
+          close: () => {},
+          transaction: (names, mode) => {
+            const tx = {
+              objectStore: (s) => {
+                const st = stores.get(s);
+                const wrap = (fn) => {
+                  const r = {};
+                  setImmediate(() => {
+                    try { r.result = fn(); if (r.onsuccess) r.onsuccess(); } catch (e) {}
+                  });
+                  return r;
+                };
+                return {
+                  get: (k) => wrap(() => st.data.get(k)),
+                  getAll: () => wrap(() => [...st.data.values()]),
+                  getAllKeys: () => wrap(() => [...st.data.keys()]),
+                  put: (rec) => wrap(() => { st.data.set(rec[st.keyPath], rec); }),
+                  delete: (k) => wrap(() => { st.data.delete(k); }),
+                  clear: () => wrap(() => { st.data.clear(); }),
+                };
+              },
+            };
+            setImmediate(() => setImmediate(() => { if (tx.oncomplete) tx.oncomplete(); }));
+            return tx;
+          },
+        };
+        req.result = db;
+        if (isNew && req.onupgradeneeded) req.onupgradeneeded();
+        if (req.onsuccess) req.onsuccess();
+      });
+      return req;
+    }
+  };
+}
 const { createAppCache, ON_KEY, MAX_BLOBS } = require('../mobile/app-cache.js');
 
 const memStorage = (init = {}) => {

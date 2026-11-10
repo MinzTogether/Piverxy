@@ -1,73 +1,33 @@
-// Builds the iOS web bundle into www/: Piverxy's desktop frontend + server.js running in-app.
+// Assembles www/ for Capacitor (iOS and Android): bundles server.js + the mobile shims into www/mobile-bridge.js,
+// copies the web UI files, and writes a mobile index.html that loads the bridge before app.js.
 import { build } from 'esbuild';
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildInfoScript } from '../tools/build-info.mjs';
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const out = join(root, 'www');
-const shim = (n) => join(root, 'mobile', 'shims', `${n}.js`);
-
-// Clean up or migrate any legacy paths left behind when extracting over an existing checkout
-const legacyLower = ['m', 'u', 'r', 'i', 'e', 'l'].join('');
-const legacyCap = 'M' + legacyLower.slice(1);
-const migrateText = (s) => s
-  .replaceAll(`io.github.cloverscripts.${legacyLower}`, 'io.github.piverxy')
-  .replaceAll(`${legacyCap} Mod`, 'Piverxy')
-  .replaceAll(legacyCap, 'Piverxy')
-  .replaceAll(legacyLower, 'piverxy');
-
-for (const sub of ['main', 'test']) {
-  const oldPkg = join(root, 'android', 'app', 'src', sub, 'java', 'io', 'github', 'cloverscripts', legacyLower);
-  const newPkg = join(root, 'android', 'app', 'src', sub, 'java', 'io', 'github', 'piverxy');
-  if (existsSync(oldPkg)) {
-    mkdirSync(newPkg, { recursive: true });
-    for (const f of readdirSync(oldPkg)) {
-      const dst = join(newPkg, f);
-      if (!existsSync(dst)) writeFileSync(dst, migrateText(readFileSync(join(oldPkg, f), 'utf8')));
-    }
-  }
-  rmSync(join(root, 'android', 'app', 'src', sub, 'java', 'io', 'github', 'cloverscripts'), { recursive: true, force: true });
-}
-
-const oldDrawable = join(root, 'android', 'app', 'src', 'main', 'res', 'drawable', `ic_stat_${legacyLower}.xml`);
-const newDrawable = join(root, 'android', 'app', 'src', 'main', 'res', 'drawable', 'ic_stat_piverxy.xml');
-if (existsSync(oldDrawable)) {
-  if (!existsSync(newDrawable)) cpSync(oldDrawable, newDrawable);
-  rmSync(oldDrawable, { force: true });
-}
-
-const oldWidgets = join(root, 'ios', 'App', `${legacyCap}Widgets`);
-const newWidgets = join(root, 'ios', 'App', 'PiverxyWidgets');
-if (existsSync(oldWidgets)) {
-  mkdirSync(newWidgets, { recursive: true });
-  const oldSwift = join(oldWidgets, `${legacyCap}Widgets.swift`);
-  const newSwift = join(newWidgets, 'PiverxyWidgets.swift');
-  if (existsSync(oldSwift) && !existsSync(newSwift)) writeFileSync(newSwift, migrateText(readFileSync(oldSwift, 'utf8')));
-  const oldPlist = join(oldWidgets, 'Info.plist');
-  const newPlist = join(newWidgets, 'Info.plist');
-  if (existsSync(oldPlist) && !existsSync(newPlist)) writeFileSync(newPlist, migrateText(readFileSync(oldPlist, 'utf8')));
-  rmSync(oldWidgets, { recursive: true, force: true });
-}
-
-rmSync(join(root, 'tools', `${legacyLower}-app-icons.py`), { force: true });
+const shim = (name) => join(root, 'mobile', 'shims', `${name}.js`);
 
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
 
-// server.js requires './platform', './tools', './logger' and './audio-output'; on phones those resolve to the shims.
+// Redirect server.js's local ./platform, ./tools, ./logger, ./audio-output requires to the mobile shims.
+const localShims = new Set(['./platform', './tools', './logger', './audio-output']);
 const swapLocal = {
-  name: 'piverxy-ios-swaps',
+  name: 'swap-local',
   setup(b) {
-    b.onResolve({ filter: /^\.\/(platform|tools|logger|audio-output)$/ }, (a) => (a.importer.endsWith('server.js') ? { path: shim(a.path.slice(2)) } : undefined));
+    b.onResolve({ filter: /^\.\// }, (args) => {
+      if (localShims.has(args.path)) return { path: shim(args.path.slice(2)) };
+    });
   },
 };
 
 await build({
   entryPoints: [join(root, 'mobile', 'bridge.js')],
-  outfile: join(out, 'mobile-bridge.js'),
   bundle: true,
+  outfile: join(out, 'mobile-bridge.js'),
   format: 'iife',
   platform: 'browser',
   target: ['safari16'],
@@ -101,4 +61,5 @@ html = html
   .replace('<script src="audio-engine.js"></script>', '<script src="mobile-bridge.js"></script>\n  <script src="audio-engine.js"></script>')
   .replace('<script src="app.js"></script>', '<script src="app.js"></script>\n  <script src="mobile-ui.js"></script>');
 writeFileSync(join(out, 'index.html'), html);
-console.log('www/ ready');
+
+console.log('Built www/ for Capacitor');

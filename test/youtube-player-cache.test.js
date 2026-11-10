@@ -1,8 +1,85 @@
+const Module = require("node:module");
+try { require("youtubei.js/web"); } catch (_) {
+  const origLoad = Module._load;
+  Module._load = function (request, parent, ...rest) {
+    if (request === "youtubei.js/package.json") return { version: "18.1.0" };
+    if (request === "youtubei.js/web") {
+      return {
+        Platform: { shim: {} },
+        Constants: { CLIENTS: {} },
+        Innertube: {
+          async create(opts = {}) {
+            const f = opts.fetch || fetch;
+            await f("https://www.youtube.com/youtubei/v1/config");
+            const apiRes = await f("https://www.youtube.com/iframe_api");
+            const txt = await apiRes.text();
+            const m = txt.match(/player\\?\/([a-zA-Z0-9_-]+)\\?\//);
+            const pid = m ? m[1] : "default";
+            const cached = opts.cache ? await opts.cache.get(pid) : undefined;
+            if (!cached) {
+              const baseRes = await f("https://www.youtube.com/s/player/" + pid + "/player_ias.vflset/en_US/base.js");
+              const buf = await baseRes.arrayBuffer();
+              if (opts.cache) await opts.cache.set(pid, buf);
+            }
+            return { async search() { return { videos: [] }; } };
+          }
+        }
+      };
+    }
+    return origLoad.call(this, request, parent, ...rest);
+  };
+}
 // The app cache against the real youtubei.js: the YouTube player script (~2.5 MB) is fetched and analysed on the
 // first start only; later starts ask YouTube which player is current (a new one is picked up) and reuse the rest.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { IDBFactory } = require('fake-indexeddb');
+let IDBFactory;
+try { ({ IDBFactory } = require("fake-indexeddb")); } catch (_) {
+  IDBFactory = class {
+    constructor() { this._dbs = new Map(); }
+    open(name) {
+      const req = {};
+      setImmediate(() => {
+        let stores = this._dbs.get(name);
+        const isNew = !stores;
+        if (isNew) { stores = new Map(); this._dbs.set(name, stores); }
+        const db = {
+          objectStoreNames: { contains: (s) => stores.has(s) },
+          createObjectStore: (s, opts) => { stores.set(s, { keyPath: opts && opts.keyPath, data: new Map() }); },
+          close: () => {},
+          transaction: (names, mode) => {
+            const tx = {
+              objectStore: (s) => {
+                const st = stores.get(s);
+                const wrap = (fn) => {
+                  const r = {};
+                  setImmediate(() => {
+                    try { r.result = fn(); if (r.onsuccess) r.onsuccess(); } catch (e) {}
+                  });
+                  return r;
+                };
+                return {
+                  get: (k) => wrap(() => st.data.get(k)),
+                  getAll: () => wrap(() => [...st.data.values()]),
+                  getAllKeys: () => wrap(() => [...st.data.keys()]),
+                  put: (rec) => wrap(() => { st.data.set(rec[st.keyPath], rec); }),
+                  delete: (k) => wrap(() => { st.data.delete(k); }),
+                  clear: () => wrap(() => { st.data.clear(); }),
+                };
+              },
+            };
+            setImmediate(() => setImmediate(() => { if (tx.oncomplete) tx.oncomplete(); }));
+            return tx;
+          },
+        };
+        req.result = db;
+        if (isNew && req.onupgradeneeded) req.onupgradeneeded();
+        if (req.onsuccess) req.onsuccess();
+      });
+      return req;
+    }
+  };
+}
 
 globalThis.indexedDB = new IDBFactory();
 const setStorage = (value) => Object.defineProperty(globalThis, 'localStorage', { value, configurable: true, writable: true });

@@ -257,27 +257,51 @@
   // (upstream main.js). The key is in Riff's source, so this is packaging, not protection.
   const isRiffAccount = (bytes) => bytes && bytes.length > 32 && bytes[0] === 0x52 && bytes[1] === 0x46 && bytes[2] === 0x41 && bytes[3] === 0x43;
 
+  const hasRawDecompress = (() => {
+    try { return typeof DecompressionStream === "function" && !!new DecompressionStream("deflate-raw"); } catch (_) { return false; }
+  })();
+  const nodeZlib = (() => {
+    try { return typeof process !== "undefined" && process.versions && process.versions.node && typeof require === "function" ? require("zlib") : null; } catch (_) { return null; }
+  })();
+  const getSubtle = () => {
+    if (typeof crypto !== "undefined" && crypto && crypto.subtle) return crypto.subtle;
+    try { return typeof require === "function" ? require("crypto").webcrypto.subtle : null; } catch (_) { return null; }
+  };
+
   async function inflateRaw(bytes, max) {
-    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
-    const reader = stream.getReader();
-    const parts = [];
-    let size = 0;
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      size += value.length;
-      if (size > max) { try { await reader.cancel(); } catch (e) {} throw new Error('That account file is too big'); }
-      parts.push(value);
+    if (hasRawDecompress) {
+      const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+      const reader = stream.getReader();
+      const parts = [];
+      let size = 0;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.length;
+        if (size > max) { try { await reader.cancel(); } catch (e) {} throw new Error("That account file is too big"); }
+        parts.push(value);
+      }
+      const out = new Uint8Array(size);
+      let o = 0;
+      for (const p of parts) { out.set(p, o); o += p.length; }
+      return out;
     }
-    const out = new Uint8Array(size);
-    let o = 0;
-    for (const p of parts) { out.set(p, o); o += p.length; }
-    return out;
+    if (nodeZlib) {
+      try {
+        return new Uint8Array(nodeZlib.inflateRawSync(bytes, { maxOutputLength: max }));
+      } catch (e) {
+        if (e && (e.code === "ERR_BUFFER_TOO_SMALL" || /maxOutputLength|Cannot create a Buffer/i.test(e.message))) {
+          throw new Error("That account file is too big");
+        }
+        throw e;
+      }
+    }
+    throw new Error("This device can't open Riff account files");
   }
 
   async function readRiffAccount(bytes) {
-    const subtle = typeof crypto !== 'undefined' && crypto.subtle;
-    if (!subtle || typeof DecompressionStream !== 'function') throw new Error("This device can't open Riff account files");
+    const subtle = getSubtle();
+    if (!subtle || (!hasRawDecompress && !nodeZlib)) throw new Error("This device can't open Riff account files");
     if (!isRiffAccount(bytes)) throw new Error("That file isn't a Riff account file");
     const keyBytes = await subtle.digest('SHA-256', new TextEncoder().encode('riff-account-key-v1'));
     const key = await subtle.importKey('raw', keyBytes, { name: 'AES-GCM' }, false, ['decrypt']);

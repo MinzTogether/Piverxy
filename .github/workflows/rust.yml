@@ -8,28 +8,64 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: rust-build
+  cancel-in-progress: true
+
 jobs:
   windows:
     runs-on: windows-latest
-    defaults:
-      run:
-        working-directory: rust
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      NODE_DIST_VERSION: 'v22.11.0'
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+
       - uses: dtolnay/rust-toolchain@stable
+
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: rust
+
+      - name: Install dependencies and stamp build info
+        run: |
+          npm ci --no-audit --no-fund
+          node tools/build-info.mjs build-info.js windows
+
       - name: Stage UI and backend
+        working-directory: rust
         run: node stage.mjs
-      - name: Bundle Node for the backend
+
+      - name: Bundle Node for the backend (verified SHA-256)
+        working-directory: rust
         shell: pwsh
-        run: Invoke-WebRequest -Uri https://nodejs.org/dist/v22.11.0/win-x64/node.exe -OutFile backend/node.exe
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $base = "https://nodejs.org/dist/$env:NODE_DIST_VERSION"
+          New-Item -ItemType Directory -Force -Path backend | Out-Null
+          $sumsFile = Join-Path $env:RUNNER_TEMP 'node-SHASUMS256.txt'
+          Invoke-WebRequest -Uri "$base/SHASUMS256.txt" -OutFile $sumsFile
+          $line = Select-String -Path $sumsFile -Pattern '^[a-fA-F0-9]{64}\s+\*?win-x64/node\.exe$' | Select-Object -First 1
+          if (-not $line) { throw "No SHA-256 entry found for win-x64/node.exe in SHASUMS256.txt" }
+          $expected = ($line.Line -split '\s+')[0].ToLower()
+          Invoke-WebRequest -Uri "$base/win-x64/node.exe" -OutFile backend/node.exe
+          $actual = (Get-FileHash -Path backend/node.exe -Algorithm SHA256).Hash.ToLower()
+          if ($actual -ne $expected) {
+            Remove-Item -Force backend/node.exe -ErrorAction SilentlyContinue
+            throw "node.exe SHA-256 mismatch: expected $expected, got $actual"
+          }
+
       - name: Build
+        working-directory: rust
         run: npx --yes @tauri-apps/cli@2.1.0 build
+
       - uses: actions/upload-artifact@v4
         with:
           name: Piverxy-RS-windows

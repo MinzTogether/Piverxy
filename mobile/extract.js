@@ -1,20 +1,158 @@
 // In-app replacement for the parts of yt-dlp Piverxy uses: YouTube/YouTube Music search,
 // SoundCloud search, and resolving a track page to a direct audio URL.
 // All network calls go through globalThis.__piverxyFetch (native HTTP in the app, dev proxy in a browser).
-const { Innertube, Platform, Constants } = require('youtubei.js/web');
+let Innertube = null;
+let Platform = { shim: {} };
+let Constants = { CLIENTS: {} };
+try {
+  ({ Innertube, Platform, Constants } = require('youtubei.js/web'));
+} catch (_) {}
 const { appCache } = require('./app-cache');
 let ytjsVersion = '';
 try { ytjsVersion = String(require('youtubei.js/package.json').version || ''); } catch (e) {}
 
 const DESKTOP_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
+const MAX_DECIPHER_SCRIPT_BYTES = 512 * 1024;
+const MAX_DECIPHER_INPUT_CHARS = 512;
+const DECIPHER_TIMEOUT_MS = 4000;
 
-// youtubei.js needs a JS evaluator for signature deciphering (only used when a client returns ciphered URLs)
-Platform.shim.eval = async (data, env) => {
-  const props = [];
-  if (env.n) props.push(`n: exportedVars.nFunction(${JSON.stringify(env.n)})`);
-  if (env.sig) props.push(`sig: exportedVars.sigFunction(${JSON.stringify(env.sig)})`);
-  return new Function(`${data.output}\nreturn { ${props.join(', ')} }`)();
-};
+function sanitizeDecipherEnv(env) {
+  if (!env || typeof env !== 'object') return { n: undefined, sig: undefined };
+  const n = typeof env.n === 'string' ? env.n : undefined;
+  const sig = typeof env.sig === 'string' ? env.sig : undefined;
+  if (n !== undefined && n.length > MAX_DECIPHER_INPUT_CHARS) throw new Error('decipher n parameter is too long');
+  if (sig !== undefined && sig.length > MAX_DECIPHER_INPUT_CHARS) throw new Error('decipher sig parameter is too long');
+  return { n, sig };
+}
+
+function evalInWorker(code, { n, sig }, timeoutMs = DECIPHER_TIMEOUT_MS) {
+  return new Promise((resolve, reject) => {
+    const workerSrc = `'use strict';
+(function () {
+  var post = self.postMessage.bind(self);
+  var closeFn = self.close ? self.close.bind(self) : function () {};
+  var blocked = [
+    'fetch', 'XMLHttpRequest', 'WebSocket', 'EventSource', 'importScripts',
+    'indexedDB', 'caches', 'BroadcastChannel', 'Worker', 'SharedWorker',
+    'navigator', 'webkitRequestFileSystem', 'requestFileSystem',
+    '__piverxyFetch', 'Capacitor', 'electronAPI', 'localStorage', 'sessionStorage'
+  ];
+  for (var i = 0; i < blocked.length; i++) {
+    try { delete self[blocked[i]]; } catch (_) {}
+    try { Object.defineProperty(self, blocked[i], { value: undefined, writable: false, configurable: false }); } catch (_) { try { self[blocked[i]] = undefined; } catch (_) {} }
+  }
+  self.onmessage = function (ev) {
+    self.onmessage = null;
+    try {
+      var input = (ev && ev.data) || {};
+      var run = new Function('__input', ...blocked, ${JSON.stringify(code)} + '\\nvar __out = Object.create(null);\\nif (typeof __input.n === "string" && typeof exportedVars !== "undefined" && typeof exportedVars.nFunction === "function") __out.n = String(exportedVars.nFunction(__input.n));\\nif (typeof __input.sig === "string" && typeof exportedVars !== "undefined" && typeof exportedVars.sigFunction === "function") __out.sig = String(exportedVars.sigFunction(__input.sig));\\nreturn __out;');
+      var res = run({ n: input.n, sig: input.sig });
+      var clean = {};
+      if (res && typeof res.n === 'string') clean.n = res.n;
+      if (res && typeof res.sig === 'string') clean.sig = res.sig;
+      post({ ok: true, result: clean });
+    } catch (err) {
+      post({ ok: false, error: (err && err.message) ? String(err.message) : String(err) });
+    } finally {
+      closeFn();
+    }
+  };
+})();`;
+    const blob = new Blob([workerSrc], { type: 'application/javascript' });
+    const url = URL.createObjectURL(blob);
+    let worker;
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      try { if (worker) worker.terminate(); } catch (_) {}
+      try { URL.revokeObjectURL(url); } catch (_) {}
+      reject(new Error('YouTube decipher timed out'));
+    }, timeoutMs);
+
+    const cleanup = () => {
+      clearTimeout(timer);
+      try { if (worker) worker.terminate(); } catch (_) {}
+      try { URL.revokeObjectURL(url); } catch (_) {}
+    };
+
+    try {
+      worker = new Worker(url);
+    } catch (err) {
+      cleanup();
+      return reject(err);
+    }
+
+    worker.onmessage = (ev) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      const msg = ev && ev.data;
+      if (msg && msg.ok && msg.result && typeof msg.result === 'object') {
+        const out = {};
+        if (typeof msg.result.n === 'string') out.n = msg.result.n;
+        if (typeof msg.result.sig === 'string') out.sig = msg.result.sig;
+        resolve(out);
+      } else {
+        reject(new Error((msg && msg.error) || 'YouTube decipher failed'));
+      }
+    };
+    worker.onerror = (err) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error((err && err.message) || 'YouTube decipher worker error'));
+    };
+    worker.postMessage({ n, sig });
+  });
+}
+
+function evalInNodeVm(code, { n, sig }, timeoutMs = DECIPHER_TIMEOUT_MS) {
+  let vmMod = null;
+  try {
+    const req = typeof module === 'object' && module && typeof module.require === 'function' ? module.require.bind(module) : null;
+    if (req) vmMod = req('node' + ':vm');
+  } catch (_) {}
+  if (!vmMod) throw new Error('No isolated JS sandbox available for YouTube decipher');
+
+  // Create a null-prototype context with zero host object references so prototype-chain escapes
+  // (`this.constructor.constructor(...)`) cannot reach the outer realm, and disable dynamic code generation inside the context.
+  const ctx = vmMod.createContext(Object.create(null), {
+    codeGeneration: { strings: false, wasm: false },
+  });
+  const nLit = n !== undefined ? JSON.stringify(n) : 'undefined';
+  const sigLit = sig !== undefined ? JSON.stringify(sig) : 'undefined';
+  const wrapped = `(function () {\n${code}\nvar __out = Object.create(null);\nif (${nLit} !== undefined && typeof exportedVars !== "undefined" && typeof exportedVars.nFunction === "function") __out.n = String(exportedVars.nFunction(${nLit}));\nif (${sigLit} !== undefined && typeof exportedVars !== "undefined" && typeof exportedVars.sigFunction === "function") __out.sig = String(exportedVars.sigFunction(${sigLit}));\nreturn JSON.stringify(__out);\n})();`;
+  const raw = vmMod.runInContext(wrapped, ctx, {
+    timeout: timeoutMs,
+    microtaskMode: 'afterEvaluate',
+  });
+  const parsed = JSON.parse(String(raw || '{}'));
+  const out = {};
+  if (parsed && typeof parsed.n === 'string') out.n = parsed.n;
+  if (parsed && typeof parsed.sig === 'string') out.sig = parsed.sig;
+  return out;
+}
+
+// Isolated evaluator for youtubei.js signature deciphering: runs inside a locked-down Web Worker in the
+// browser/WebView (no DOM, storage, bridge, or network access) or an isolated null-prototype node:vm context.
+async function evalDecipher(data, env, opts) {
+  const code = data && typeof data.output === 'string' ? data.output : '';
+  if (!code) throw new Error('empty decipher script');
+  if (code.length > MAX_DECIPHER_SCRIPT_BYTES) throw new Error('decipher script is too large');
+  const cleanEnv = sanitizeDecipherEnv(env);
+  if (cleanEnv.n === undefined && cleanEnv.sig === undefined) return {};
+  const timeoutMs = (opts && Number.isFinite(opts.timeoutMs) && opts.timeoutMs > 0) ? opts.timeoutMs : DECIPHER_TIMEOUT_MS;
+
+  if (typeof Worker === 'function' && typeof Blob === 'function' && typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+    return evalInWorker(code, cleanEnv, timeoutMs);
+  }
+  return evalInNodeVm(code, cleanEnv, timeoutMs);
+}
+
+if (Platform && Platform.shim) {
+  Platform.shim.eval = (data, env) => evalDecipher(data, env);
+}
 
 let ytPromise = null;
 function yt() {
@@ -322,4 +460,16 @@ async function playlist(pageUrl, limit = 500) {
   throw new Error(`unsupported link ${s}`);
 }
 
-module.exports = { youtubeSearch, ytMusicSearch, soundcloudSearch, resolveAudio, playlist, scCandidates, scCanonicalUrl, isPlayable };
+module.exports = {
+  youtubeSearch,
+  ytMusicSearch,
+  soundcloudSearch,
+  resolveAudio,
+  playlist,
+  scCandidates,
+  scCanonicalUrl,
+  isPlayable,
+  evalDecipher,
+  MAX_DECIPHER_SCRIPT_BYTES,
+  MAX_DECIPHER_INPUT_CHARS,
+};

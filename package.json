@@ -67,11 +67,9 @@
       "!ios/**",
       "!android/**",
       "!tools/**",
+      "!test/**",
       "!capacitor.config.json",
-      "!.claude/**",
-      "!vendor/**",
       "!*.md",
-      "!strip_comments.js",
       "!package-lock.json"
     ],
     "win": {

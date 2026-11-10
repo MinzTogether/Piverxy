@@ -1,11 +1,11 @@
-const { app, BrowserWindow, dialog, ipcMain, screen, shell, Tray, Menu, nativeImage, globalShortcut, powerMonitor, clipboard } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, screen, shell, session, Tray, Menu, nativeImage, globalShortcut, powerMonitor, clipboard } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { pathToFileURL, fileURLToPath } = require('url');
 const { spawn } = require('child_process');
 const crypto = require('crypto');
-const { LIBRARY_DIR, DATA_DIR, resolveBinary, tutorialDone, markTutorialDone, readStartupConfig, writeStartupConfig } = require('./platform');
+const { LIBRARY_DIR, DATA_DIR, CACHE_DIR, THUMBNAILS_DIR, resolveBinary, tutorialDone, markTutorialDone, readStartupConfig, writeStartupConfig } = require('./platform');
 const { getLauncherInfo, installLauncher } = require('./launcher');
 const { getSystemAudioOutputInfo } = require('./audio-output');
 const { log, tail, LOG_DIR } = require('./logger');
@@ -53,16 +53,8 @@ app.commandLine.appendSwitch('disable-background-networking');
 app.commandLine.appendSwitch('disable-domain-reliability');
 app.commandLine.appendSwitch('disable-sync');
 app.commandLine.appendSwitch('disable-speech-api');
-app.commandLine.appendSwitch('js-flags', '--expose-gc');
 
 if (readStartupConfig().hwAccel === false) app.disableHardwareAcceleration();
-
-const extraFlags = (process.env.PIVERXY_FLAGS || '').split(';').map((s) => s.trim()).filter(Boolean);
-for (const flag of extraFlags) {
-  const eq = flag.indexOf('=');
-  if (eq > 0) app.commandLine.appendSwitch(flag.slice(0, eq), flag.slice(eq + 1));
-  else app.commandLine.appendSwitch(flag);
-}
 
 if (process.env.PIVERXY_DEBUG === '1') {
   app.whenReady().then(async () => {
@@ -126,6 +118,28 @@ function runGUI() {
   let isMiniWindow = false;
   let preMiniBounds = null;
 
+  const APP_PAGES = new Set([
+    path.resolve(__dirname, 'index.html'),
+    path.resolve(__dirname, 'welcome.html'),
+  ]);
+
+  // Only Piverxy's own top-level HTML files may load in the main window or invoke privileged IPC handlers.
+  const isAppPage = (u) => {
+    try {
+      const x = new URL(u);
+      return x.protocol === 'file:' && APP_PAGES.has(path.resolve(fileURLToPath(x)));
+    } catch (e) {
+      return false;
+    }
+  };
+
+  const isAppSender = (event) => {
+    if (!event || !mainWindow || mainWindow.isDestroyed() || event.sender !== mainWindow.webContents) return false;
+    if (event.senderFrame && event.senderFrame !== mainWindow.webContents.mainFrame) return false;
+    const frameUrl = (event.senderFrame && event.senderFrame.url) || event.sender.getURL() || '';
+    return !frameUrl || isAppPage(frameUrl);
+  };
+
   const windowStatePath = path.join(app.getPath('userData'), 'window-state.json');
 
   function readWindowState() {
@@ -142,11 +156,10 @@ function runGUI() {
   function clampBoundsToDisplay(bounds) {
     const primaryDisplay = screen.getPrimaryDisplay();
     const primaryWorkArea = primaryDisplay.workArea;
-    const scaleFactor = primaryDisplay.scaleFactor;
 
     const sourceBounds = bounds && Number.isFinite(bounds.width) && Number.isFinite(bounds.height)
-    ? { ...bounds }
-    : {};
+      ? { ...bounds }
+      : {};
 
     const minW = 360;
     const minH = 500;
@@ -164,11 +177,11 @@ function runGUI() {
     const workArea = display.workArea;
     const x = Math.min(
       Math.max(sourceBounds.x ?? workArea.x + Math.round((workArea.width - width) / 2), workArea.x),
-                       workArea.x + Math.max(0, workArea.width - width)
+      workArea.x + Math.max(0, workArea.width - width)
     );
     const y = Math.min(
       Math.max(sourceBounds.y ?? workArea.y + Math.round((workArea.height - height) / 2), workArea.y),
-                       workArea.y + Math.max(0, workArea.height - height)
+      workArea.y + Math.max(0, workArea.height - height)
     );
 
     return { x, y, width, height };
@@ -208,14 +221,38 @@ function runGUI() {
     }
   }
 
+  function hardenSession() {
+    try {
+      const s = session.defaultSession;
+      s.setPermissionRequestHandler((wc, permission, cb) => cb(false));
+      s.setPermissionCheckHandler(() => false);
+      // With webSecurity enabled on a file:// page, cover art canvas sampling (img.crossOrigin = 'Anonymous')
+      // and <audio crossorigin="anonymous"> require an Access-Control-Allow-Origin header on media/CDN responses.
+      s.webRequest.onHeadersReceived({
+        urls: [
+          'https://*.ytimg.com/*',
+          'https://*.ggpht.com/*',
+          'https://*.googleusercontent.com/*',
+          'https://*.sndcdn.com/*',
+          'https://*.soundcloud.cloud/*',
+          'https://*.mzstatic.com/*',
+          'https://*.googlevideo.com/*',
+          'https://avatars.yandex.net/*',
+        ]
+      }, (details, callback) => {
+        const headers = Object.assign({}, details.responseHeaders || {});
+        const hasAcao = Object.keys(headers).some((k) => k.toLowerCase() === 'access-control-allow-origin');
+        if (!hasAcao) headers['Access-Control-Allow-Origin'] = ['*'];
+        callback({ responseHeaders: headers });
+      });
+    } catch (e) {}
+  }
+
   async function createWindow() {
     serverPort = await startServer(PORT);
     const firstRun = !tutorialDone();
     const initialBounds = getResponsiveWindowBounds();
     const savedState = readWindowState();
-
-    const primaryDisplay = screen.getPrimaryDisplay();
-    const scaleFactor = primaryDisplay.scaleFactor;
 
     mainWindow = new BrowserWindow({
       x: initialBounds.x,
@@ -223,28 +260,31 @@ function runGUI() {
       width: initialBounds.width,
       height: initialBounds.height,
       minWidth: 360,
-                                   minHeight: 500,
-                                   backgroundColor: firstRun ? '#8d5ef2' : '#000000',
-                                   title: 'Piverxy',
-                                   icon: path.join(__dirname, 'assets', 'icon.png'),
-                                   // macOS keeps its frame so the native traffic lights, rounded corners and shadow are
-                                   // used; Windows and Linux draw their own controls
-                                   ...(process.platform === 'darwin'
-                                     ? { titleBarStyle: 'hidden', trafficLightPosition: { x: 14, y: 13 } }
-                                     : { frame: false, titleBarStyle: 'hidden' }),
-                                   show: false,
-                                   useContentSize: true,
-                                   webPreferences: {
-                                     preload: path.join(__dirname, 'preload.js'),
-                                   additionalArguments: [`--piverxy-token=${getServerToken()}`],
-                                   nodeIntegration: false,
-                                   contextIsolation: true,
-                                   webSecurity: false,
-                                   backgroundThrottling: true,
-                                   spellcheck: false,
-                                   // songs start from a lookup that finishes after the click's user activation is gone (#17)
-                                   autoplayPolicy: 'no-user-gesture-required'
-                                   }
+      minHeight: 500,
+      backgroundColor: firstRun ? '#8d5ef2' : '#000000',
+      title: 'Piverxy',
+      icon: path.join(__dirname, 'assets', 'icon.png'),
+      // macOS keeps its frame so the native traffic lights, rounded corners and shadow are
+      // used; Windows and Linux draw their own controls
+      ...(process.platform === 'darwin'
+        ? { titleBarStyle: 'hidden', trafficLightPosition: { x: 14, y: 13 } }
+        : { frame: false, titleBarStyle: 'hidden' }),
+      show: false,
+      useContentSize: true,
+      webPreferences: {
+        preload: path.join(__dirname, 'preload.js'),
+        additionalArguments: [`--piverxy-token=${getServerToken()}`],
+        nodeIntegration: false,
+        contextIsolation: true,
+        sandbox: true,
+        webSecurity: true,
+        allowRunningInsecureContent: false,
+        webviewTag: false,
+        backgroundThrottling: true,
+        spellcheck: false,
+        // songs start from a lookup that finishes after the click's user activation is gone (#17)
+        autoplayPolicy: 'no-user-gesture-required'
+      }
     });
 
     if (savedState?.isMaximized) {
@@ -260,6 +300,7 @@ function runGUI() {
     if (firstRun) {
       ipcMain.removeAllListeners('welcome-finish');
       ipcMain.once('welcome-finish', (e, detail) => {
+        if (!isAppSender(e)) return;
         markTutorialDone();
         if (detail && detail.launcher) installLauncher();
         if (!mainWindow || mainWindow.isDestroyed()) return;
@@ -276,23 +317,14 @@ function runGUI() {
       return { action: 'deny' };
     });
     // the window only ever shows Piverxy's own pages; anything else would get the preload API and the server token
-    const isAppPage = (u) => {
-      try {
-        const x = new URL(u);
-        return x.protocol === 'file:' && path.resolve(fileURLToPath(x)).startsWith(path.resolve(__dirname) + path.sep);
-      } catch (e) { return false; }
-    };
     mainWindow.webContents.on('will-navigate', (e, url) => { if (!isAppPage(url)) e.preventDefault(); });
+    mainWindow.webContents.on('will-redirect', (e, url) => { if (!isAppPage(url)) e.preventDefault(); });
+    mainWindow.webContents.on('will-attach-webview', (e) => e.preventDefault());
 
     mainWindow.on('minimize', () => {
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('window-visibility', false);
-        if (global.gc) global.gc();
       }
-    });
-
-    mainWindow.on('blur', () => {
-      if (global.gc) global.gc();
     });
 
     mainWindow.on('restore', () => {
@@ -325,481 +357,513 @@ function runGUI() {
         mainWindow.hide();
       }
     });
-
   }
+
+  app.on('web-contents-created', (_, contents) => {
+    contents.on('will-attach-webview', (e) => e.preventDefault());
+  });
 
   ipcMain.removeHandler('get-server-port');
   ipcMain.removeHandler('pick-media');
   ipcMain.removeHandler('import-audio-files');
 
-  ipcMain.on('window-minimize', () => {
+  ipcMain.on('window-minimize', (e) => {
+    if (!isAppSender(e)) return;
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.minimize();
   });
 
-    ipcMain.on('window-maximize', () => {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        if (mainWindow.isMaximized()) mainWindow.unmaximize();
-        else mainWindow.maximize();
+  ipcMain.on('window-maximize', (e) => {
+    if (!isAppSender(e)) return;
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMaximized()) mainWindow.unmaximize();
+      else mainWindow.maximize();
+    }
+  });
+
+  ipcMain.on('window-close', (e) => {
+    if (!isAppSender(e)) return;
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.close();
+  });
+
+  // macOS: the traffic lights hide with the titlebar (mini player, or "Hide titlebar" until it slides down)
+  ipcMain.on('set-window-buttons-visible', (e, visible) => {
+    if (!isAppSender(e)) return;
+    if (process.platform !== 'darwin' || !mainWindow || mainWindow.isDestroyed()) return;
+    try { mainWindow.setWindowButtonVisibility(!!visible); } catch (_) {}
+  });
+
+  // Spotify's login page and Last.fm's approval page (lastfm.js)
+  ipcMain.on('open-external', (e, u) => {
+    if (!isAppSender(e)) return;
+    if (/^https:\/\/(?:accounts\.spotify\.com|www\.last\.fm\/api\/auth)\//.test(String(u))) shell.openExternal(String(u));
+  });
+
+  let mainLogCount = 0;
+  let mainLogReset = Date.now();
+  ipcMain.on('log-error', (e, data) => {
+    if (!isAppSender(e)) return;
+    const now = Date.now();
+    if (now - mainLogReset > 60000) {
+      mainLogReset = now;
+      mainLogCount = 0;
+    }
+    if (mainLogCount < 20) {
+      mainLogCount++;
+      if (data && typeof data === 'object') {
+        logger.log(data.level || 'ERROR', data.message || '', data.stack || null);
       }
+    }
+  });
+
+  ipcMain.handle('get-diagnostics', async (e) => {
+    if (!isAppSender(e)) return '';
+    const lines = [`Piverxy ${app.getVersion()}`, `OS ${process.platform} ${process.arch} ${os.release()}`, `Electron ${process.versions.electron} Chromium ${process.versions.chrome} Node ${process.versions.node}`, `Locale ${app.getLocale()}`, `Data ${DATA_DIR}`];
+    for (const name of ['yt-dlp', 'ffmpeg']) {
+      const bin = resolveBinary(name);
+      lines.push(`${name}: ${bin || 'NOT FOUND'}`);
+    }
+    lines.push('--- last log lines ---', ...tail(60));
+    return lines.join('\n');
+  });
+  ipcMain.on('open-logs-folder', (e) => {
+    if (!isAppSender(e)) return;
+    shell.openPath(LOG_DIR);
+  });
+  // the system clipboard directly: the page's navigator.clipboard refuses once the click's moment has passed
+  ipcMain.handle('copy-text', (e, text) => {
+    if (!isAppSender(e)) return false;
+    clipboard.writeText(String(text || '').slice(0, 5 * 1024 * 1024));
+    return true;
+  });
+
+  ipcMain.handle('get-server-port', (e) => (isAppSender(e) ? serverPort : 0));
+  ipcMain.handle('get-gpu-compositing', (e) => {
+    if (!isAppSender(e)) return '';
+    try { return String(app.getGPUFeatureStatus().gpu_compositing || ''); } catch (_) { return ''; }
+  });
+  ipcMain.handle('launcher-info', (e) => (isAppSender(e) ? getLauncherInfo() : null));
+  ipcMain.handle('get-app-version', (e) => (isAppSender(e) ? app.getVersion() : ''));
+  ipcMain.handle('get-audio-output-info', async (e) => (isAppSender(e) ? getSystemAudioOutputInfo() : null));
+  require('./plugins').register(() => mainWindow);
+  require('./discord-presence').register(() => mainWindow);
+  // YouTube / YouTube Music library import through a Google login (its own browser storage per profile)
+  require('./google-library').register(() => mainWindow);
+
+  // playlist files and profile backups (backup.js): the page hands over the text, the person picks where it goes
+  ipcMain.removeHandler('save-text-file');
+  ipcMain.handle('save-text-file', async (event, payload) => {
+    if (!isAppSender(event)) return { success: false, error: 'Unauthorized' };
+    const content = payload && typeof payload.content === 'string' ? payload.content : null;
+    if (content === null || content.length > 64 * 1024 * 1024) return { success: false, error: 'Nothing to save' };
+    const isBackup = payload.kind === 'backup';
+    const base = path.basename(String(payload.defaultName || '')).replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').replace(/^\.+/, '');
+    const name = base || (isBackup ? 'piverxy-backup.json' : 'playlists.json');
+    const win = BrowserWindow.fromWebContents(event.sender) || mainWindow;
+    const r = await dialog.showSaveDialog(win, {
+      title: isBackup ? 'Save a backup of this profile' : 'Export playlists',
+      defaultPath: path.join(app.getPath('documents'), name.toLowerCase().endsWith('.json') ? name : `${name}.json`),
+      filters: [{ name: 'JSON', extensions: ['json'] }],
     });
+    if (r.canceled || !r.filePath) return { canceled: true };
+    try {
+      await fs.promises.writeFile(r.filePath, content, 'utf8');
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: "Couldn't write the file there" };
+    }
+  });
 
-    ipcMain.on('window-close', () => {
-      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.close();
-    });
+  const audioExtRegex = /\.(opus|webm|m4a|mp3)$/i;
 
-    // macOS: the traffic lights hide with the titlebar (mini player, or "Hide titlebar" until it slides down)
-    ipcMain.on('set-window-buttons-visible', (e, visible) => {
-      if (process.platform !== 'darwin' || !mainWindow || mainWindow.isDestroyed()) return;
-      try { mainWindow.setWindowButtonVisibility(!!visible); } catch (_) {}
-    });
+  ipcMain.handle('get-cache-size', async (e) => {
+    if (!isAppSender(e)) return { audio: 0, web: 0 };
+    let webSize = 0;
+    try { webSize = await session.defaultSession.getCacheSize(); } catch (_) {}
 
-    // Spotify's login page and Last.fm's approval page (lastfm.js)
-    ipcMain.on('open-external', (e, u) => {
-      if (/^https:\/\/(?:accounts\.spotify\.com|www\.last\.fm\/api\/auth)\//.test(String(u))) shell.openExternal(String(u));
-    });
-
-    let mainLogCount = 0;
-    let mainLogReset = Date.now();
-    ipcMain.on('log-error', (e, data) => {
-      const now = Date.now();
-      if (now - mainLogReset > 60000) {
-        mainLogReset = now;
-        mainLogCount = 0;
-      }
-      if (mainLogCount < 20) {
-        mainLogCount++;
-        if (data && typeof data === 'object') {
-          logger.log(data.level || 'ERROR', data.message || '', data.stack || null);
-        }
-      }
-    });
-
-    ipcMain.handle('get-diagnostics', async () => {
-      const lines = [`Piverxy ${app.getVersion()}`, `OS ${process.platform} ${process.arch} ${os.release()}`, `Electron ${process.versions.electron} Chromium ${process.versions.chrome} Node ${process.versions.node}`, `Locale ${app.getLocale()}`, `Data ${DATA_DIR}`];
-      for (const name of ['yt-dlp', 'ffmpeg']) {
-        const bin = resolveBinary(name);
-        lines.push(`${name}: ${bin || 'NOT FOUND'}`);
-      }
-      lines.push('--- last log lines ---', ...tail(60));
-      return lines.join('\n');
-    });
-    ipcMain.on('open-logs-folder', () => { shell.openPath(LOG_DIR); });
-    // the system clipboard directly: the page's navigator.clipboard refuses once the click's moment has passed
-    ipcMain.handle('copy-text', (e, text) => { clipboard.writeText(String(text || '')); return true; });
-
-      ipcMain.handle('get-server-port', () => serverPort);
-      ipcMain.handle('get-gpu-compositing', () => { try { return String(app.getGPUFeatureStatus().gpu_compositing || ''); } catch (e) { return ''; } });
-      ipcMain.handle('launcher-info', () => getLauncherInfo());
-      ipcMain.handle('get-app-version', () => app.getVersion());
-      ipcMain.handle('get-audio-output-info', async () => getSystemAudioOutputInfo());
-      require('./plugins').register(() => mainWindow);
-      require('./discord-presence').register(() => mainWindow);
-      // YouTube / YouTube Music library import through a Google login (its own browser storage per profile)
-      require('./google-library').register(() => mainWindow);
-
-      // playlist files and profile backups (backup.js): the page hands over the text, the person picks where it goes
-      ipcMain.removeHandler('save-text-file');
-      ipcMain.handle('save-text-file', async (event, payload) => {
-        const content = payload && typeof payload.content === 'string' ? payload.content : null;
-        if (content === null || content.length > 64 * 1024 * 1024) return { success: false, error: 'Nothing to save' };
-        const isBackup = payload.kind === 'backup';
-        const base = path.basename(String(payload.defaultName || '')).replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').replace(/^\.+/, '');
-        const name = base || (isBackup ? 'piverxy-backup.json' : 'playlists.json');
-        const win = BrowserWindow.fromWebContents(event.sender) || mainWindow;
-        const r = await dialog.showSaveDialog(win, {
-          title: isBackup ? 'Save a backup of this profile' : 'Export playlists',
-          defaultPath: path.join(app.getPath('documents'), name.toLowerCase().endsWith('.json') ? name : `${name}.json`),
-          filters: [{ name: 'JSON', extensions: ['json'] }],
-        });
-        if (r.canceled || !r.filePath) return { canceled: true };
-        try {
-          await fs.promises.writeFile(r.filePath, content, 'utf8');
-          return { success: true };
-        } catch (e) {
-          return { success: false, error: "Couldn't write the file there" };
-        }
-      });
-
-      ipcMain.handle('get-cache-size', async () => {
-        const fs = require('fs');
-        const path = require('path');
-        const os = require('os');
-        const { session } = require('electron');
-
-        let webSize = 0;
-        try { webSize = await session.defaultSession.getCacheSize(); } catch(e) {}
-
-        let audioSize = 0;
-        const tracksDir = require('./platform').CACHE_DIR;
-        const thumbnailsDir = require('./platform').THUMBNAILS_DIR;
-        const audioExtRegex = /\.(opus|webm|m4a|mp3)$/i;
-        try {
-          if (fs.existsSync(tracksDir)) {
-            for (const file of fs.readdirSync(tracksDir)) {
-              if (audioExtRegex.test(file)) {
-                try { audioSize += fs.statSync(path.join(tracksDir, file)).size; } catch(e) {}
-              }
-            }
-          }
-        } catch(e) {}
-        try {
-          if (fs.existsSync(thumbnailsDir)) {
-            for (const file of fs.readdirSync(thumbnailsDir)) {
-              try { audioSize += fs.statSync(path.join(thumbnailsDir, file)).size; } catch(e) {}
-            }
-          }
-        } catch(e) {}
-
-        return { audio: audioSize, web: webSize };
-      });
-
-      ipcMain.handle('clear-cache', async () => {
-        const fs = require('fs');
-        const path = require('path');
-        const os = require('os');
-        const { session } = require('electron');
-        
-        try { await session.defaultSession.clearCache(); } catch(e) {}
-        try { await session.defaultSession.clearStorageData({ storages: ['serviceworkers', 'cachestorage'] }); } catch(e) {}
-
-        const tracksDir = require('./platform').CACHE_DIR;
-        const thumbnailsDir = require('./platform').THUMBNAILS_DIR;
-        const audioExtRegex = /\.(opus|webm|m4a|mp3)$/i;
-        try {
-          if (fs.existsSync(tracksDir)) {
-            for (const file of fs.readdirSync(tracksDir)) {
-              if (audioExtRegex.test(file)) {
-                try { fs.unlinkSync(path.join(tracksDir, file)); } catch(e) {}
-              }
-            }
-          }
-        } catch(e) {}
-        try {
-          if (fs.existsSync(thumbnailsDir)) {
-            for (const file of fs.readdirSync(thumbnailsDir)) {
-              try { fs.unlinkSync(path.join(thumbnailsDir, file)); } catch(e) {}
-            }
-          }
-        } catch(e) {}
-
-        return true;
-      });
-
-      ipcMain.handle('pick-media', async () => {
-        const r = await dialog.showOpenDialog(mainWindow, { properties: ['openFile'], filters: [{ name: 'Media', extensions: ['png','jpg','jpeg','webp','gif','mp4','webm'] }] });
-        return r.canceled ? null : pathToFileURL(r.filePaths[0]).href;
-      });
-
-      const AUDIO_EXTS = ['mp3','wav','flac','opus','ogg','oga','m4a','aac','webm','weba'];
-      // the audio files in a picked folder and its subfolders (a few levels, at most 1000 files)
-      async function audioFilesIn(dir, out, depth = 0) {
-        let entries = [];
-        try { entries = await fs.promises.readdir(dir, { withFileTypes: true }); } catch (e) { return; }
-        for (const entry of entries) {
-          if (out.length >= 1000 || entry.name.startsWith('.')) continue;
-          const full = path.join(dir, entry.name);
-          if (entry.isDirectory()) { if (depth < 4) await audioFilesIn(full, out, depth + 1); }
-          else if (entry.isFile() && AUDIO_EXTS.includes(path.extname(entry.name).slice(1).toLowerCase())) out.push(full);
-        }
-      }
-
-      // opts.folder: pick folders instead of files (from Riff 43.1); the files are copied into the library either way
-      ipcMain.handle('import-audio-files', async (e, opts) => {
-        const folder = !!(opts && opts.folder);
-        const r = await dialog.showOpenDialog(mainWindow, folder
-          ? { properties: ['openDirectory', 'multiSelections'] }
-          : { properties: ['openFile', 'multiSelections'], filters: [{ name: 'Audio', extensions: AUDIO_EXTS }] });
-        if (r.canceled) return [];
-        let sources = r.filePaths;
-        if (folder) {
-          sources = [];
-          for (const dir of r.filePaths) await audioFilesIn(dir, sources);
-        }
-        fs.mkdirSync(LIBRARY_DIR, { recursive: true });
-        const out = [];
-        for (const src of sources) {
-          const st = fs.statSync(src), ext = path.extname(src).slice(1).toLowerCase();
-          const id = 'local_' + crypto.createHash('sha1').update(path.basename(src) + st.size).digest('hex').slice(0, 12);
-          const file = `${id}.${ext}`;
-          if (!fs.existsSync(path.join(LIBRARY_DIR, file))) await fs.promises.copyFile(src, path.join(LIBRARY_DIR, file));
-          out.push({ id, file, ext, name: path.basename(src, path.extname(src)) });
-        }
-        return out;
-      });
-
-      ipcMain.handle('get-data-dir', () => {
-        const platform = require('./platform');
-        return {
-          dir: platform.DATA_DIR,
-          defaultDir: platform.DEFAULT_DATA_DIR,
-          isCustom: platform.DATA_DIR !== platform.DEFAULT_DATA_DIR
-        };
-      });
-
-      // set-data-dir / set-download-dir accept only the folder the user just picked in the dialog, not any
-      // path a script in the window passes in (with "move", the old folder's Piverxy files get deleted)
-      let pickedDataDir = null;
-      let pickedDownloadDir = null;
-      const isPicked = (picked, dir) => !!picked && path.resolve(String(dir)) === path.resolve(picked);
-      const isNetworkPath = (dir) => /^(\\\\|\/\/)/.test(String(dir));
-
-      ipcMain.handle('pick-data-dir', async () => {
-        const platform = require('./platform');
-        const r = await dialog.showOpenDialog(mainWindow, {
-          title: 'Choose music folder',
-          defaultPath: platform.DATA_DIR,
-          properties: ['openDirectory', 'createDirectory']
-        });
-        pickedDataDir = r.canceled ? null : r.filePaths[0];
-        return pickedDataDir;
-      });
-
-      ipcMain.handle('set-data-dir', async (event, payload) => {
-        const platform = require('./platform');
-        const target = payload && payload.dir ? path.resolve(String(payload.dir)) : null;
-        const move = !!(payload && payload.move);
-        if (!target) return { ok: false, error: 'No folder selected' };
-        if (!isPicked(pickedDataDir, target)) return { ok: false, error: 'Pick the folder with the folder button' };
-        // tools in <data>/bin are run from there, so a network share as music folder would run remote programs
-        if (isNetworkPath(target)) return { ok: false, error: 'Choose a folder on this computer' };
-
-        const current = path.resolve(platform.DATA_DIR);
-        if (target === current) return { ok: true, dir: target, moved: false };
-
-        const rel = path.relative(current, target);
-        const insideCurrent = rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
-        const relBack = path.relative(target, current);
-        const currentInsideTarget = relBack === '' || (!relBack.startsWith('..') && !path.isAbsolute(relBack));
-        if (insideCurrent || currentInsideTarget) {
-          return { ok: false, error: 'Choose a folder outside the current music folder' };
-        }
-
-        try {
-          fs.mkdirSync(target, { recursive: true });
-          fs.accessSync(target, fs.constants.W_OK);
-        } catch (e) {
-          return { ok: false, error: 'That folder is not writable' };
-        }
-
-        // only Piverxy's own files move (and get deleted afterwards): the old folder may hold other things too
-        if (move) {
-          try {
-            await platform.copyDirContents(current, target, undefined, platform.PIVERXY_DATA_ENTRIES);
-          } catch (e) {
-            return { ok: false, error: 'Could not move files: ' + e.message };
+    let audioSize = 0;
+    try {
+      if (fs.existsSync(CACHE_DIR)) {
+        for (const file of fs.readdirSync(CACHE_DIR)) {
+          if (audioExtRegex.test(file)) {
+            try { audioSize += fs.statSync(path.join(CACHE_DIR, file)).size; } catch (_) {}
           }
         }
-
-        platform.setDataDir(target);
-        pickedDataDir = null;
-
-        if (move) {
-          try { await platform.removeDirContents(current, undefined, platform.PIVERXY_DATA_ENTRIES); } catch (e) {}
-        }
-
-        return { ok: true, dir: target, moved: move };
-      });
-
-      const defaultDownloadsDir = () => {
-        try { return app.getPath('downloads'); } catch (e) { return null; }
-      };
-
-      ipcMain.handle('get-download-dir', () => {
-        const platform = require('./platform');
-        const def = defaultDownloadsDir();
-        const custom = platform.resolveDownloadDir();
-        return {
-          dir: custom || def,
-          defaultDir: def,
-          isCustom: !!custom
-        };
-      });
-
-      ipcMain.handle('pick-download-dir', async () => {
-        const platform = require('./platform');
-        const r = await dialog.showOpenDialog(mainWindow, {
-          title: 'Choose download folder',
-          defaultPath: platform.resolveDownloadDir() || defaultDownloadsDir() || undefined,
-          properties: ['openDirectory', 'createDirectory']
-        });
-        pickedDownloadDir = r.canceled ? null : r.filePaths[0];
-        return pickedDownloadDir;
-      });
-
-      ipcMain.handle('set-download-dir', async (event, payload) => {
-        const platform = require('./platform');
-        const reset = !!(payload && payload.reset);
-        if (reset) {
-          platform.setDownloadDir(null);
-          return { ok: true, dir: defaultDownloadsDir(), reset: true };
-        }
-        const target = payload && payload.dir ? path.resolve(String(payload.dir)) : null;
-        if (!target) return { ok: false, error: 'No folder selected' };
-        if (!isPicked(pickedDownloadDir, target)) return { ok: false, error: 'Pick the folder with the folder button' };
-        try {
-          fs.mkdirSync(target, { recursive: true });
-          fs.accessSync(target, fs.constants.W_OK);
-        } catch (e) {
-          return { ok: false, error: 'That folder is not writable' };
-        }
-        platform.setDownloadDir(target);
-        return { ok: true, dir: target };
-      });
-
-      ipcMain.on('restart-app', () => {
-        app.relaunch();
-        app.exit(0);
-      });
-
-      ipcMain.on('set-tray-on-close', (e, v) => {
-        trayOnClose = !!v;
-      });
-
-      ipcMain.handle('get-hw-accel', () => readStartupConfig().hwAccel !== false);
-      ipcMain.on('set-hw-accel', (e, value) => { writeStartupConfig({ hwAccel: !!value }); });
-
-      const MEDIA_KEYS = { MediaPlayPause: 'toggle', MediaNextTrack: 'next', MediaPreviousTrack: 'prev', MediaStop: 'stop' };
-      // off unless turned on in Settings: global shortcuts take the keys away from Chromium's media session, and
-      // with them the Windows overlay and lock screen controls (from Riff 43.1)
-      let mediaKeysWanted = false;
-      let mediaKeysActive = false;
-      const sendMedia = (cmd) => {
-        if (process.env.PIVERXY_DEBUG === '1') console.log('[media] globalShortcut', cmd);
-        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('media-command', cmd);
-      };
-      function unregisterMediaKeys() {
-        for (const k of Object.keys(MEDIA_KEYS)) {
-          try { globalShortcut.unregister(k); } catch (e) {}
+      }
+    } catch (_) {}
+    try {
+      if (fs.existsSync(THUMBNAILS_DIR)) {
+        for (const file of fs.readdirSync(THUMBNAILS_DIR)) {
+          try { audioSize += fs.statSync(path.join(THUMBNAILS_DIR, file)).size; } catch (_) {}
         }
       }
-      function registerMediaKeys() {
-        if (process.platform !== 'win32') return;
-        unregisterMediaKeys();
-        if (!mediaKeysWanted || !mediaKeysActive) return;
-        for (const [k, cmd] of Object.entries(MEDIA_KEYS)) {
-          try {
-            if (!globalShortcut.register(k, () => sendMedia(cmd))) {
-              console.warn('[media] could not register', k);
-            }
-          } catch (e) {}
-        }
-      }
-      ipcMain.on('set-media-keys', (e, enabled) => { mediaKeysWanted = !!enabled; registerMediaKeys(); });
-      ipcMain.on('media-keys-active', () => { if (!mediaKeysActive) { mediaKeysActive = true; registerMediaKeys(); } });
-      powerMonitor.on('resume', registerMediaKeys);
-      powerMonitor.on('unlock-screen', registerMediaKeys);
-      app.on('will-quit', () => globalShortcut.unregisterAll());
+    } catch (_) {}
 
-      let preMiniLyricsH = null;
-      ipcMain.removeHandler('toggle-mini-window');
-      ipcMain.handle('toggle-mini-window', () => {
-        if (!mainWindow || mainWindow.isDestroyed()) return false;
-        if (!isMiniWindow) {
-          isMiniWindow = true;
-          preMiniBounds = mainWindow.isMaximized() ? mainWindow.getNormalBounds() : mainWindow.getBounds();
-          if (mainWindow.isMaximized()) mainWindow.unmaximize();
-          mainWindow.setMinimumSize(280, 115);
-          mainWindow.setSize(380, 160);
-          mainWindow.setAlwaysOnTop(true);
-          return true;
-        } else {
-          isMiniWindow = false;
-          preMiniLyricsH = null;
-          mainWindow.setAlwaysOnTop(false);
-          mainWindow.setMinimumSize(360, 500);
-          if (preMiniBounds) {
-            mainWindow.setBounds(clampBoundsToDisplay(preMiniBounds));
-          } else {
-            mainWindow.setSize(1000, 700);
+    return { audio: audioSize, web: webSize };
+  });
+
+  ipcMain.handle('clear-cache', async (e) => {
+    if (!isAppSender(e)) return false;
+    try { await session.defaultSession.clearCache(); } catch (_) {}
+    try { await session.defaultSession.clearStorageData({ storages: ['serviceworkers', 'cachestorage'] }); } catch (_) {}
+
+    try {
+      if (fs.existsSync(CACHE_DIR)) {
+        for (const file of fs.readdirSync(CACHE_DIR)) {
+          if (audioExtRegex.test(file)) {
+            try { fs.unlinkSync(path.join(CACHE_DIR, file)); } catch (_) {}
           }
-          return false;
         }
-      });
-
-      // lyrics under the mini player: the window grows to fit them (kept on screen) and shrinks back without them
-      ipcMain.removeHandler('set-mini-lyrics');
-      ipcMain.handle('set-mini-lyrics', (e, enabled) => {
-        if (!mainWindow || mainWindow.isDestroyed() || !isMiniWindow) return false;
-        const bounds = mainWindow.getBounds();
-        const area = screen.getDisplayMatching(bounds).workArea;
-        if (enabled) {
-          if (!preMiniLyricsH) preMiniLyricsH = bounds.height;
-          mainWindow.setMinimumSize(320, 240);
-          const targetH = Math.min(Math.max(bounds.height, 360), Math.floor(area.height * 0.9));
-          const y = bounds.y + targetH > area.y + area.height ? Math.max(area.y, area.y + area.height - targetH) : bounds.y;
-          mainWindow.setBounds({ x: bounds.x, y, width: bounds.width, height: targetH });
-        } else {
-          mainWindow.setMinimumSize(280, 115);
-          mainWindow.setSize(bounds.width, preMiniLyricsH || 160);
-          preMiniLyricsH = null;
+      }
+    } catch (_) {}
+    try {
+      if (fs.existsSync(THUMBNAILS_DIR)) {
+        for (const file of fs.readdirSync(THUMBNAILS_DIR)) {
+          try { fs.unlinkSync(path.join(THUMBNAILS_DIR, file)); } catch (_) {}
         }
-        return true;
-      });
+      }
+    } catch (_) {}
 
-      function setupTray() {
-        try {
-          const iconPath = path.join(__dirname, 'assets', 'icon.png');
-          let trayIcon = nativeImage.createFromPath(iconPath);
-          trayIcon = trayIcon.resize({ width: 22, height: 22 });
-          tray = new Tray(trayIcon);
-          tray.setToolTip('Piverxy');
-          const contextMenu = Menu.buildFromTemplate([
-            {
-              label: 'Show/Hide',
-              click: () => {
-                if (!mainWindow || mainWindow.isDestroyed()) return;
-                if (mainWindow.isVisible()) mainWindow.hide();
-                else { mainWindow.show(); mainWindow.focus(); }
-              }
-            },
-            {
-              label: 'Play/Pause',
-              click: () => {
-                if (mainWindow && !mainWindow.isDestroyed()) {
-                  mainWindow.webContents.send('media-command', 'toggle');
-                }
-              }
-            },
-            { type: 'separator' },
-            {
-              label: 'Quit',
-              click: () => {
-                isQuitting = true;
-                app.quit();
-              }
-            }
-          ]);
-          tray.setContextMenu(contextMenu);
-          tray.on('click', () => {
+    return true;
+  });
+
+  ipcMain.handle('pick-media', async (e) => {
+    if (!isAppSender(e)) return null;
+    const r = await dialog.showOpenDialog(mainWindow, { properties: ['openFile'], filters: [{ name: 'Media', extensions: ['png','jpg','jpeg','webp','gif','mp4','webm'] }] });
+    return r.canceled ? null : pathToFileURL(r.filePaths[0]).href;
+  });
+
+  const AUDIO_EXTS = ['mp3','wav','flac','opus','ogg','oga','m4a','aac','webm','weba'];
+  // the audio files in a picked folder and its subfolders (a few levels, at most 1000 files)
+  async function audioFilesIn(dir, out, depth = 0) {
+    let entries = [];
+    try { entries = await fs.promises.readdir(dir, { withFileTypes: true }); } catch (e) { return; }
+    for (const entry of entries) {
+      if (out.length >= 1000 || entry.name.startsWith('.')) continue;
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) { if (depth < 4) await audioFilesIn(full, out, depth + 1); }
+      else if (entry.isFile() && AUDIO_EXTS.includes(path.extname(entry.name).slice(1).toLowerCase())) out.push(full);
+    }
+  }
+
+  // opts.folder: pick folders instead of files (from Riff 43.1); the files are copied into the library either way
+  ipcMain.handle('import-audio-files', async (e, opts) => {
+    if (!isAppSender(e)) return [];
+    const folder = !!(opts && opts.folder);
+    const r = await dialog.showOpenDialog(mainWindow, folder
+      ? { properties: ['openDirectory', 'multiSelections'] }
+      : { properties: ['openFile', 'multiSelections'], filters: [{ name: 'Audio', extensions: AUDIO_EXTS }] });
+    if (r.canceled) return [];
+    let sources = r.filePaths;
+    if (folder) {
+      sources = [];
+      for (const dir of r.filePaths) await audioFilesIn(dir, sources);
+    }
+    fs.mkdirSync(LIBRARY_DIR, { recursive: true });
+    const out = [];
+    for (const src of sources) {
+      const st = fs.statSync(src), ext = path.extname(src).slice(1).toLowerCase();
+      const id = 'local_' + crypto.createHash('sha1').update(path.basename(src) + st.size).digest('hex').slice(0, 12);
+      const file = `${id}.${ext}`;
+      if (!fs.existsSync(path.join(LIBRARY_DIR, file))) await fs.promises.copyFile(src, path.join(LIBRARY_DIR, file));
+      out.push({ id, file, ext, name: path.basename(src, path.extname(src)) });
+    }
+    return out;
+  });
+
+  ipcMain.handle('get-data-dir', (e) => {
+    if (!isAppSender(e)) return null;
+    const platform = require('./platform');
+    return {
+      dir: platform.DATA_DIR,
+      defaultDir: platform.DEFAULT_DATA_DIR,
+      isCustom: platform.DATA_DIR !== platform.DEFAULT_DATA_DIR
+    };
+  });
+
+  // set-data-dir / set-download-dir accept only the folder the user just picked in the dialog, not any
+  // path a script in the window passes in (with "move", the old folder's Piverxy files get deleted)
+  let pickedDataDir = null;
+  let pickedDownloadDir = null;
+  const isPicked = (picked, dir) => !!picked && path.resolve(String(dir)) === path.resolve(picked);
+  const isNetworkPath = (dir) => /^(\\\\|\/\/)/.test(String(dir));
+
+  ipcMain.handle('pick-data-dir', async (e) => {
+    if (!isAppSender(e)) return null;
+    const platform = require('./platform');
+    const r = await dialog.showOpenDialog(mainWindow, {
+      title: 'Choose music folder',
+      defaultPath: platform.DATA_DIR,
+      properties: ['openDirectory', 'createDirectory']
+    });
+    pickedDataDir = r.canceled ? null : r.filePaths[0];
+    return pickedDataDir;
+  });
+
+  ipcMain.handle('set-data-dir', async (event, payload) => {
+    if (!isAppSender(event)) return { ok: false, error: 'Unauthorized' };
+    const platform = require('./platform');
+    const target = payload && payload.dir ? path.resolve(String(payload.dir)) : null;
+    const move = !!(payload && payload.move);
+    if (!target) return { ok: false, error: 'No folder selected' };
+    if (!isPicked(pickedDataDir, target)) return { ok: false, error: 'Pick the folder with the folder button' };
+    // tools in <data>/bin are run from there, so a network share as music folder would run remote programs
+    if (isNetworkPath(target)) return { ok: false, error: 'Choose a folder on this computer' };
+
+    const current = path.resolve(platform.DATA_DIR);
+    if (target === current) return { ok: true, dir: target, moved: false };
+
+    const rel = path.relative(current, target);
+    const insideCurrent = rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
+    const relBack = path.relative(target, current);
+    const currentInsideTarget = relBack === '' || (!relBack.startsWith('..') && !path.isAbsolute(relBack));
+    if (insideCurrent || currentInsideTarget) {
+      return { ok: false, error: 'Choose a folder outside the current music folder' };
+    }
+
+    try {
+      fs.mkdirSync(target, { recursive: true });
+      fs.accessSync(target, fs.constants.W_OK);
+    } catch (e) {
+      return { ok: false, error: 'That folder is not writable' };
+    }
+
+    // only Piverxy's own files move (and get deleted afterwards): the old folder may hold other things too
+    if (move) {
+      try {
+        await platform.copyDirContents(current, target, undefined, platform.PIVERXY_DATA_ENTRIES);
+      } catch (e) {
+        return { ok: false, error: 'Could not move files: ' + e.message };
+      }
+    }
+
+    platform.setDataDir(target);
+    pickedDataDir = null;
+
+    if (move) {
+      try { await platform.removeDirContents(current, undefined, platform.PIVERXY_DATA_ENTRIES); } catch (e) {}
+    }
+
+    return { ok: true, dir: target, moved: move };
+  });
+
+  const defaultDownloadsDir = () => {
+    try { return app.getPath('downloads'); } catch (e) { return null; }
+  };
+
+  ipcMain.handle('get-download-dir', (e) => {
+    if (!isAppSender(e)) return null;
+    const platform = require('./platform');
+    const def = defaultDownloadsDir();
+    const custom = platform.resolveDownloadDir();
+    return {
+      dir: custom || def,
+      defaultDir: def,
+      isCustom: !!custom
+    };
+  });
+
+  ipcMain.handle('pick-download-dir', async (e) => {
+    if (!isAppSender(e)) return null;
+    const platform = require('./platform');
+    const r = await dialog.showOpenDialog(mainWindow, {
+      title: 'Choose download folder',
+      defaultPath: platform.resolveDownloadDir() || defaultDownloadsDir() || undefined,
+      properties: ['openDirectory', 'createDirectory']
+    });
+    pickedDownloadDir = r.canceled ? null : r.filePaths[0];
+    return pickedDownloadDir;
+  });
+
+  ipcMain.handle('set-download-dir', async (event, payload) => {
+    if (!isAppSender(event)) return { ok: false, error: 'Unauthorized' };
+    const platform = require('./platform');
+    const reset = !!(payload && payload.reset);
+    if (reset) {
+      platform.setDownloadDir(null);
+      return { ok: true, dir: defaultDownloadsDir(), reset: true };
+    }
+    const target = payload && payload.dir ? path.resolve(String(payload.dir)) : null;
+    if (!target) return { ok: false, error: 'No folder selected' };
+    if (!isPicked(pickedDownloadDir, target)) return { ok: false, error: 'Pick the folder with the folder button' };
+    try {
+      fs.mkdirSync(target, { recursive: true });
+      fs.accessSync(target, fs.constants.W_OK);
+    } catch (e) {
+      return { ok: false, error: 'That folder is not writable' };
+    }
+    platform.setDownloadDir(target);
+    return { ok: true, dir: target };
+  });
+
+  ipcMain.on('restart-app', (e) => {
+    if (!isAppSender(e)) return;
+    app.relaunch();
+    app.exit(0);
+  });
+
+  ipcMain.on('set-tray-on-close', (e, v) => {
+    if (!isAppSender(e)) return;
+    trayOnClose = !!v;
+  });
+
+  ipcMain.handle('get-hw-accel', (e) => (isAppSender(e) ? readStartupConfig().hwAccel !== false : true));
+  ipcMain.on('set-hw-accel', (e, value) => {
+    if (!isAppSender(e)) return;
+    writeStartupConfig({ hwAccel: !!value });
+  });
+
+  const MEDIA_KEYS = { MediaPlayPause: 'toggle', MediaNextTrack: 'next', MediaPreviousTrack: 'prev', MediaStop: 'stop' };
+  // off unless turned on in Settings: global shortcuts take the keys away from Chromium's media session, and
+  // with them the Windows overlay and lock screen controls (from Riff 43.1)
+  let mediaKeysWanted = false;
+  let mediaKeysActive = false;
+  const sendMedia = (cmd) => {
+    if (process.env.PIVERXY_DEBUG === '1') console.log('[media] globalShortcut', cmd);
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('media-command', cmd);
+  };
+  function unregisterMediaKeys() {
+    for (const k of Object.keys(MEDIA_KEYS)) {
+      try { globalShortcut.unregister(k); } catch (e) {}
+    }
+  }
+  function registerMediaKeys() {
+    if (process.platform !== 'win32') return;
+    unregisterMediaKeys();
+    if (!mediaKeysWanted || !mediaKeysActive) return;
+    for (const [k, cmd] of Object.entries(MEDIA_KEYS)) {
+      try {
+        if (!globalShortcut.register(k, () => sendMedia(cmd))) {
+          console.warn('[media] could not register', k);
+        }
+      } catch (e) {}
+    }
+  }
+  ipcMain.on('set-media-keys', (e, enabled) => {
+    if (!isAppSender(e)) return;
+    mediaKeysWanted = !!enabled;
+    registerMediaKeys();
+  });
+  ipcMain.on('media-keys-active', (e) => {
+    if (!isAppSender(e)) return;
+    if (!mediaKeysActive) { mediaKeysActive = true; registerMediaKeys(); }
+  });
+  powerMonitor.on('resume', registerMediaKeys);
+  powerMonitor.on('unlock-screen', registerMediaKeys);
+  app.on('will-quit', () => globalShortcut.unregisterAll());
+
+  let preMiniLyricsH = null;
+  ipcMain.removeHandler('toggle-mini-window');
+  ipcMain.handle('toggle-mini-window', (e) => {
+    if (!isAppSender(e)) return false;
+    if (!mainWindow || mainWindow.isDestroyed()) return false;
+    if (!isMiniWindow) {
+      isMiniWindow = true;
+      preMiniBounds = mainWindow.isMaximized() ? mainWindow.getNormalBounds() : mainWindow.getBounds();
+      if (mainWindow.isMaximized()) mainWindow.unmaximize();
+      mainWindow.setMinimumSize(280, 115);
+      mainWindow.setSize(380, 160);
+      mainWindow.setAlwaysOnTop(true);
+      return true;
+    } else {
+      isMiniWindow = false;
+      preMiniLyricsH = null;
+      mainWindow.setAlwaysOnTop(false);
+      mainWindow.setMinimumSize(360, 500);
+      if (preMiniBounds) {
+        mainWindow.setBounds(clampBoundsToDisplay(preMiniBounds));
+      } else {
+        mainWindow.setSize(1000, 700);
+      }
+      return false;
+    }
+  });
+
+  // lyrics under the mini player: the window grows to fit them (kept on screen) and shrinks back without them
+  ipcMain.removeHandler('set-mini-lyrics');
+  ipcMain.handle('set-mini-lyrics', (e, enabled) => {
+    if (!isAppSender(e)) return false;
+    if (!mainWindow || mainWindow.isDestroyed() || !isMiniWindow) return false;
+    const bounds = mainWindow.getBounds();
+    const area = screen.getDisplayMatching(bounds).workArea;
+    if (enabled) {
+      if (!preMiniLyricsH) preMiniLyricsH = bounds.height;
+      mainWindow.setMinimumSize(320, 240);
+      const targetH = Math.min(Math.max(bounds.height, 360), Math.floor(area.height * 0.9));
+      const y = bounds.y + targetH > area.y + area.height ? Math.max(area.y, area.y + area.height - targetH) : bounds.y;
+      mainWindow.setBounds({ x: bounds.x, y, width: bounds.width, height: targetH });
+    } else {
+      mainWindow.setMinimumSize(280, 115);
+      mainWindow.setSize(bounds.width, preMiniLyricsH || 160);
+      preMiniLyricsH = null;
+    }
+    return true;
+  });
+
+  function setupTray() {
+    try {
+      const iconPath = path.join(__dirname, 'assets', 'icon.png');
+      let trayIcon = nativeImage.createFromPath(iconPath);
+      trayIcon = trayIcon.resize({ width: 22, height: 22 });
+      tray = new Tray(trayIcon);
+      tray.setToolTip('Piverxy');
+      const contextMenu = Menu.buildFromTemplate([
+        {
+          label: 'Show/Hide',
+          click: () => {
             if (!mainWindow || mainWindow.isDestroyed()) return;
             if (mainWindow.isVisible()) mainWindow.hide();
             else { mainWindow.show(); mainWindow.focus(); }
-          });
-        } catch (err) {
-          console.warn('Tray creation failed:', err);
-          tray = null;
-        }
-      }
-
-      app.on('before-quit', () => {
-        isQuitting = true;
-      });
-
-      app.whenReady().then(() => {
-        setupTray();
-        createWindow();
-        app.on('activate', () => {
-          // the Dock icon brings back a window that was closed to the tray
-          if (mainWindow && !mainWindow.isDestroyed()) {
-            if (!mainWindow.isVisible()) mainWindow.show();
-            mainWindow.focus();
-            return;
           }
-          if (BrowserWindow.getAllWindows().length === 0) createWindow();
-        });
+        },
+        {
+          label: 'Play/Pause',
+          click: () => {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.webContents.send('media-command', 'toggle');
+            }
+          }
+        },
+        { type: 'separator' },
+        {
+          label: 'Quit',
+          click: () => {
+            isQuitting = true;
+            app.quit();
+          }
+        }
+      ]);
+      tray.setContextMenu(contextMenu);
+      tray.on('click', () => {
+        if (!mainWindow || mainWindow.isDestroyed()) return;
+        if (mainWindow.isVisible()) mainWindow.hide();
+        else { mainWindow.show(); mainWindow.focus(); }
       });
+    } catch (err) {
+      console.warn('Tray creation failed:', err);
+      tray = null;
+    }
+  }
 
-      app.on('window-all-closed', () => {
-        if (process.platform !== 'darwin') app.quit();
-      });
+  app.on('before-quit', () => {
+    isQuitting = true;
+  });
+
+  app.whenReady().then(() => {
+    hardenSession();
+    setupTray();
+    createWindow();
+    app.on('activate', () => {
+      // the Dock icon brings back a window that was closed to the tray
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        if (!mainWindow.isVisible()) mainWindow.show();
+        mainWindow.focus();
+        return;
+      }
+      if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    });
+  });
+
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') app.quit();
+  });
 }

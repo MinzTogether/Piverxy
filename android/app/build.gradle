@@ -1,27 +1,14 @@
 apply plugin: 'com.android.application'
 
-// Remove legacy package directories or drawables if extracted over an existing checkout
-delete 'src/main/java/io/github/cloverscripts', 'src/test/java/io/github/cloverscripts'
-delete fileTree('src/main/res/drawable') { include 'ic_stat_*.xml'; exclude 'ic_stat_piverxy.xml' }
-
 android {
     namespace = "io.github.piverxy"
     compileSdk = rootProject.ext.compileSdkVersion
-    sourceSets {
-        main {
-            java.exclude '**/cloverscripts/**'
-        }
-        test {
-            java.exclude '**/cloverscripts/**'
-        }
-    }
     defaultConfig {
         applicationId "io.github.piverxy"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        // CI passes the run number so every build installs as an update
-        versionCode((System.getenv("PIVERXY_VERSION_CODE") ?: "1").toInteger())
-        versionName System.getenv("PIVERXY_VERSION_NAME") ?: "1.0"
+        versionCode System.getenv("PIVERXY_VERSION_CODE")?.toInteger() ?: 1
+        versionName System.getenv("PIVERXY_VERSION_NAME") ?: "1.2.4"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -29,14 +16,11 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
-    // Release key comes from GitHub secrets (decoded to a file by the workflow). One stable key means
-    // new APKs install over old ones instead of requiring an uninstall.
     signingConfigs {
         release {
             def ks = System.getenv("PIVERXY_KEYSTORE")
             if (ks) {
                 storeFile file(ks)
-                storeType "PKCS12"
                 storePassword System.getenv("PIVERXY_KEYSTORE_PASSWORD")
                 keyAlias System.getenv("PIVERXY_KEY_ALIAS")
                 keyPassword System.getenv("PIVERXY_KEY_PASSWORD")
@@ -45,7 +29,9 @@ android {
     }
     buildTypes {
         release {
-            if (System.getenv("PIVERXY_KEYSTORE")) signingConfig signingConfigs.release
+            if (System.getenv("PIVERXY_KEYSTORE")) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
@@ -63,11 +49,7 @@ dependencies {
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
-    // media session + media-style notification for the "now playing" controls (MediaControlsPlugin)
     implementation "androidx.media:media:1.7.0"
-    // the version Capacitor already ships; named here because MediaControlsPlugin uses its Live Update calls
-    // (NotificationCompat.Builder#setRequestPromotedOngoing / setShortCriticalText, in 1.17)
-    implementation "androidx.core:core:$androidxCoreVersion"
     implementation project(':capacitor-android')
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
