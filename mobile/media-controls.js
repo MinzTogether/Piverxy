@@ -6,13 +6,13 @@ const { Capacitor, registerPlugin } = require('@capacitor/core');
 
 module.exports = function mediaControls() {
   if (Capacitor.getPlatform() !== 'android') return;
-  const plugin = registerPlugin('MurielMedia');
-  const core = () => window.MurielCore;
+  const plugin = registerPlugin('PiverxyMedia');
+  const core = () => window.PiverxyCore;
   let pending = 0;
   // The song in the island at the top of the screen (Android 16+, a "Live Update" beside the playback notification;
   // see MediaControlsPlugin). 'on' / 'off' once picked in Settings; until then the phone's default: on for vivo,
-  // whose Origin Island won't take Muriel's playback notification itself.
-  const ISLAND = 'muriel_android_island';
+  // whose Origin Island won't take Piverxy's playback notification itself.
+  const ISLAND = 'piverxy_android_island';
   const islandMode = () => { const v = localStorage.getItem(ISLAND); return v === 'on' || v === 'off' ? v : 'auto'; };
 
   function send() {
@@ -32,7 +32,7 @@ module.exports = function mediaControls() {
       duration,
       position: Math.min(a.currentTime || 0, duration || Infinity),
       playing: !!c.state.isPlaying,
-      // between two songs nothing plays, but Muriel still has to stay in the foreground (see MediaControlsPlugin)
+      // between two songs nothing plays, but Piverxy still has to stay in the foreground (see MediaControlsPlugin)
       loading: !c.state.isPlaying && !!c.state.trackLoading,
       rate: a.playbackRate || 1,
       shuffle: !!c.state.isShuffle,
@@ -47,7 +47,7 @@ module.exports = function mediaControls() {
   // 'xiaomi', 'samsung', 'honor' or 'other'), defaultOn, notifications (allowed), promoted (the phone's switch for
   // live updates) }. allow(): asks for notifications or opens that switch, whichever is missing; resolves with status.
   const ask = (method, ...args) => Promise.resolve().then(() => plugin[method](...args)).then((s) => s || {}).catch(() => ({}));
-  const island = window.MurielIsland = {
+  const island = window.PiverxyIsland = {
     status: () => ask('islandStatus'),
     enabled: (status) => (islandMode() === 'auto' ? !!(status && status.defaultOn) : islandMode() === 'on'),
     setEnabled: (on) => { localStorage.setItem(ISLAND, on ? 'on' : 'off'); update(); },
@@ -58,17 +58,17 @@ module.exports = function mediaControls() {
 
   // Some phones stop apps in the background to save battery, music or not. For the "Play in the background"
   // row in Settings (mobile-ui.js), and asked once by itself when the first song starts.
-  const background = window.MurielBackground = {
+  const background = window.PiverxyBackground = {
     allowed: () => plugin.backgroundStatus().then((r) => !!(r && r.unrestricted)).catch(() => true),
     // resolves with the answer once the system dialog is closed
     allow: () => plugin.allowBackground().then((r) => !!(r && r.unrestricted)).catch(() => false),
   };
-  const ASKED = 'muriel_bg_asked';
+  const ASKED = 'piverxy_bg_asked';
   // Android 13+ shows an app's notifications only once it asked for them; many phones hide the playback notification
   // too, and then there is no play button after a game or a call took the music (#25). The island needs them as
   // well. Asked once, after the battery question (the key is older than this: phones asked for the island aren't
   // asked again). Before Android 13 notifications are on unless turned off, and then this does nothing.
-  const NOTIFY_ASKED = 'muriel_island_asked';
+  const NOTIFY_ASKED = 'piverxy_island_asked';
   const askNotificationsOnce = () => island.status().then((s) => {
     if (s.notifications !== false || localStorage.getItem(NOTIFY_ASKED) || document.hidden) return;
     localStorage.setItem(NOTIFY_ASKED, '1');
@@ -83,9 +83,9 @@ module.exports = function mediaControls() {
   function hook() {
     const c = core();
     if (!c || !c.audio) return;
-    window.addEventListener('muriel:track', update);
-    window.addEventListener('muriel:loading', update);
-    window.addEventListener('muriel:modes', update);
+    window.addEventListener('piverxy:track', update);
+    window.addEventListener('piverxy:loading', update);
+    window.addEventListener('piverxy:modes', update);
     ['playing', 'pause', 'seeked', 'ratechange', 'durationchange', 'ended'].forEach((ev) => c.audio.addEventListener(ev, update));
     c.audio.addEventListener('playing', askOnce, { once: true });
     plugin.addListener('action', ({ action, position } = {}) => {
@@ -101,5 +101,5 @@ module.exports = function mediaControls() {
       update();
     });
   }
-  if (window.MurielCore) hook(); else window.addEventListener('muriel:ready', hook, { once: true });
+  if (window.PiverxyCore) hook(); else window.addEventListener('piverxy:ready', hook, { once: true });
 };

@@ -1,13 +1,13 @@
 name: Rights holder request
-description: You hold rights to content and believe Muriel infringes them. We'll look at it promptly.
+description: You hold rights to content and believe Piverxy infringes them. We'll look at it promptly.
 title: "Rights holder request: "
 labels: ["rights-holder"]
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for reaching out first. Muriel doesn't host any music; it plays publicly available sources on the
-        listener's device (see [LEGAL.md](https://github.com/cloverscripts/riff-muriel/blob/main/LEGAL.md)).
+        Thanks for reaching out first. Piverxy doesn't host any music; it plays publicly available sources on the
+        listener's device (see [LEGAL.md](https://github.com/MinzTogether/Piverxy/blob/main/LEGAL.md)).
         This issue is **public**: don't post personal details or confidential information here. Tick the box
         below and we'll contact you privately instead.
   - type: textarea

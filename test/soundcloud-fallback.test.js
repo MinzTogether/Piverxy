@@ -12,12 +12,12 @@ const https = require('node:https');
 const childProcess = require('node:child_process');
 const { EventEmitter } = require('node:events');
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'muriel-scfallback-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'piverxy-scfallback-'));
 for (const key of ['HOME', 'USERPROFILE', 'LOCALAPPDATA', 'XDG_CONFIG_HOME']) process.env[key] = tmp;
-process.env.MURIEL_DATA_DIR = path.join(tmp, 'data');
+process.env.PIVERXY_DATA_DIR = path.join(tmp, 'data');
 const fakeYtDlp = path.join(tmp, 'yt-dlp');
 fs.writeFileSync(fakeYtDlp, '#!/bin/sh\nexit 1\n', { mode: 0o755 });
-process.env.MURIEL_YTDLP = fakeYtDlp;
+process.env.PIVERXY_YTDLP = fakeYtDlp;
 
 // a cached 30-second preview from before (a sixth of a 199 s song) and a real song of the same length
 const tracks = path.join(tmp, 'data', 'tracks');
@@ -112,7 +112,7 @@ before(async () => { port = await startServer(0); });
 after(async () => { await stopServer(); fs.rmSync(tmp, { recursive: true, force: true }); });
 
 const get = (p) => new Promise((resolve, reject) => {
-  http.get({ host: '127.0.0.1', port, path: p, headers: { 'x-muriel-token': getServerToken() } }, (res) => {
+  http.get({ host: '127.0.0.1', port, path: p, headers: { 'x-piverxy-token': getServerToken() } }, (res) => {
     let body = '';
     res.on('data', (c) => { body += c; });
     res.on('end', () => resolve({ status: res.statusCode, body }));

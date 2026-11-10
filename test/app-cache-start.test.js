@@ -156,7 +156,7 @@ test('start: a broken IndexedDB changes nothing for the app', async () => {
 
 test('start: the launch writes one line about itself to the log', async () => {
   const lines = [];
-  globalThis.MurielLog = { add: (level, msg) => lines.push([level, msg]) };
+  globalThis.PiverxyLog = { add: (level, msg) => lines.push([level, msg]) };
   try {
     const idb = new IDBFactory();
     const files = library();
@@ -165,7 +165,7 @@ test('start: the launch writes one line about itself to the log', async () => {
     await f1._cacheSaved();
     const f2 = launch(makeStore(files), cacheOver(idb));
     await f2.init();
-  } finally { delete globalThis.MurielLog; }
+  } finally { delete globalThis.PiverxyLog; }
   assert.strictEqual(lines.length, 2);
   assert.match(lines[0][1], /3 text files, 0 from the app cache, 3 read/);
   assert.match(lines[1][1], /3 text files, 3 from the app cache, 0 read/);

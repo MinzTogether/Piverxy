@@ -4,8 +4,8 @@
 // backups leave it out (backup-core NEVER). Whatever is read back is checked and trimmed: a damaged value, an
 // older layout or a stale entry reads as "nothing cached" and the page loads exactly as it always did.
 const VERSION = 1;
-const KEY_WAVE = 'muriel_appcache_wave';
-const KEY_FOR_YOU = 'muriel_appcache_foryou';
+const KEY_WAVE = 'piverxy_appcache_wave';
+const KEY_FOR_YOU = 'piverxy_appcache_foryou';
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_SKEW_MS = 24 * 60 * 60 * 1000; // a clock that jumped back must not pin an entry forever
 const MAX_BYTES = 256 * 1024; // per entry

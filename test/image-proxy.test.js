@@ -9,11 +9,11 @@ const os = require('node:os');
 const path = require('node:path');
 
 // a data folder of its own, so the kept pictures neither come from nor stay in the real one
-process.env.MURIEL_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'muriel-image-proxy-'));
+process.env.PIVERXY_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'piverxy-image-proxy-'));
 
 function get(port, route, token) {
   return new Promise((resolve, reject) => {
-    http.get({ host: '127.0.0.1', port, path: route, headers: token ? { 'X-Muriel-Token': token } : {} }, (res) => {
+    http.get({ host: '127.0.0.1', port, path: route, headers: token ? { 'X-Piverxy-Token': token } : {} }, (res) => {
       const chunks = [];
       res.on('data', (c) => chunks.push(c));
       res.on('end', () => resolve({ status: res.statusCode, type: res.headers['content-type'], body: Buffer.concat(chunks) }));
@@ -55,6 +55,6 @@ test('image proxy: needs the token, refuses private hosts, fetches and keeps pub
     if (server) await server.stopServer();
     delete require.cache[require.resolve('../server')];
     globalThis.fetch = oldFetch;
-    fs.rmSync(process.env.MURIEL_DATA_DIR, { recursive: true, force: true });
+    fs.rmSync(process.env.PIVERXY_DATA_DIR, { recursive: true, force: true });
   }
 });

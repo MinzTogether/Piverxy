@@ -169,8 +169,8 @@ test('PG-07: a locked song that fails to load is not "missing" and is not skippe
 test('PG-08: the page wiring: rows are marked, the phone is asked at start and listened to, and it is phones with the API only', () => {
   assert.match(fn(appSource, 'createTrackRow'), /if \(isMediaLocked\(track\)\) row\.classList\.add\('is-locked'\);/);
   assert.match(appSource, /if \(isPhoneApp && window\.electronAPI && window\.electronAPI\.getMediaAccess\) \{/);
-  for (const ev of ['muriel:media-access', 'muriel:media-permission-required']) assert.ok(appSource.includes(`window.addEventListener('${ev}'`), ev);
-  assert.ok(appSource.includes("window.addEventListener('muriel:media-access', (e) => { applyMediaAccess(e.detail); });"));
+  for (const ev of ['piverxy:media-access', 'piverxy:media-permission-required']) assert.ok(appSource.includes(`window.addEventListener('${ev}'`), ev);
+  assert.ok(appSource.includes("window.addEventListener('piverxy:media-access', (e) => { applyMediaAccess(e.detail); });"));
   assert.match(read('mobile/mobile.css'), /html\.is-mobile \.track-row\.is-locked \{ opacity: 0\.5; \}/);
 });
 
@@ -234,7 +234,7 @@ test('BR-03: the server says MEDIA_PERMISSION_REQUIRED: the page hears which son
   const body = JSON.stringify({ success: false, error: 'MEDIA_PERMISSION_REQUIRED', code: 'MEDIA_PERMISSION_REQUIRED' });
   let ctx = bridgeFns({ call: async () => ({ status: 403, body }) });
   await assert.rejects(ctx.resolveLocalUrl('http://127.0.0.1:38472/api/library-file?id=local_a&t=tok'), (e) => e.code === 'MEDIA_PERMISSION_REQUIRED');
-  assert.deepEqual(plain(ctx.events), [{ type: 'muriel:media-permission-required', detail: { id: 'local_a' } }]);
+  assert.deepEqual(plain(ctx.events), [{ type: 'piverxy:media-permission-required', detail: { id: 'local_a' } }]);
 
   ctx = bridgeFns({ call: async () => ({ status: 404, body: 'File not found in library' }) });
   await assert.rejects(ctx.resolveLocalUrl('http://127.0.0.1:38472/api/library-file?id=local_a'), (e) => e.code === undefined && /no file behind/.test(e.message));
@@ -268,7 +268,7 @@ beforeEach(() => {
   audioGranted = false;
   const media = { audioAccess: async () => ({ granted: audioGranted, canAsk: !audioGranted }), openAppSettings: async () => { settingsOpened++; return {}; }, allowAudioAccess: async () => ({}) };
   Module._load = ((load) => function (request, ...rest) {
-    if (request === '@capacitor/core') return { Capacitor: { getPlatform: () => 'android', isNativePlatform: () => true, Plugins: { MurielMedia: media }, convertFileSrc: (u) => u } };
+    if (request === '@capacitor/core') return { Capacitor: { getPlatform: () => 'android', isNativePlatform: () => true, Plugins: { PiverxyMedia: media }, convertFileSrc: (u) => u } };
     if (request === '@capacitor/filesystem') return { Filesystem: {}, Directory: {}, Encoding: {} };
     if (request === '@capacitor/share') return { Share: {} };
     return load.call(this, request, ...rest);

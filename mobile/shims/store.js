@@ -1,11 +1,11 @@
 // Persistent storage behind the fs shim. Virtual paths under /data map to Capacitor Filesystem paths under
-// Muriel/ (IndexedDB in a browser): in Documents on iOS, visible in the Files app; in the app's private storage
-// on Android, except the songs people download, which go to Music/Muriel Mod (see "Android: downloads" below).
+// Piverxy/ (IndexedDB in a browser): in Documents on iOS, visible in the Files app; in the app's private storage
+// on Android, except the songs people download, which go to Music/Piverxy (see "Android: downloads" below).
 const path = require('path');
 const { Filesystem, Directory, Encoding } = require('@capacitor/filesystem');
 const { Capacitor } = require('@capacitor/core');
 
-const ROOT = 'Muriel';
+const ROOT = 'Piverxy';
 const ANDROID = Capacitor.getPlatform() === 'android';
 // iOS: Documents (shown in the Files app). Android: app-private storage; public Documents needs permissions.
 const DIR = ANDROID ? Directory.Data : Directory.Documents;
@@ -15,7 +15,7 @@ const toVirtual = (rpath) => '/data' + rpath.slice(ROOT.length);
 const priv = (vpath) => ({ path: toReal(vpath), directory: DIR });
 
 // ---- Android: downloads ----
-// Songs saved with Download (/data/Downloads) go to Music/Muriel Mod on the phone's shared storage (Documents/Muriel Mod
+// Songs saved with Download (/data/Downloads) go to Music/Piverxy on the phone's shared storage (Documents/Piverxy
 // if Music can't be used), where file managers and music apps find them. The song cache and the rest stay private.
 // Android 11+ lets an app save files there without asking. Android 10 and older need the storage permission
 // (AndroidManifest.xml); it's asked for when the first song is saved, and without it downloads stay private.
@@ -24,23 +24,23 @@ const PUBLIC = Directory.ExternalStorage;
 // the app's own folder on shared storage: Android/data/<package>/files. Needs no permission on any Android version
 // (other apps and, on Android 11+, file managers can't browse it).
 const APPDIR = Directory.External;
-// The mod's own folder name: the original Muriel saves to Music/Muriel, and on Android 11+ an app can't change or delete
+// The mod's own folder name: the original Piverxy saves to Music/Piverxy, and on Android 11+ an app can't change or delete
 // files another app made there, so two apps sharing one folder would trip over each other.
-const FOLDER = 'Muriel Mod';
+const FOLDER = 'Piverxy';
 const PUBLIC_ROOTS = [`Music/${FOLDER}`, `Documents/${FOLDER}`];
-let pub = null; // the folder in use, e.g. 'Music/Muriel Mod' (in PUBLIC) or 'download' (in APPDIR)
+let pub = null; // the folder in use, e.g. 'Music/Piverxy' (in PUBLIC) or 'download' (in APPDIR)
 let pubDir = PUBLIC; // which of the two it is in
 let mayAsk = false; // Android 10 and older: storage permission not given, but may be
 let asked = false;
 // ---- Android: choosing the download folder (Settings → Folders → Download folder → Change) ----
-// The choice is kept as text: 'Music/Muriel Mod' (shared storage) or 'Android/data/<package>/files/download' (the app's
+// The choice is kept as text: 'Music/Piverxy' (shared storage) or 'Android/data/<package>/files/download' (the app's
 // own folder). Shared storage only takes the folders Android lets an app write to, and a folder of its own inside one.
 // the package name; replaced by the real one at launch (list below), because a rebuilt app may carry another
 let APP_ID = 'io.github.piverxy';
 const appFiles = () => `Android/data/${APP_ID}/files`;
 const SHARED_TOPS = ['Music', 'Documents', 'Download', 'Podcasts', 'Audiobooks'];
-const LOC_KEY = 'muriel_download_location';
-const SIB_KEY = 'muriel_local_folders'; // which folders next to the download folder were linked as playlists
+const LOC_KEY = 'piverxy_download_location';
+const SIB_KEY = 'piverxy_local_folders'; // which folders next to the download folder were linked as playlists
 const ROOT_PREFIX = '/storage/emulated/0/';
 const lsGet = (k) => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
@@ -57,14 +57,14 @@ function parseLocation(text) {
     return root ? { kind: 'app', root } : null;
   }
   const top = SHARED_TOPS.find((t) => t.toLowerCase() === segs[0].toLowerCase());
-  if (!top || segs.length < 2) return null; // 'Music' itself is not a folder of Muriel's
+  if (!top || segs.length < 2) return null; // 'Music' itself is not a folder of Piverxy's
   return { kind: 'shared', root: [top, ...segs.slice(1)].join('/') };
 }
 const kindDir = (kind) => (kind === 'app' ? APPDIR : PUBLIC);
 const textOf = (kind, root) => (kind === 'app' ? `${appFiles()}/${root}` : root);
 // the folder chosen in Settings; while a move to another one is unfinished, that one (see "moving the downloads")
 const readLoc = () => { const m = readMove(); return m ? m.to : parseLocation(lsGet(LOC_KEY)); };
-// a folder as Settings shows it: 'Music/Muriel Mod' (the sheet that picks it also shows the full path)
+// a folder as Settings shows it: 'Music/Piverxy' (the sheet that picks it also shows the full path)
 const shown = (kind, root) => textOf(kind, root);
 const sharedName = (rel, dir) => (dir === PUBLIC ? rel.replace(/\.webm$/i, '.mka') : rel);
 
@@ -81,7 +81,7 @@ const fromPub = (rpath) => DOWNLOADS + rpath.slice(pub.length).replace(/\.mka$/i
 
 // ---- Android: songs in the folders next to the download folder ----
 // /data/LocalMusic/<rel> is <folder next to the download folder>/<rel>: the songs are played where they are (never copied
-// and never deleted by Muriel) and show up as playlists (scanSiblings below).
+// and never deleted by Piverxy) and show up as playlists (scanSiblings below).
 const LOCALROOT = '/data/LocalMusic';
 const isLocalLink = (vpath) => ANDROID && vpath.startsWith(LOCALROOT + '/');
 const parentRoot = () => (pub && pub.includes('/') ? pub.slice(0, pub.lastIndexOf('/')) : '');
@@ -103,7 +103,7 @@ function where(vpath) {
 }
 
 // where a file being saved goes. On Android 10 and older the first download asks for the permission, without
-// waiting for the answer: with Muriel in the background the question waits for its return, and the music (which
+// waiting for the answer: with Piverxy in the background the question waits for its return, and the music (which
 // waits for files to be saved) would too. Songs saved meanwhile stay private and move once it's given.
 function saveTo(vpath) {
   if (isDownload(vpath) && !pub && mayAsk && !asked) {
@@ -125,7 +125,7 @@ function saved(vpath, loc) {
 // Android 10 and older only index new files at their next full scan: tell the media index now, so the song shows
 // up in music apps right away (Android 11+ does that by itself; MediaControlsPlugin.java)
 function scan(loc) {
-  const media = Capacitor.Plugins && Capacitor.Plugins.MurielMedia; // registered by media-controls.js
+  const media = Capacitor.Plugins && Capacitor.Plugins.PiverxyMedia; // registered by media-controls.js
   if (loc.directory !== PUBLIC || !media) return;
   Filesystem.getUri(loc).then(({ uri }) => media.scanFile({ path: uri })).catch(() => {});
 }
@@ -269,17 +269,17 @@ async function checkWritable({ kind, root }) {
     if (perm === 'prompt' || perm === 'prompt-with-rationale') {
       try { perm = (await Filesystem.requestPermissions()).publicStorage; } catch (e) {}
     }
-    if (perm && perm !== 'granted') return 'Muriel needs access to storage to save songs there';
+    if (perm && perm !== 'granted') return 'Piverxy needs access to storage to save songs there';
   }
   try { await Filesystem.mkdir({ path: root, directory, recursive: true }); } catch (e) {} // there already
   // a real write: Android 11+ refuses some files in some folders (Music/ only takes audio, say), and that
   // would only show up with the first download. The probe is named like a song for that reason.
-  const probe = `${root}/.muriel-write-test.mp3`;
+  const probe = `${root}/.piverxy-write-test.mp3`;
   try {
     await Filesystem.writeFile({ path: probe, directory, data: 'AAAA', recursive: true });
     await Filesystem.deleteFile({ path: probe, directory });
   } catch (e) {
-    return "Muriel can't save songs in that folder";
+    return "Piverxy can't save songs in that folder";
   }
   return null;
 }
@@ -291,8 +291,8 @@ async function checkWritable({ kind, root }) {
 // name, an old copy that would not delete), a folder that could not be read and a missing permission all keep it, however
 // often it was tried. `tries` only counts the runs; it never ends the move. Every launch tries once more, and so does
 // Retry in Settings.
-const MOVE_KEY = 'muriel_download_move';
-const PART = '.muriel-part-'; // a song being copied has this in front of its name; it gets its own name once it is whole
+const MOVE_KEY = 'piverxy_download_move';
+const PART = '.piverxy-part-'; // a song being copied has this in front of its name; it gets its own name once it is whole
 const MAX_HELD = 500; // names of conflicting songs the journal remembers (see listDownloads)
 const sameLoc = (a, b) => !!a && !!b && a.kind === b.kind && a.root === b.root;
 const textOfLoc = (l) => textOf(l.kind, l.root);
@@ -313,7 +313,7 @@ const NOT_THERE = /not exist|no such|not found|enoent|doesn'?t exist/i;
 const errText = (e) => `${e && e.code ? `${e.code} ` : ''}${e && e.message ? e.message : e}`;
 const isNotThere = (e) => NOT_THERE.test(errText(e));
 // what the log keeps: the phase, the path and the error; never what is in a song
-const warnMove = (phase, path, e) => { try { console.warn(`[muriel move] ${phase} ${path}: ${errText(e)}`); } catch (x) {} };
+const warnMove = (phase, path, e) => { try { console.warn(`[piverxy move] ${phase} ${path}: ${errText(e)}`); } catch (x) {} };
 
 // true only when the error says "not there" AND the folder really is not there. Anything else (no permission, an I/O
 // error, a provider that does not answer) says nothing about whether the songs are still there.
@@ -325,7 +325,7 @@ async function isGoneDir(loc, err) {
 // Whether two files hold exactly the same bytes: true, false, or null (could not be checked). The same name and the same
 // size prove nothing; only the bytes do. MediaControlsPlugin.sameFile reads both in pieces (a FLAC is 30-150 MB).
 async function sameBytes(a, b) {
-  const media = Capacitor.Plugins && Capacitor.Plugins.MurielMedia; // registered by media-controls.js
+  const media = Capacitor.Plugins && Capacitor.Plugins.PiverxyMedia; // registered by media-controls.js
   if (!media) return null;
   try {
     const [ua, ub] = await Promise.all([Filesystem.getUri(a), Filesystem.getUri(b)]);
@@ -497,7 +497,7 @@ function moveStatus() {
 }
 // the page listens for this to refresh what Settings says (a move finishes in the background, after launch)
 function announceMove() {
-  try { window.dispatchEvent(new CustomEvent('muriel-move-status')); } catch (e) {}
+  try { window.dispatchEvent(new CustomEvent('piverxy-move-status')); } catch (e) {}
 }
 
 async function resumeMove() {
@@ -515,7 +515,7 @@ async function retryMove() {
   const m = ANDROID ? readMove() : null;
   if (!m) return { ok: true, ran: false, ...moveStatus() };
   if (!pub || pubDir !== kindDir(m.to.kind) || pub !== m.to.root) {
-    return { ok: false, ran: false, error: "Muriel can't use the new download folder right now", ...moveStatus() };
+    return { ok: false, ran: false, error: "Piverxy can't use the new download folder right now", ...moveStatus() };
   }
   const r = await resumeMove();
   if (!r) return { ok: true, ran: false, busy: true, ...moveStatus() }; // one is running already
@@ -543,16 +543,16 @@ async function switchTo(loc, move, custom) {
 // -> { granted, canAsk } (canAsk false: said no for good, only the app's page in Settings turns it on). With ask, the
 // system dialog comes first (answers when it is closed); with settings too, a refusal for good opens that page.
 async function readAccessOf({ ask = false, settings = false } = {}) {
-  const media = Capacitor.Plugins && Capacitor.Plugins.MurielMedia; // registered by media-controls.js
+  const media = Capacitor.Plugins && Capacitor.Plugins.PiverxyMedia; // registered by media-controls.js
   if (!ANDROID || !media) return { granted: true, canAsk: false };
   try { return await (ask ? media.allowAudioAccess({ settings }) : media.audioAccess()); } catch (e) {
     return { granted: true, canAsk: false }; // an older build of the plugin: nothing to ask
   }
 }
 
-// ---- Android: the songs linked in place, and the permission that lets Muriel read them ----
+// ---- Android: the songs linked in place, and the permission that lets Piverxy read them ----
 // Linked songs stay in the folders next to the download folder (shared storage). From Android 11 the app sees them only
-// while it may read music and audio. When that is taken back (Settings -> Apps -> Muriel -> Permissions) the files are
+// while it may read music and audio. When that is taken back (Settings -> Apps -> Piverxy -> Permissions) the files are
 // untouched and the library and playlists still know them, but Android refuses every read: the songs are LOCKED until the
 // permission is given again. Locked is only ever a state held here, computed from the permission as it is now: nothing is
 // written down for it, so it cannot go stale, and nothing is forgotten, unlinked or deleted because of it.
@@ -662,7 +662,7 @@ async function collectLinked(only) {
 }
 
 // at launch: the songs of the folders that were linked before are put back in the file index (fs shim), so they play.
-// While Muriel may not read music and audio they are not: Android would show the folders as empty or refuse every read,
+// While Piverxy may not read music and audio they are not: Android would show the folders as empty or refuse every read,
 // which says nothing about the songs. They stay remembered (SIB_KEY, the library, the playlists) and come back the moment
 // the permission does (refreshLinkedAccess).
 async function listLinked(out) {
@@ -670,8 +670,8 @@ async function listLinked(out) {
   out.push(...(await restoredLinked()));
 }
 
-// true for a song linked in place while Muriel may not read music and audio: nothing under /data/LocalMusic is readable then.
-// The downloads, the songs imported into the app and everything else Muriel keeps are not affected.
+// true for a song linked in place while Piverxy may not read music and audio: nothing under /data/LocalMusic is readable then.
+// The downloads, the songs imported into the app and everything else Piverxy keeps are not affected.
 const isLinkedLocked = (vpath) => linkedLock.locked && isLocalLink(vpath);
 
 module.exports = {
@@ -694,7 +694,7 @@ module.exports = {
 
   // ---- Android: download folder choice ----
   // each place offered in Settings: text (what is kept), shown (as Settings shows it), full (the path on the phone).
-  // `label` of a shared folder is the folder's name (not translated); the app folder's label and every hint are Muriel's words.
+  // `label` of a shared folder is the folder's name (not translated); the app folder's label and every hint are Piverxy's words.
   downloadChoices: () => [
     { text: PUBLIC_ROOTS[0], kind: 'shared', label: `Music / ${FOLDER}`, hint: 'Music apps and file managers find it' },
     { text: `Download/${FOLDER}`, kind: 'shared', label: `Download / ${FOLDER}`, hint: 'Next to your other downloads' },
@@ -703,7 +703,7 @@ module.exports = {
   ].map((c) => ({ ...c, shown: c.text, full: ROOT_PREFIX + c.text })),
   isCustomDownloadDir: () => !!parseLocation(lsGet(LOC_KEY)),
   sharedTops: () => SHARED_TOPS.slice(),
-  // a folder typed or picked in the sheet, as Settings shows it (null: not a folder Muriel can use)
+  // a folder typed or picked in the sheet, as Settings shows it (null: not a folder Piverxy can use)
   showDownloadDir(text) {
     const loc = parseLocation(text);
     return loc ? shown(loc.kind, loc.root) : null;
@@ -714,7 +714,7 @@ module.exports = {
   async setDownloadDir(text, { move = true } = {}) {
     if (!ANDROID) return { ok: false, error: 'The download folder is fixed here' };
     const loc = parseLocation(text);
-    if (!loc) return { ok: false, error: "That isn't a folder Muriel can save songs in" };
+    if (!loc) return { ok: false, error: "That isn't a folder Piverxy can save songs in" };
     const problem = await checkWritable(loc);
     if (problem) return { ok: false, error: problem };
     return switchTo(loc, move, true);
@@ -726,7 +726,7 @@ module.exports = {
       const loc = { kind: 'shared', root };
       if (!(await checkWritable(loc))) return switchTo(loc, move, false);
     }
-    return { ok: false, error: "Muriel can't save songs in the default folder right now" };
+    return { ok: false, error: "Piverxy can't save songs in the default folder right now" };
   },
   // a move that was cut short carries on by itself shortly after launch (and at every launch after, until nothing is left)
   resumeMove,
@@ -767,7 +767,7 @@ module.exports = {
 
   // ---- Android: reading songs the app did not save itself ----
   // Android 11+ hides a song the app did not make (a file manager or a computer put it there, or an earlier install of
-  // Muriel saved it) until the app may read music and audio (MediaControlsPlugin.allowAudioAccess). That is only so on
+  // Piverxy saved it) until the app may read music and audio (MediaControlsPlugin.allowAudioAccess). That is only so on
   // shared storage: the app's own folder (Android/data/<package>/files) needs nothing.
   needsReadAccess: () => !!(ANDROID && pub && pubDir === PUBLIC),
   // -> { granted, canAsk } (canAsk false: said no for good, only the app's page in Settings turns it on). With ask, the
@@ -807,7 +807,7 @@ module.exports = {
   writeBlob: (vpath, blob) => writeInPieces(vpath, blob.size, async (from, to) => new Uint8Array(await blob.slice(from, to).arrayBuffer())),
 
   async remove(vpath, isDir) {
-    if (isLocalLink(vpath)) return; // the user's own files: Muriel only forgets them
+    if (isLocalLink(vpath)) return; // the user's own files: Piverxy only forgets them
     const loc = where(vpath);
     if (isDir) await Filesystem.rmdir({ ...loc, recursive: true });
     else await Filesystem.deleteFile(loc);
@@ -852,7 +852,7 @@ module.exports = {
     const loc = saveTo(vpath);
     if (!Capacitor.isNativePlatform()) {
       // browser harness: downloadFile would hit CORS, so go through the dev proxy
-      const r = await globalThis.__murielFetch(url, { headers });
+      const r = await globalThis.__piverxyFetch(url, { headers });
       if (!r.ok) throw new Error(`download failed: ${r.status}`);
       const bytes = new Uint8Array(await r.arrayBuffer());
       await Filesystem.writeFile({ ...loc, data: b64FromBytes(bytes), recursive: true });

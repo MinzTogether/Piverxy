@@ -27,14 +27,14 @@ if (process.platform === 'linux') {
   app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
   app.commandLine.appendSwitch('disable-features', 'Vulkan,AudioServiceOutOfProcess');
 
-  if (process.env.MURIEL_SKIP_GPU_BUFFER_FLAGS !== '1') {
+  if (process.env.PIVERXY_SKIP_GPU_BUFFER_FLAGS !== '1') {
     app.commandLine.appendSwitch('disable-gpu-memory-buffer-video-frames');
     app.commandLine.appendSwitch('disable-gpu-memory-buffer-compositor-resources');
   }
 }
 
 if (process.platform === 'win32') {
-  // MediaSessionService: Chromium's own media session, so the Windows media overlay and lock screen show Muriel
+  // MediaSessionService: Chromium's own media session, so the Windows media overlay and lock screen show Piverxy
   enabledFeatures.push('HardwareMediaKeyHandling', 'MediaSessionService');
   app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
 }
@@ -57,14 +57,14 @@ app.commandLine.appendSwitch('js-flags', '--expose-gc');
 
 if (readStartupConfig().hwAccel === false) app.disableHardwareAcceleration();
 
-const extraFlags = (process.env.MURIEL_FLAGS || '').split(';').map((s) => s.trim()).filter(Boolean);
+const extraFlags = (process.env.PIVERXY_FLAGS || '').split(';').map((s) => s.trim()).filter(Boolean);
 for (const flag of extraFlags) {
   const eq = flag.indexOf('=');
   if (eq > 0) app.commandLine.appendSwitch(flag.slice(0, eq), flag.slice(eq + 1));
   else app.commandLine.appendSwitch(flag);
 }
 
-if (process.env.MURIEL_DEBUG === '1') {
+if (process.env.PIVERXY_DEBUG === '1') {
   app.whenReady().then(async () => {
     console.log('[gpu] features', JSON.stringify(app.getGPUFeatureStatus()));
     try {
@@ -77,10 +77,10 @@ if (process.env.MURIEL_DEBUG === '1') {
   });
 }
 
-// MURIEL_METRICS=1: one JSON line per interval with each Chromium process's CPU and memory, for measuring
-if (process.env.MURIEL_METRICS === '1') {
+// PIVERXY_METRICS=1: one JSON line per interval with each Chromium process's CPU and memory, for measuring
+if (process.env.PIVERXY_METRICS === '1') {
   app.whenReady().then(() => {
-    const every = Math.max(1000, parseInt(process.env.MURIEL_METRICS_MS || '5000', 10) || 5000);
+    const every = Math.max(1000, parseInt(process.env.PIVERXY_METRICS_MS || '5000', 10) || 5000);
     setInterval(() => {
       const procs = app.getAppMetrics().map((m) => ({
         pid: m.pid,
@@ -109,7 +109,7 @@ function runGUI() {
 
   let mainWindow = null;
   // Must match build.appId so the NSIS shortcut, pinned icons and the running window share one taskbar identity.
-  if (process.platform === 'win32') app.setAppUserModelId('io.github.cloverscripts.muriel');
+  if (process.platform === 'win32') app.setAppUserModelId('io.github.piverxy');
   const gotLock = app.requestSingleInstanceLock();
   if (!gotLock) { app.quit(); return; }
   app.on('second-instance', () => {
@@ -225,7 +225,7 @@ function runGUI() {
       minWidth: 360,
                                    minHeight: 500,
                                    backgroundColor: firstRun ? '#8d5ef2' : '#000000',
-                                   title: 'Muriel',
+                                   title: 'Piverxy',
                                    icon: path.join(__dirname, 'assets', 'icon.png'),
                                    // macOS keeps its frame so the native traffic lights, rounded corners and shadow are
                                    // used; Windows and Linux draw their own controls
@@ -236,7 +236,7 @@ function runGUI() {
                                    useContentSize: true,
                                    webPreferences: {
                                      preload: path.join(__dirname, 'preload.js'),
-                                   additionalArguments: [`--muriel-token=${getServerToken()}`],
+                                   additionalArguments: [`--piverxy-token=${getServerToken()}`],
                                    nodeIntegration: false,
                                    contextIsolation: true,
                                    webSecurity: false,
@@ -275,7 +275,7 @@ function runGUI() {
       try { if (new URL(url).protocol === 'https:') shell.openExternal(url); } catch (e) {}
       return { action: 'deny' };
     });
-    // the window only ever shows Muriel's own pages; anything else would get the preload API and the server token
+    // the window only ever shows Piverxy's own pages; anything else would get the preload API and the server token
     const isAppPage = (u) => {
       try {
         const x = new URL(u);
@@ -375,7 +375,7 @@ function runGUI() {
     });
 
     ipcMain.handle('get-diagnostics', async () => {
-      const lines = [`Muriel ${app.getVersion()}`, `OS ${process.platform} ${process.arch} ${os.release()}`, `Electron ${process.versions.electron} Chromium ${process.versions.chrome} Node ${process.versions.node}`, `Locale ${app.getLocale()}`, `Data ${DATA_DIR}`];
+      const lines = [`Piverxy ${app.getVersion()}`, `OS ${process.platform} ${process.arch} ${os.release()}`, `Electron ${process.versions.electron} Chromium ${process.versions.chrome} Node ${process.versions.node}`, `Locale ${app.getLocale()}`, `Data ${DATA_DIR}`];
       for (const name of ['yt-dlp', 'ffmpeg']) {
         const bin = resolveBinary(name);
         lines.push(`${name}: ${bin || 'NOT FOUND'}`);
@@ -404,7 +404,7 @@ function runGUI() {
         if (content === null || content.length > 64 * 1024 * 1024) return { success: false, error: 'Nothing to save' };
         const isBackup = payload.kind === 'backup';
         const base = path.basename(String(payload.defaultName || '')).replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').replace(/^\.+/, '');
-        const name = base || (isBackup ? 'muriel-backup.json' : 'playlists.json');
+        const name = base || (isBackup ? 'piverxy-backup.json' : 'playlists.json');
         const win = BrowserWindow.fromWebContents(event.sender) || mainWindow;
         const r = await dialog.showSaveDialog(win, {
           title: isBackup ? 'Save a backup of this profile' : 'Export playlists',
@@ -537,7 +537,7 @@ function runGUI() {
       });
 
       // set-data-dir / set-download-dir accept only the folder the user just picked in the dialog, not any
-      // path a script in the window passes in (with "move", the old folder's Muriel files get deleted)
+      // path a script in the window passes in (with "move", the old folder's Piverxy files get deleted)
       let pickedDataDir = null;
       let pickedDownloadDir = null;
       const isPicked = (picked, dir) => !!picked && path.resolve(String(dir)) === path.resolve(picked);
@@ -581,10 +581,10 @@ function runGUI() {
           return { ok: false, error: 'That folder is not writable' };
         }
 
-        // only Muriel's own files move (and get deleted afterwards): the old folder may hold other things too
+        // only Piverxy's own files move (and get deleted afterwards): the old folder may hold other things too
         if (move) {
           try {
-            await platform.copyDirContents(current, target, undefined, platform.MURIEL_DATA_ENTRIES);
+            await platform.copyDirContents(current, target, undefined, platform.PIVERXY_DATA_ENTRIES);
           } catch (e) {
             return { ok: false, error: 'Could not move files: ' + e.message };
           }
@@ -594,7 +594,7 @@ function runGUI() {
         pickedDataDir = null;
 
         if (move) {
-          try { await platform.removeDirContents(current, undefined, platform.MURIEL_DATA_ENTRIES); } catch (e) {}
+          try { await platform.removeDirContents(current, undefined, platform.PIVERXY_DATA_ENTRIES); } catch (e) {}
         }
 
         return { ok: true, dir: target, moved: move };
@@ -664,7 +664,7 @@ function runGUI() {
       let mediaKeysWanted = false;
       let mediaKeysActive = false;
       const sendMedia = (cmd) => {
-        if (process.env.MURIEL_DEBUG === '1') console.log('[media] globalShortcut', cmd);
+        if (process.env.PIVERXY_DEBUG === '1') console.log('[media] globalShortcut', cmd);
         if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('media-command', cmd);
       };
       function unregisterMediaKeys() {
@@ -742,7 +742,7 @@ function runGUI() {
           let trayIcon = nativeImage.createFromPath(iconPath);
           trayIcon = trayIcon.resize({ width: 22, height: 22 });
           tray = new Tray(trayIcon);
-          tray.setToolTip('Muriel');
+          tray.setToolTip('Piverxy');
           const contextMenu = Menu.buildFromTemplate([
             {
               label: 'Show/Hide',

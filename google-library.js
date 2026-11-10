@@ -1,8 +1,8 @@
 // YouTube / YouTube Music library import (desktop): log in to Google in a separate window, then read the liked
 // songs and playlists of that account. Registered by main.js.
-// The Google login lives in its own persistent browser storage, one per Muriel profile ("persist:muriel-google"
-// for the first one), apart from the app's own pages: Muriel's window never gets the Google cookies, and the
-// login window gets neither Muriel's preload API nor its server token. Only "logged in or not" and the songs
+// The Google login lives in its own persistent browser storage, one per Piverxy profile ("persist:piverxy-google"
+// for the first one), apart from the app's own pages: Piverxy's window never gets the Google cookies, and the
+// login window gets neither Piverxy's preload API nor its server token. Only "logged in or not" and the songs
 // (checked and capped here) go back to the page.
 const { BrowserWindow, ipcMain, session, shell } = require('electron');
 const crypto = require('crypto');
@@ -12,12 +12,12 @@ const YT_ID = /^[A-Za-z0-9_-]{11}$/;
 const CHROME_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 const LIMITS = { likePages: 60, playlists: 200, playlistPages: 40, tracksPerList: 5000, requests: 1500 };
 
-const partitionFor = (profile) => (PROFILE_RE.test(String(profile || '')) && profile !== 'default' ? `persist:muriel-google-${profile}` : 'persist:muriel-google');
+const partitionFor = (profile) => (PROFILE_RE.test(String(profile || '')) && profile !== 'default' ? `persist:piverxy-google-${profile}` : 'persist:piverxy-google');
 
 function googleSession(profile) {
   const s = session.fromPartition(partitionFor(profile));
-  if (!s.__murielReady) {
-    s.__murielReady = true;
+  if (!s.__piverxyReady) {
+    s.__piverxyReady = true;
     try { s.setUserAgent(CHROME_UA); } catch (e) {}
     // the login page needs no camera, microphone, notifications or anything else
     try { s.setPermissionRequestHandler((wc, permission, cb) => cb(false)); } catch (e) {}

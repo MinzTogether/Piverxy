@@ -216,18 +216,18 @@
       filter: url(#iconTint);
     }
 
-    .muriel-icon {
+    .piverxy-icon {
       width: 118px;
       height: 118px;
       display: block;
       opacity: 0;
     }
 
-    body.intro .muriel-icon {
+    body.intro .piverxy-icon {
       animation: heroIconAnim 1.9s cubic-bezier(0.1, 0.8, 0.15, 1) forwards;
     }
 
-    .muriel-title {
+    .piverxy-title {
       font-size: 68px;
       font-weight: 700;
       letter-spacing: -0.04em;
@@ -237,23 +237,24 @@
       transition: color 0.3s ease;
     }
 
-    .muriel-title span {
+    .piverxy-title span {
       display: inline-block;
       opacity: 0;
       transform: translateY(48px) scale(1.4);
       filter: blur(20px);
     }
 
-    body.intro .muriel-title span {
+    body.intro .piverxy-title span {
       animation: heroLetterAnim 1.9s cubic-bezier(0.1, 0.8, 0.15, 1) forwards;
     }
 
-    .muriel-title span:nth-child(1) { animation-delay: 0.9s; }
-    .muriel-title span:nth-child(2) { animation-delay: 1.05s; }
-    .muriel-title span:nth-child(3) { animation-delay: 1.2s; }
-    .muriel-title span:nth-child(4) { animation-delay: 1.35s; }
-    .muriel-title span:nth-child(5) { animation-delay: 1.5s; }
-    .muriel-title span:nth-child(6) { animation-delay: 1.65s; }
+    .piverxy-title span:nth-child(1) { animation-delay: 0.9s; }
+    .piverxy-title span:nth-child(2) { animation-delay: 1.05s; }
+    .piverxy-title span:nth-child(3) { animation-delay: 1.2s; }
+    .piverxy-title span:nth-child(4) { animation-delay: 1.35s; }
+    .piverxy-title span:nth-child(5) { animation-delay: 1.5s; }
+    .piverxy-title span:nth-child(6) { animation-delay: 1.65s; }
+    .piverxy-title span:nth-child(7) { animation-delay: 1.8s; }
 
     body:not(.intro) #step1 .stacked-group {
       opacity: 0;
@@ -985,14 +986,14 @@
       to { transform: scale(3.5); opacity: 0; }
     }
   
-/* ---- Muriel logo: a sparkle that twinkles while music plays ---- */
+/* ---- Piverxy logo: a sparkle that twinkles while music plays ---- */
 .logo-star path { transform-box: fill-box; transform-origin: 50% 50%; }
 @keyframes sparkleMain { 0% { transform: rotate(0deg) scale(1); } 50% { transform: rotate(45deg) scale(0.78); } 100% { transform: rotate(90deg) scale(1); } }
 @keyframes sparkleBlink { 0%, 100% { transform: scale(1); opacity: 1; } 45% { transform: scale(0.25); opacity: 0.35; } 62% { transform: scale(1.15); opacity: 1; } }
 .logo-star.dancing .s1 { animation: sparkleMain 2.6s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
 .logo-star.dancing .s2 { animation: sparkleBlink 1.3s ease-in-out infinite -0.4s; }
-    .muriel-icon.logo-star { overflow: visible; }
-    .muriel-icon.logo-star .s1 { animation-duration: 3.4s !important; }
+    .piverxy-icon.logo-star { overflow: visible; }
+    .piverxy-icon.logo-star .s1 { animation-duration: 3.4s !important; }
     @media (prefers-reduced-motion: reduce) { .logo-star path { animation: none !important; } }
   </style>
 </head>
@@ -1022,11 +1023,11 @@
             <g class="shape-spin"><path class="shape-path" id="shapePath" d=""/></g>
           </svg>
           <div class="icon-tint">
-            <svg class="muriel-icon logo-star dancing" viewBox="0 0 1024 1024" fill="#FFFFFF" role="img" aria-label="Muriel"><path class="s1" d="M500 160Q543.2 476.8 860 520Q543.2 563.2 500 880Q456.8 563.2 140 520Q456.8 476.8 500 160Z"/><path class="s2" d="M780 154Q791.5 238.5 876 250Q791.5 261.5 780 346Q768.5 261.5 684 250Q768.5 238.5 780 154Z"/></svg>
+            <svg class="piverxy-icon logo-star dancing" viewBox="0 0 1024 1024" fill="#FFFFFF" role="img" aria-label="Piverxy"><path class="s1" d="M500 160Q543.2 476.8 860 520Q543.2 563.2 500 880Q456.8 563.2 140 520Q456.8 476.8 500 160Z"/><path class="s2" d="M780 154Q791.5 238.5 876 250Q791.5 261.5 780 346Q768.5 261.5 684 250Q768.5 238.5 780 154Z"/></svg>
           </div>
         </div>
-        <h1 class="muriel-title">
-          <span>M</span><span>u</span><span>r</span><span>i</span><span>e</span><span>l</span>
+        <h1 class="piverxy-title">
+          <span>P</span><span>i</span><span>v</span><span>e</span><span>r</span><span>x</span><span>y</span>
         </h1>
       </div>
 
@@ -1181,7 +1182,7 @@
             <div class="row-title">Local library</div>
             <div class="row-sub">Show the My files tab for music stored on your computer</div>
           </div>
-          <button class="sw on" role="switch" aria-checked="true" data-key="muriel_show_local"></button>
+          <button class="sw on" role="switch" aria-checked="true" data-key="piverxy_show_local"></button>
         </div>
 
         <div class="stacked-container stacked-3-middle row">
@@ -1193,7 +1194,7 @@
             <div class="row-sub" id="bgSub">Use your own image or video behind the app</div>
           </div>
           <button class="btn small secondary is-hidden" id="bgPickBtn">Choose file</button>
-          <button class="sw" role="switch" aria-checked="false" data-key="muriel_custom_bg_enabled"></button>
+          <button class="sw" role="switch" aria-checked="false" data-key="piverxy_custom_bg_enabled"></button>
         </div>
 
         <div class="stacked-container stacked-3-middle row">
@@ -1204,7 +1205,7 @@
             <div class="row-title">No-Hand cursor</div>
             <div class="row-sub">Keep the normal arrow instead of the hand on buttons</div>
           </div>
-          <button class="sw" role="switch" aria-checked="false" data-key="muriel_no_hand_cursor"></button>
+          <button class="sw" role="switch" aria-checked="false" data-key="piverxy_no_hand_cursor"></button>
         </div>
 
         <div class="stacked-container stacked-3-middle row">
@@ -1215,7 +1216,7 @@
             <div class="row-title">Performance mode</div>
             <div class="row-sub">Turn off blur and heavy animations on slower computers</div>
           </div>
-          <button class="sw" role="switch" aria-checked="false" data-key="muriel_perf_mode"></button>
+          <button class="sw" role="switch" aria-checked="false" data-key="piverxy_perf_mode"></button>
         </div>
 
         <div class="stacked-container stacked-3-bottom">
@@ -1241,8 +1242,8 @@
       <div class="stacked-group">
 
         <div class="stacked-container stacked-3-top">
-          <h2 class="step-header-title">Add Muriel to your launcher</h2>
-          <p class="step-header-subtitle" id="launcherSub">Open Muriel in one click from your Start menu or applications menu.</p>
+          <h2 class="step-header-title">Add Piverxy to your launcher</h2>
+          <p class="step-header-subtitle" id="launcherSub">Open Piverxy in one click from your Start menu or applications menu.</p>
         </div>
 
         <div class="stacked-container stacked-3-middle launcher-preview">
@@ -1261,7 +1262,7 @@
           </div>
           <div class="row-text">
             <div class="row-title" id="launcherTitle">Start menu shortcut</div>
-            <div class="row-sub" id="launcherRowSub">Add Muriel with its icon so you can find it by searching</div>
+            <div class="row-sub" id="launcherRowSub">Add Piverxy with its icon so you can find it by searching</div>
           </div>
           <button class="sw on" role="switch" aria-checked="true" id="launcherSwitch"></button>
         </div>
@@ -1293,7 +1294,7 @@
           <p class="step-header-subtitle">Optional. You can skip this and set it up whenever you like.</p>
         </div>
 
-        <!-- Muriel has no Discord Rich Presence, so the upstream switch is left out -->
+        <!-- Piverxy has no Discord Rich Presence, so the upstream switch is left out -->
 
         <div class="stacked-container stacked-3-middle">
           <div class="row">
@@ -1302,7 +1303,7 @@
             </div>
             <div class="row-text">
               <div class="row-title">Import a Spotify playlist</div>
-              <div class="row-sub">Paste a public playlist link and it becomes a Muriel playlist</div>
+              <div class="row-sub">Paste a public playlist link and it becomes a Piverxy playlist</div>
             </div>
           </div>
           <div class="field-row">
@@ -1406,14 +1407,14 @@
 
       async spotifyLookup(url) {
         const port = await this.serverPort();
-        if (!port) return { success: false, error: 'Muriel server is not available here' };
+        if (!port) return { success: false, error: 'Piverxy server is not available here' };
         try {
           const res = await fetch(`http://127.0.0.1:${port}/api/spotify-import?url=${encodeURIComponent(url)}`, {
-            headers: { 'X-Muriel-Token': this.api?.serverToken || '' }
+            headers: { 'X-Piverxy-Token': this.api?.serverToken || '' }
           });
           return await res.json();
         } catch (e) {
-          return { success: false, error: 'Could not reach the Muriel server' };
+          return { success: false, error: 'Could not reach the Piverxy server' };
         }
       }
     };
@@ -1879,8 +1880,8 @@
       toggles[key] = on;
       bridge.set(key, on ? '1' : '0');
 
-      if (key === 'muriel_no_hand_cursor') document.body.classList.toggle('no-hand-cursor', on);
-      if (key === 'muriel_custom_bg_enabled') bgPickBtn.classList.toggle('is-hidden', !on);
+      if (key === 'piverxy_no_hand_cursor') document.body.classList.toggle('no-hand-cursor', on);
+      if (key === 'piverxy_custom_bg_enabled') bgPickBtn.classList.toggle('is-hidden', !on);
     }
 
     document.querySelectorAll('.sw[data-key]').forEach((sw) => {
@@ -1896,7 +1897,7 @@
       const picked = await bridge.pickMedia();
       if (!picked) return;
       bgUrl = picked;
-      bridge.set('muriel_welcome_bg', bgUrl);
+      bridge.set('piverxy_welcome_bg', bgUrl);
       bgSub.textContent = bgDisplayName(bgUrl);
     });
 
@@ -1925,16 +1926,16 @@
 
       if (platform === 'win32') {
         launcherTitle.textContent = 'Start menu shortcut';
-        launcherSub.textContent = 'Pin Muriel to the Start menu so you can open it by searching.';
-        launcherRowSub.textContent = 'Adds Muriel with its icon to the Start menu';
+        launcherSub.textContent = 'Pin Piverxy to the Start menu so you can open it by searching.';
+        launcherRowSub.textContent = 'Adds Piverxy with its icon to the Start menu';
       } else {
         launcherTitle.textContent = 'Applications menu entry';
-        launcherSub.textContent = 'Add Muriel to your applications menu with its icon and description.';
+        launcherSub.textContent = 'Add Piverxy to your applications menu with its icon and description.';
         launcherRowSub.textContent = 'Creates a launcher that starts the AppImage';
       }
 
       if (!info) return;
-      if (info.installed) setLauncherUnavailable('Muriel is already in your launcher');
+      if (info.installed) setLauncherUnavailable('Piverxy is already in your launcher');
       else if (!info.canInstall) setLauncherUnavailable(info.reason || 'Not available here');
     }
 
@@ -2013,12 +2014,12 @@
         spotify: pendingImport
       };
 
-      bridge.set('muriel_welcome_theme', JSON.stringify(detail.theme));
-      bridge.set('muriel_welcome_done', '1');
+      bridge.set('piverxy_welcome_theme', JSON.stringify(detail.theme));
+      bridge.set('piverxy_welcome_done', '1');
 
       setTimeout(() => {
         viewport.classList.add('closing');
-        window.dispatchEvent(new CustomEvent('muriel:welcome-done', { detail }));
+        window.dispatchEvent(new CustomEvent('piverxy:welcome-done', { detail }));
         setTimeout(() => bridge.finish(detail), 500);
       }, 700);
     });

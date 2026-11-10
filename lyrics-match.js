@@ -91,5 +91,5 @@
 
   const api = { parseForLyrics, pickBest, cleanTitle, cleanArtist, splitArtists, norm };
   if (typeof module !== 'undefined') module.exports = api;
-  else window.MurielLyricsMatch = api; // the page uses it to show clean song names (Encore)
+  else window.PiverxyLyricsMatch = api; // the page uses it to show clean song names (Encore)
 })();

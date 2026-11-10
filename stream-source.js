@@ -1,5 +1,5 @@
 'use strict';
-// #17: how Muriel hands a YouTube media URL to the desktop audio element. yt-dlp resolves the URL with a
+// #17: how Piverxy hands a YouTube media URL to the desktop audio element. yt-dlp resolves the URL with a
 // player client (android, tv, ...) and YouTube serves it only to requests that look like that client;
 // Chromium fetching it with its own User-Agent/Origin gets a refusal the <audio> element reports as
 // "MEDIA_ELEMENT_ERROR: Format error" (code 4). The same yt-dlp run also prints the request headers it

@@ -1,6 +1,6 @@
 name: iOS build
 
-# Builds an unsigned Muriel.ipa on a GitHub macOS runner and publishes it to the rolling
+# Builds an unsigned Piverxy.ipa on a GitHub macOS runner and publishes it to the rolling
 # "ios-latest" release. Sideload it with Sideloadly or AltStore/SideStore, which sign it with your Apple ID.
 on:
   push:
@@ -53,12 +53,12 @@ jobs:
             CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
             build
 
-      - name: Package Muriel.ipa
+      - name: Package Piverxy.ipa
         run: |
           mkdir -p Payload
           cp -R build/Build/Products/Release-iphoneos/App.app Payload/
-          zip -qry Muriel.ipa Payload
-          ls -lh Muriel.ipa
+          zip -qry Piverxy.ipa Payload
+          ls -lh Piverxy.ipa
 
       - name: Write the SideStore / AltStore source
         env:
@@ -69,8 +69,8 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Muriel-ipa
-          path: Muriel.ipa
+          name: Piverxy-ipa
+          path: Piverxy.ipa
 
       - name: Publish to the ios-latest release
         # test branches only get the workflow artifact; the public release follows main
@@ -85,8 +85,8 @@ jobs:
           # website adds this to the new file's count). 1640 = downloads counted before this existed
           ver="$(node -p "require('./package.json').version")"
           gh release delete ios-latest --cleanup-tag --yes 2>/dev/null || true
-          gh release create ios-latest Muriel.ipa sidestore.json \
+          gh release create ios-latest Piverxy.ipa sidestore.json \
             --prerelease \
             --target "$GITHUB_SHA" \
-            --title "Muriel for iPhone (latest build)" \
-            --notes "Muriel $ver. Unsigned build of ${GITHUB_SHA::7} (run ${{ github.run_number }}). Install with Sideloadly or AltStore/SideStore using your Apple ID. Free Apple IDs need re-signing every 7 days.<!-- muriel-version: $ver -->"
+            --title "Piverxy for iPhone (latest build)" \
+            --notes "Piverxy $ver. Unsigned build of ${GITHUB_SHA::7} (run ${{ github.run_number }}). Install with Sideloadly or AltStore/SideStore using your Apple ID. Free Apple IDs need re-signing every 7 days.<!-- piverxy-version: $ver -->"

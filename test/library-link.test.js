@@ -1,7 +1,7 @@
 'use strict';
 
 // Songs linked in place (phones: the folders next to the download folder). /api/library-link adds them to the
-// library without copying; they play from where they are, and Muriel never deletes the files.
+// library without copying; they play from where they are, and Piverxy never deletes the files.
 // platform.js is the computer's; LOCAL_LINK_DIR is what the phone's shim (mobile/shims/platform.js) sets, so the test sets it
 // here, before server.js is loaded, to a real folder of this machine.
 
@@ -12,16 +12,16 @@ const os = require('node:os');
 const path = require('node:path');
 const http = require('node:http');
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'muriel-link-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'piverxy-link-'));
 for (const key of ['HOME', 'USERPROFILE', 'LOCALAPPDATA', 'XDG_CONFIG_HOME']) process.env[key] = tmp;
-process.env.MURIEL_DATA_DIR = path.join(tmp, 'data');
+process.env.PIVERXY_DATA_DIR = path.join(tmp, 'data');
 const LINK = path.join(tmp, 'LocalMusic');
 fs.mkdirSync(path.join(LINK, 'Road trip'), { recursive: true });
 require('../platform').LOCAL_LINK_DIR = LINK;
 // a library.json record somebody edited by hand to point at another file on the phone
 const evil = 'local_999999999999';
-fs.mkdirSync(process.env.MURIEL_DATA_DIR, { recursive: true });
-fs.writeFileSync(path.join(process.env.MURIEL_DATA_DIR, 'library.json'), JSON.stringify({ [evil]: { id: evil, file: '', path: path.join(tmp, 'secret.txt'), ext: 'mp3', title: 'x', artist: 'y', duration: 0, addedAt: 1 } }));
+fs.mkdirSync(process.env.PIVERXY_DATA_DIR, { recursive: true });
+fs.writeFileSync(path.join(process.env.PIVERXY_DATA_DIR, 'library.json'), JSON.stringify({ [evil]: { id: evil, file: '', path: path.join(tmp, 'secret.txt'), ext: 'mp3', title: 'x', artist: 'y', duration: 0, addedAt: 1 } }));
 fs.writeFileSync(path.join(tmp, 'secret.txt'), 'not for the player');
 
 const { startServer, stopServer, getServerToken } = require('../server');
@@ -39,7 +39,7 @@ after(async () => { await stopServer(); fs.rmSync(tmp, { recursive: true, force:
 function call(method, route, body, headers = {}) {
   return new Promise((resolve, reject) => {
     const data = body === undefined ? null : JSON.stringify(body);
-    const req = http.request({ host: '127.0.0.1', port, path: route, method, headers: { 'x-muriel-token': getServerToken(), ...(data ? { 'Content-Type': 'application/json' } : {}), ...headers } }, (res) => {
+    const req = http.request({ host: '127.0.0.1', port, path: route, method, headers: { 'x-piverxy-token': getServerToken(), ...(data ? { 'Content-Type': 'application/json' } : {}), ...headers } }, (res) => {
       const chunks = [];
       res.on('data', (c) => chunks.push(c));
       res.on('end', () => {
@@ -112,7 +112,7 @@ test('removing a linked song forgets it but never deletes the file', async () =>
 test('library-unlink forgets linked songs that are not kept, and leaves imported ones and every file alone', async () => {
   // an imported song: a copy inside the library folder
   const imported = 'local_111111111111';
-  const libDir = path.join(process.env.MURIEL_DATA_DIR, 'library');
+  const libDir = path.join(process.env.PIVERXY_DATA_DIR, 'library');
   fs.writeFileSync(path.join(libDir, `${imported}.mp3`), BYTES);
   await call('POST', '/api/library-add', { items: [{ id: imported, file: `${imported}.mp3`, name: 'Imported' }] });
   await call('POST', '/api/library-link', { items: [{ id: idB, path: songB, name: 'loose' }] });

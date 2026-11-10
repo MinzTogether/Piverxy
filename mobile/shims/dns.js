@@ -1,7 +1,7 @@
 // `dns.promises.lookup` for the iOS/Android build. A WebView has no resolver, so names are resolved
 // over DNS-over-HTTPS (Cloudflare), keeping server.js's private-address (SSRF) check meaningful.
 async function query(host, type) {
-  const r = await globalThis.__murielFetch(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(host)}&type=${type}`, { headers: { accept: 'application/dns-json' } });
+  const r = await globalThis.__piverxyFetch(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(host)}&type=${type}`, { headers: { accept: 'application/dns-json' } });
   const j = await r.json();
   const want = type === 'A' ? 1 : 28;
   return (j.Answer || []).filter((a) => a.type === want).map((a) => ({ address: a.data, family: type === 'A' ? 4 : 6 }));

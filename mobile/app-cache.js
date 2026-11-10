@@ -6,12 +6,12 @@
 //          and take apart on every cold start otherwise)
 // It is only ever an accelerator. Nothing here throws: a missing, failed, slow or switched-off store reads as
 // "nothing cached" and the caller then does exactly what it did before the cache existed. Settings > Storage can
-// switch it off (this device, key muriel_app_cache = '0') and clear it.
-const DB_NAME = 'muriel-app-cache';
+// switch it off (this device, key piverxy_app_cache = '0') and clear it.
+const DB_NAME = 'piverxy-app-cache';
 const DB_VERSION = 1;
 const TEXTS = 'texts'; // keyPath p: { p, size, mtimeMs, text }
 const BLOBS = 'blobs'; // keyPath k: { k, v: ArrayBuffer, at }
-const ON_KEY = 'muriel_app_cache';
+const ON_KEY = 'piverxy_app_cache';
 const OPEN_TIMEOUT_MS = 4000;
 const LOAD_TIMEOUT_MS = 2500;
 const MAX_FILE_CHARS = 8 * 1024 * 1024; // a bigger text file is read from disk each time

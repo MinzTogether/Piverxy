@@ -3,12 +3,12 @@
 // JSON button under "Create playlist". What goes in and what is let back in is in backup-core.js.
 // Files are saved with the desktop save dialog, or handed to the share sheet on phones (electronAPI.saveTextFile).
 (function () {
-  const B = window.MurielBackup;
+  const B = window.PiverxyBackup;
   if (!B) return;
   const $ = (id) => document.getElementById(id);
   let core = null;
   const toast = (m, kind) => { try { core && core.toast(m, kind || 'info'); } catch (e) {} };
-  const P = () => window.MurielProfiles || null;
+  const P = () => window.PiverxyProfiles || null;
   const isDevice = (k) => { const p = P(); return p && p.isDevice ? p.isDevice(k) : false; };
 
   async function appVersion() {
@@ -52,7 +52,7 @@
   function exportAll() {
     const s = core && core.state;
     const me = P() ? P().current().name : '';
-    exportPlaylists(s ? s.playlists : [], B.fileName(me && P().list().length > 1 ? `muriel-playlists-${me}` : 'muriel-playlists', 'json'));
+    exportPlaylists(s ? s.playlists : [], B.fileName(me && P().list().length > 1 ? `piverxy-playlists-${me}` : 'piverxy-playlists', 'json'));
   }
 
   function pickPlaylistFiles() {
@@ -128,7 +128,7 @@
     const data = B.makeBackup(ownEntries(), { profileName: me.name, appVersion: await appVersion(), isDevice });
     const day = new Date().toISOString().slice(0, 10);
     try {
-      if ((await saveFile(B.fileName(`muriel-backup-${me.name || 'profile'}-${day}`, 'json'), JSON.stringify(data), 'backup')) === 'saved') toast('Backup saved', 'success');
+      if ((await saveFile(B.fileName(`piverxy-backup-${me.name || 'profile'}-${day}`, 'json'), JSON.stringify(data), 'backup')) === 'saved') toast('Backup saved', 'success');
     } catch (e) { toast(e.message || "Couldn't save the backup", 'error'); }
   }
 
@@ -147,17 +147,17 @@
       backup = B.readBackup(await B.parseBackupFile(new Uint8Array(await file.arrayBuffer())), { isDevice });
     } catch (e) { toast(e.message || "Couldn't read that file", 'error'); return; }
     const c = backup.counts;
-    if (!c.keys) { toast('That backup has nothing Muriel can restore', 'error'); return; }
+    if (!c.keys) { toast('That backup has nothing Piverxy can restore', 'error'); return; }
     const me = P() ? P().current().name : '';
     const what = [`${c.playlists} playlist${c.playlists === 1 ? '' : 's'}`, `${c.favorites} favorite${c.favorites === 1 ? '' : 's'}`];
     const from = backup.source === 'riff' ? 'this Riff account' : (backup.profileName ? `the backup of "${backup.profileName}"` : 'this backup');
-    const linked = (() => { try { return !!localStorage.getItem('muriel_sync_group'); } catch (e) { return false; } })();
-    const ok = window.confirm(`Restore ${from} (${what.join(', ')}) into ${me ? `the profile "${me}"` : 'Muriel'}?\n\nIts playlists, favorites, history and settings are replaced by the backup's.${linked ? ' Devices this profile syncs with get the restored ones too.' : ''} Muriel restarts afterwards.`);
+    const linked = (() => { try { return !!localStorage.getItem('piverxy_sync_group'); } catch (e) { return false; } })();
+    const ok = window.confirm(`Restore ${from} (${what.join(', ')}) into ${me ? `the profile "${me}"` : 'Piverxy'}?\n\nIts playlists, favorites, history and settings are replaced by the backup's.${linked ? ' Devices this profile syncs with get the restored ones too.' : ''} Piverxy restarts afterwards.`);
     if (!ok) return;
     // stop what would save over the restored keys while the page goes away
     try { if (core.state && core.state.isPlaying) core.togglePlay(); if (core.audio) core.audio.pause(); } catch (e) {}
     try { if (core.state) core.state._queueRestored = false; } catch (e) {}
-    try { if (window.MurielSync && window.MurielSync.stop) window.MurielSync.stop(); } catch (e) {}
+    try { if (window.PiverxySync && window.PiverxySync.stop) window.PiverxySync.stop(); } catch (e) {}
     const entries = backup.entries;
     const apply = () => {
       for (const [k] of ownEntries()) {
@@ -175,7 +175,7 @@
   }
 
   function hook() {
-    core = window.MurielCore;
+    core = window.PiverxyCore;
     if (!core) return;
     const on = (id, fn) => { const b = $(id); if (b) b.addEventListener('click', fn); };
     on('btn-export-playlist', exportCurrent);
@@ -194,6 +194,6 @@
     if (hint && P() && P().list().length > 1) hint.textContent = `${P().current().name}: playlists, favorites, history, Encore and settings in one file`;
   }
 
-  if (window.MurielCore) hook();
-  else window.addEventListener('muriel:ready', hook, { once: true });
+  if (window.PiverxyCore) hook();
+  else window.addEventListener('piverxy:ready', hook, { once: true });
 })();

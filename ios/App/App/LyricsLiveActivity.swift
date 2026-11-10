@@ -8,10 +8,10 @@ import ActivityKit
 // Lyrics on the lock screen and in the Dynamic Island. The page (mobile/live-activity.js) sends the song,
 // its synced lyrics and every play/pause/seek; the line timing runs here, so the Live Activity keeps up
 // with the song in the background without the web view having to send each line.
-@objc(MurielLiveActivityPlugin)
-public class MurielLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
-    public let identifier = "MurielLiveActivityPlugin"
-    public let jsName = "MurielLiveActivity"
+@objc(PiverxyLiveActivityPlugin)
+public class PiverxyLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
+    public let identifier = "PiverxyLiveActivityPlugin"
+    public let jsName = "PiverxyLiveActivity"
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "isAvailable", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setTrack", returnType: CAPPluginReturnPromise),
@@ -25,8 +25,8 @@ public class MurielLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         #if canImport(ActivityKit)
         if #available(iOS 16.2, *) { DispatchQueue.main.async { LyricsActivity.shared.endAll() } }
         #endif
-        // the buttons in the Dynamic Island (MurielPlayerIntent): play / pause, next, previous, shuffle
-        NotificationCenter.default.addObserver(forName: Notification.Name("MurielPlayerAction"), object: nil, queue: .main) { [weak self] note in
+        // the buttons in the Dynamic Island (PiverxyPlayerIntent): play / pause, next, previous, shuffle
+        NotificationCenter.default.addObserver(forName: Notification.Name("PiverxyPlayerAction"), object: nil, queue: .main) { [weak self] note in
             guard let action = note.userInfo?["action"] as? String else { return }
             self?.notifyListeners("action", data: ["action": action])
         }
@@ -95,11 +95,11 @@ public class MurielLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
 @available(iOS 16.2, *)
 final class LyricsActivity {
     static let shared = LyricsActivity()
-    typealias State = MurielLyricsAttributes.ContentState
+    typealias State = PiverxyLyricsAttributes.ContentState
 
     private struct Line: Decodable { let t: Double; let x: String }
 
-    private var activity: Activity<MurielLyricsAttributes>?
+    private var activity: Activity<PiverxyLyricsAttributes>?
     private var trackId = ""
     private var title = ""
     private var artist = ""
@@ -158,7 +158,7 @@ final class LyricsActivity {
         idleEnd?.cancel()
         activity = nil
         shown = nil
-        for a in Activity<MurielLyricsAttributes>.activities {
+        for a in Activity<PiverxyLyricsAttributes>.activities {
             Task { await a.end(nil, dismissalPolicy: .immediate) }
         }
     }
@@ -167,7 +167,7 @@ final class LyricsActivity {
     func endAllBeforeExit() {
         let done = DispatchSemaphore(value: 0)
         Task.detached {
-            for a in Activity<MurielLyricsAttributes>.activities { await a.end(nil, dismissalPolicy: .immediate) }
+            for a in Activity<PiverxyLyricsAttributes>.activities { await a.end(nil, dismissalPolicy: .immediate) }
             done.signal()
         }
         _ = done.wait(timeout: .now() + 1.5)
@@ -209,11 +209,11 @@ final class LyricsActivity {
             return
         }
         activity = nil
-        // only while something plays, and iOS only allows starting one while Muriel is open
+        // only while something plays, and iOS only allows starting one while Piverxy is open
         guard playing, !title.isEmpty, UIApplication.shared.applicationState == .active,
               ActivityAuthorizationInfo().areActivitiesEnabled else { return }
         do {
-            activity = try Activity.request(attributes: MurielLyricsAttributes(), content: content, pushType: nil)
+            activity = try Activity.request(attributes: PiverxyLyricsAttributes(), content: content, pushType: nil)
             shown = state
         } catch {
             activity = nil

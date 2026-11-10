@@ -4,8 +4,8 @@ const os = require('os');
 const path = require('path');
 const { execFile } = require('child_process');
 
-const NAME = 'Muriel';
-const COMMENT = 'Muriel - music player';
+const NAME = 'Piverxy';
+const COMMENT = 'Piverxy - music player';
 const APP_ID = '';
 
 function winShortcutPath() {
@@ -13,11 +13,11 @@ function winShortcutPath() {
 }
 
 function linuxDesktopPath() {
-  return path.join(os.homedir(), '.local', 'share', 'applications', 'muriel.desktop');
+  return path.join(os.homedir(), '.local', 'share', 'applications', 'piverxy.desktop');
 }
 
 function linuxIconPath() {
-  return path.join(os.homedir(), '.local', 'share', 'icons', 'hicolor', '512x512', 'apps', 'muriel.png');
+  return path.join(os.homedir(), '.local', 'share', 'icons', 'hicolor', '512x512', 'apps', 'piverxy.png');
 }
 
 function getLauncherInfo() {
@@ -26,7 +26,7 @@ function getLauncherInfo() {
     return { platform: 'win32', canInstall: true, installed: fs.existsSync(winShortcutPath()), reason: '' };
   }
   if (process.platform === 'linux') {
-    if (!process.env.APPIMAGE) return { platform: 'linux', canInstall: false, installed: false, reason: 'Available when Muriel runs as an AppImage' };
+    if (!process.env.APPIMAGE) return { platform: 'linux', canInstall: false, installed: false, reason: 'Available when Piverxy runs as an AppImage' };
     return { platform: 'linux', canInstall: true, installed: fs.existsSync(linuxDesktopPath()), reason: '' };
   }
   return { platform: process.platform, canInstall: false, installed: false, reason: 'Not supported on this system' };

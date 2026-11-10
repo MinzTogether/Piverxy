@@ -5,7 +5,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const MAX_FRAME_BYTES = 1024 * 1024;
-const CLIENT_ID = '1564605359610400929'; // Muriel's own Discord application
+const CLIENT_ID = '1564605359610400929'; // Piverxy's own Discord application
 let socket = null;
 let buffer = Buffer.alloc(0);
 let activity = null;

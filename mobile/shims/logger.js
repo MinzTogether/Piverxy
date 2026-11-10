@@ -3,7 +3,7 @@
 // disappearing, so a failed download or import can still be diagnosed.
 const describe = (message, err) => (err ? `${message}: ${(err && (err.message || err)) || err}` : message);
 const toLog = (level, message) => {
-  try { if (typeof window !== 'undefined' && window.MurielLog) window.MurielLog.add(level, `[server] ${message}`); } catch (e) {}
+  try { if (typeof window !== 'undefined' && window.PiverxyLog) window.PiverxyLog.add(level, `[server] ${message}`); } catch (e) {}
 };
 const log = (level, message) => { if (level === 'error' || level === 'warn') toLog(level, message); };
 const error = (message, err) => toLog('error', describe(message, err));

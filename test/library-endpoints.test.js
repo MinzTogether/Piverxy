@@ -12,9 +12,9 @@ const path = require('node:path');
 const http = require('node:http');
 const https = require('node:https');
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'muriel-library-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'piverxy-library-'));
 for (const key of ['HOME', 'USERPROFILE', 'LOCALAPPDATA', 'XDG_CONFIG_HOME']) process.env[key] = tmp;
-process.env.MURIEL_DATA_DIR = path.join(tmp, 'data');
+process.env.PIVERXY_DATA_DIR = path.join(tmp, 'data');
 
 const ARTIST = 'UCbandbandbandbandband01';
 const json = (res, data, status = 200) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(data)); };
@@ -123,7 +123,7 @@ after(async () => {
 });
 
 const call = (route) => new Promise((resolve, reject) => {
-  http.get({ host: '127.0.0.1', port, path: route, headers: { 'x-muriel-token': getServerToken() } }, (res) => {
+  http.get({ host: '127.0.0.1', port, path: route, headers: { 'x-piverxy-token': getServerToken() } }, (res) => {
     let b = '';
     res.on('data', (c) => { b += c; });
     res.on('end', () => resolve({ status: res.statusCode, body: JSON.parse(b) }));

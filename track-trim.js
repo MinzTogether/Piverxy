@@ -103,5 +103,5 @@
 
   const api = { normalizeTrim, isActive, trimAction, endFadeSeconds, crossfadePoint, crossfadeStep, fadeOutGain, fadeInGain,formatPreciseTime, wavePeaks, placeholderPeaks, MIN_KEEP };
   if (typeof module !== 'undefined') module.exports = api;
-  else window.MurielTrim = api;
+  else window.PiverxyTrim = api;
 })();

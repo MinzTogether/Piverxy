@@ -32,7 +32,7 @@ function setup(platform = 'android', { unrestricted = true, island = null } = {}
   const store = new Map();
   global.localStorage = { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)) };
   global.document = { hidden: false };
-  window.MurielCore = {
+  window.PiverxyCore = {
     state, audio, thumb: (t) => t.thumbnail,
     togglePlay: () => { did.push('toggle'); state.isPlaying = !state.isPlaying; },
     next: () => did.push('next'), prev: () => did.push('prev'), seek: (s) => did.push(`seek ${s}`),
@@ -47,7 +47,7 @@ test('one update per song change with title, cover, length and play state', asyn
   const { calls, audio, state } = setup();
   state.currentTrack = { title: 'Song', artist: 'Someone', duration: 200, thumbnail: 'https://i.ytimg.com/vi/a/mqdefault.jpg' };
   state.isPlaying = true;
-  window.dispatchEvent(new Event('muriel:track'));
+  window.dispatchEvent(new Event('piverxy:track'));
   Object.assign(audio, { currentTime: 3, duration: 201.5 });
   audio.dispatchEvent(new Event('durationchange'));
   audio.dispatchEvent(new Event('playing'));
@@ -59,22 +59,22 @@ test('one update per song change with title, cover, length and play state', asyn
 test('the island setting goes along: the phone decides until it is picked, then on or off', async () => {
   const { calls, state } = setup();
   state.currentTrack = { title: 'T' };
-  assert.strictEqual(window.MurielIsland.enabled({ defaultOn: true }), true);
-  assert.strictEqual(window.MurielIsland.enabled({ defaultOn: false }), false);
-  window.MurielIsland.setEnabled(true);
+  assert.strictEqual(window.PiverxyIsland.enabled({ defaultOn: true }), true);
+  assert.strictEqual(window.PiverxyIsland.enabled({ defaultOn: false }), false);
+  window.PiverxyIsland.setEnabled(true);
   await tick();
   assert.strictEqual(calls[0].island, 'on');
-  assert.strictEqual(window.MurielIsland.enabled({ defaultOn: false }), true);
-  window.MurielIsland.setEnabled(false);
+  assert.strictEqual(window.PiverxyIsland.enabled({ defaultOn: false }), true);
+  window.PiverxyIsland.setEnabled(false);
   await tick();
   assert.strictEqual(calls[1].island, 'off');
-  assert.strictEqual(window.MurielIsland.enabled({ defaultOn: true }), false);
+  assert.strictEqual(window.PiverxyIsland.enabled({ defaultOn: true }), false);
 });
 
 test('island status survives a native side without it', async () => {
   setup();
-  assert.deepStrictEqual(await window.MurielIsland.status(), {});
-  assert.strictEqual(window.MurielIsland.enabled({}), false);
+  assert.deepStrictEqual(await window.PiverxyIsland.status(), {});
+  assert.strictEqual(window.PiverxyIsland.enabled({}), false);
 });
 
 test('notifications are asked for once, after the battery question, island or not (#25)', async () => {
@@ -112,7 +112,7 @@ test('the gap while the next song downloads is reported as loading, not as a pau
   audio.dispatchEvent(new Event('pause'));
   state.currentTrack = { title: 'Two', duration: 100 };
   state.trackLoading = true;
-  window.dispatchEvent(new Event('muriel:loading'));
+  window.dispatchEvent(new Event('piverxy:loading'));
   await tick();
   assert.strictEqual(calls.length, 2);
   assert.strictEqual(calls[1].title, 'Two');
@@ -128,7 +128,7 @@ test('the gap while the next song downloads is reported as loading, not as a pau
 test('a button press is answered with the real state, even when it changed nothing', async () => {
   const { calls, state, action } = setup();
   state.currentTrack = { title: 'T' };
-  window.MurielCore.togglePlay = () => {}; // nothing to resume
+  window.PiverxyCore.togglePlay = () => {}; // nothing to resume
   action({ action: 'play' });
   await tick();
   assert.strictEqual(calls.length, 1);
@@ -163,7 +163,7 @@ test('notification buttons drive the player', () => {
 test('shuffle and repeat: their state goes to the player, and its buttons toggle them', async () => {
   const { calls, state, did, action } = setup();
   state.currentTrack = { title: 'T' };
-  Object.assign(window.MurielCore, {
+  Object.assign(window.PiverxyCore, {
     toggleShuffle: () => { did.push('shuffle'); state.isShuffle = !state.isShuffle; },
     // like the app's button: off, the playlist, the song
     toggleRepeat: () => { did.push('repeat'); state.repeatMode = { off: 'all', all: 'one', one: 'off' }[state.repeatMode || 'off']; },
@@ -179,7 +179,7 @@ test('shuffle and repeat: their state goes to the player, and its buttons toggle
   assert.strictEqual(calls[2].repeat, 'one');
   // toggled inside the app: the notification follows
   state.isShuffle = false;
-  window.dispatchEvent(new Event('muriel:modes'));
+  window.dispatchEvent(new Event('piverxy:modes'));
   await tick();
   assert.strictEqual(calls[3].shuffle, false);
   assert.deepStrictEqual(did, ['shuffle', 'repeat', 'repeat']);
@@ -188,7 +188,7 @@ test('shuffle and repeat: their state goes to the player, and its buttons toggle
 test('does nothing outside Android', async () => {
   const { calls, state } = setup('ios');
   state.currentTrack = { title: 'T' };
-  window.dispatchEvent(new Event('muriel:track'));
+  window.dispatchEvent(new Event('piverxy:track'));
   await tick();
   assert.strictEqual(calls.length, 0);
 });

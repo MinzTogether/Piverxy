@@ -1,37 +1,37 @@
-// Muriel in other languages (Settings → Interface → Language). Muriel's own words (menus, buttons, settings,
+// Piverxy in other languages (Settings → Interface → Language). Piverxy's own words (menus, buttons, settings,
 // messages) are machine-translated through server.js (/api/i18n-batch, the service the lyrics translation uses)
 // the first time each one is needed, and then kept: on disk per language (the data dir; on phones the app's
 // storage), in memory here, and a copy of the open language's words in localStorage, so a restart shows them
 // translated straight away instead of flashing English first. English costs nothing: no requests, nothing watched.
 //
-// Only text Muriel itself wrote is ever sent, never anything from the library (song titles, artists, playlist
+// Only text Piverxy itself wrote is ever sent, never anything from the library (song titles, artists, playlist
 // names) or typed by someone:
 //  - the page as index.html has it, before app.js fills anything in: every text node, and the title, placeholder
 //    and aria-label attributes. A node or attribute app.js changes later is app.js's from then on.
 //  - elements marked data-i18n: their own text, also when app.js changes it later (labels it updates), and the
-//    attributes named in data-i18n-attr="title aria-label". Only for elements whose text is always Muriel's own.
+//    attributes named in data-i18n-attr="title aria-label". Only for elements whose text is always Piverxy's own.
 //  - T('English') and Tf('{0} songs in {1}', n, name) in code: what goes into {0}, {1} is filled in after
 //    translating, so it never reaches the translator. Tm(...) is the same kept as a message: a toast (or
-//    MurielI18n.text) shows it and updates it when the words come in or the language changes.
+//    PiverxyI18n.text) shows it and updates it when the words come in or the language changes.
 // Translations only ever go into text nodes and attribute values; Th(...), for HTML built as a string, escapes them.
 // data-no-i18n (or translate="no") keeps a whole subtree as it is: the language list, brand names, user content.
 //
-// Right-to-left languages keep Muriel's layout as it is (mirroring a layout built left to right breaks more than
+// Right-to-left languages keep Piverxy's layout as it is (mirroring a layout built left to right breaks more than
 // it fixes); the translated text itself is laid out right to left (unicode-bidi: plaintext, styles.css), so
 // punctuation lands where it belongs. test/i18n.test.js runs the pure part in Node.
 (function (root) {
   'use strict';
 
   // ---------- pure part ----------
-  const KEY = 'muriel_ui_lang'; // per profile, like every other setting
-  const SNAP = 'muriel_i18n_snap'; // device-wide (profiles-core DEVICE): the open language's words, for a quick start
+  const KEY = 'piverxy_ui_lang'; // per profile, like every other setting
+  const SNAP = 'piverxy_i18n_snap'; // device-wide (profiles-core DEVICE): the open language's words, for a quick start
   const LANG_RE = /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$/;
   const RTL = new Set(['ar', 'he', 'iw', 'fa', 'ur', 'ps', 'sd', 'ug', 'yi', 'dv', 'ckb']);
   const MAX_LEN = 500;
   // names that stay as they are in every language
-  const KEEP = new Set(['muriel', 'encore', 'youtube', 'youtube music', 'soundcloud', 'spotify', 'apple music', 'deezer', 'itunes',
+  const KEEP = new Set(['piverxy', 'encore', 'youtube', 'youtube music', 'soundcloud', 'spotify', 'apple music', 'deezer', 'itunes',
     'last.fm', 'lrclib', 'musixmatch', 'genius', 'netease', 'google sans', 'sf pro', 'peerjs', 'yt-dlp', 'ffmpeg', 'github',
-    'android', 'ios', 'iphone', 'windows', 'macos', 'linux', 'electron', 'material 3', 'material you', 'riff', 'muriel encore',
+    'android', 'ios', 'iphone', 'windows', 'macos', 'linux', 'electron', 'material 3', 'material you', 'riff', 'piverxy encore',
     'rootscripts', 'cloverscripts', 'ctrl', 'shift', 'alt', 'esc', 'cmd', 'tab', 'enter']);
   const UNIT = /^[\d\s.,:;/+\-–—×x%°]*(ms|s|sec|min|h|x|db|hz|khz|px|kb|mb|gb|kbps|bpm|fps|lufs)?[\d\s.,:;/+\-–—×x%°]*$/i;
 
@@ -103,7 +103,7 @@
   const staticAttrs = []; // { el, a, src, cur }
   const nodeRec = new WeakMap(); // Text inside [data-i18n] -> { src, cur }
   const attrRec = new WeakMap(); // [data-i18n-attr] element -> { [attr]: { src, cur } }
-  const liveRec = new WeakMap(); // element -> { ref, template, args, cur }: MurielI18n.text / toasts
+  const liveRec = new WeakMap(); // element -> { ref, template, args, cur }: PiverxyI18n.text / toasts
   const liveRefs = new Set(); // WeakRef(element) of those, to go through on a switch
   const known = new Set(); // words code shows often that the page doesn't have (menus, messages): asked for up front
   const ATTRS = ['title', 'placeholder', 'aria-label'];
@@ -254,7 +254,7 @@
     applyStatics(visibleFirst);
     doAll(document.body);
     applyLive();
-    try { root.dispatchEvent(new CustomEvent('muriel:i18n', { detail: { lang } })); } catch (e) {}
+    try { root.dispatchEvent(new CustomEvent('piverxy:i18n', { detail: { lang } })); } catch (e) {}
   }
 
   // ---------- watching the page (other languages only) ----------
@@ -432,7 +432,7 @@
 
   // the getter is defined, not copied: Object.assign would read it once and freeze the language at startup, so
   // the language picker thought English was still on and ignored picking it again (#20)
-  root.MurielI18n = Object.defineProperty(Object.assign({}, core, {
+  root.PiverxyI18n = Object.defineProperty(Object.assign({}, core, {
     T, Tf, Tm, Th, text, setLang, connect, ready,
     known: (list) => { for (const k of list || []) if (typeof k === 'string') known.add(k); },
     refresh: () => refresh(false),

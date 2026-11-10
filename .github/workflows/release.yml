@@ -28,7 +28,7 @@ jobs:
         run: |
           gh release view "$TAG" >/dev/null 2>&1 && exit 0
           if [ -f .github/release-notes.md ]; then notes=(--notes-file .github/release-notes.md); else notes=(--generate-notes); fi
-          gh release create "$TAG" --target "$GITHUB_SHA" --title "Muriel ${TAG#v}" "${notes[@]}"
+          gh release create "$TAG" --target "$GITHUB_SHA" --title "Piverxy ${TAG#v}" "${notes[@]}"
 
   build:
     needs: create-release

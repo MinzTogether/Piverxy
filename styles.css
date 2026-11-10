@@ -4197,7 +4197,7 @@ body.perf #sleep-timer-status.active::before {
   pointer-events: none;
 }
 
-.muriel-toast {
+.piverxy-toast {
   pointer-events: auto;
   min-width: 240px;
   max-width: 480px;
@@ -4215,14 +4215,14 @@ body.perf #sleep-timer-status.active::before {
   user-select: none;
 }
 
-.muriel-toast .toast-icon {
+.piverxy-toast .toast-icon {
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
 
-.muriel-toast .toast-text {
+.piverxy-toast .toast-text {
   flex: 1;
   color: var(--md-sys-color-on-surface);
   font-size: 14px;
@@ -4233,34 +4233,34 @@ body.perf #sleep-timer-status.active::before {
   text-overflow: ellipsis;
 }
 
-.muriel-toast.info {
+.piverxy-toast.info {
   background: var(--md-sys-color-surface-container-highest);
   color: var(--md-sys-color-on-surface);
 }
-.muriel-toast.info .toast-icon {
+.piverxy-toast.info .toast-icon {
   color: var(--md-sys-color-primary);
 }
 
-.muriel-toast.success {
+.piverxy-toast.success {
   background: var(--md-sys-color-surface-container-highest);
   color: var(--md-sys-color-on-surface);
 }
-.muriel-toast.success .toast-icon {
+.piverxy-toast.success .toast-icon {
   color: #388e3c;
 }
 
-.muriel-toast.warning {
+.piverxy-toast.warning {
   background: var(--md-sys-color-surface-container-highest);
   color: var(--md-sys-color-on-surface);
 }
-.muriel-toast.warning .toast-icon {
+.piverxy-toast.warning .toast-icon {
   color: #f9a825;
 }
-.muriel-toast.error {
+.piverxy-toast.error {
   background: var(--md-sys-color-error-container);
   color: var(--md-sys-color-on-error-container);
 }
-.muriel-toast.error .toast-icon {
+.piverxy-toast.error .toast-icon {
   color: var(--md-sys-color-error);
 }
 
@@ -7234,8 +7234,8 @@ body.perf .cpm-service-btn { transition: none !important; transform: none !impor
 
 @keyframes toastIn { from { opacity: 0; transform: translateY(-14px) scale(.96); } to { opacity: 1; transform: none; } }
 @keyframes toastOut { to { opacity: 0; transform: translateY(-10px) scale(.97); } }
-.muriel-toast { animation: toastIn 240ms cubic-bezier(0.2, 0, 0, 1) both; }
-.muriel-toast.leaving { animation: toastOut 180ms cubic-bezier(0.4, 0, 1, 1) forwards; }
+.piverxy-toast { animation: toastIn 240ms cubic-bezier(0.2, 0, 0, 1) both; }
+.piverxy-toast.leaving { animation: toastOut 180ms cubic-bezier(0.4, 0, 1, 1) forwards; }
 
 .right-panel > .panel-resize-edge { position: absolute; left: -5px; top: 0; bottom: 0; width: 12px; z-index: 60; }
 
@@ -8209,7 +8209,7 @@ body.multi-select-on .track-row.selectable .track-row-actions {
 
 
 
-/* ---- Muriel: smoothness pass ---- */
+/* ---- Piverxy: smoothness pass ---- */
 
 .artwork-wrapper { position: relative; }
 
@@ -8276,7 +8276,7 @@ body.no-blur *, body.no-blur *::before, body.no-blur *::after { backdrop-filter:
 body.no-blur :is(.banner-image, .banner-video, .lyric-line, .art-ghost, .art-in) { filter: none !important; }
 body.perf .art-in { animation: none; }
 
-/* ---- Muriel layout: compact rail + slide-over drawer ---- */
+/* ---- Piverxy layout: compact rail + slide-over drawer ---- */
 
 @property --np-c1 { syntax: '<color>'; inherits: true; initial-value: transparent; }
 @property --np-c2 { syntax: '<color>'; inherits: true; initial-value: transparent; }
@@ -8358,7 +8358,7 @@ body.glass:not(.perf) :is(.sidebar, .main-content, #right-panel, .playbar) {
   border: 1px solid color-mix(in srgb, var(--md-sys-color-on-surface-solid, #fff) 8%, transparent);
 }
 
-/* ---- Muriel logo: centred in the title bar like Riff's, the name only in the mini player ---- */
+/* ---- Piverxy logo: centred in the title bar like Riff's, the name only in the mini player ---- */
 body:not(.mini) .titlebar .app-logo { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none; }
 body:not(.mini) .titlebar .logo-text { display: none; }
 .logo-star path { transform-box: fill-box; transform-origin: 50% 50%; }
@@ -8410,7 +8410,7 @@ body.glass.glass-lite :is(.sidebar, .main-content, #right-panel, .playbar, .sear
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
 }
 
-/* ---- Muriel: home is a scrolling page again (Hot picks card on top, "For you" recommendations below) ---- */
+/* ---- Piverxy: home is a scrolling page again (Hot picks card on top, "For you" recommendations below) ---- */
 #view-discover:has(.home-hero),
 .discover-content:has(.home-hero) { height: auto; }
 #view-discover { height: auto; overflow: clip; }
@@ -8419,7 +8419,7 @@ body.glass.glass-lite :is(.sidebar, .main-content, #right-panel, .playbar, .sear
 /* without the M3 cover the placeholder sat next to the (empty) 48-72px cover box and got squeezed to a sliver */
 .artwork-wrapper > .artwork-fallback { position: absolute; inset: 0; width: auto; height: auto; }
 
-/* ---- Muriel: "Update available" banner (update-notifier.js) ---- */
+/* ---- Piverxy: "Update available" banner (update-notifier.js) ---- */
 .update-banner { position: fixed; left: 50%; top: max(64px, calc(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) + 14px)); z-index: 9000; display: flex; align-items: center; gap: 12px; width: max-content; max-width: min(560px, calc(100vw - 24px)); padding: 10px 10px 10px 16px; border-radius: 22px; background: var(--md-sys-color-surface-container-high-solid, var(--md-sys-color-surface-container-high, #2a2630)); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); color: var(--md-sys-color-on-surface, #fff); opacity: 0; transform: translate(-50%, -24px); transition: transform 0.35s cubic-bezier(0.2, 0, 0, 1), opacity 0.25s ease; }
 .update-banner.show { opacity: 1; transform: translate(-50%, 0); }
 .update-banner-star { width: 24px; height: 24px; flex: none; fill: var(--md-sys-color-primary); }
@@ -8432,7 +8432,7 @@ body.glass.glass-lite :is(.sidebar, .main-content, #right-panel, .playbar, .sear
 #update-status.has-update { color: var(--md-sys-color-primary); }
 @media (prefers-reduced-motion: reduce) { .update-banner { transition: none; } }
 
-/* ---- Muriel: "On repeat" (home) and Muriel Encore (encore.js) ---- */
+/* ---- Piverxy: "On repeat" (home) and Piverxy Encore (encore.js) ---- */
 #section-on-repeat { padding-top: 6px; }
 .onrepeat-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
 .onrepeat-head .section-title { margin: 0; flex: 1 1 auto; }
@@ -8777,9 +8777,9 @@ html.ui-rtl input::placeholder { direction: rtl; text-align: right; }
 
 /* ---------- Riff 43: player & look ---------- */
 .setting-hint { font-size: calc(12px * var(--font-scale, 1)); color: var(--md-sys-color-outline); line-height: 1.35; font-weight: 400; }
-.muriel-beta-badge { display: inline-flex; align-items: center; justify-content: center; padding: 2px 7px; border-radius: 999px; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); line-height: 1.2; }
+.piverxy-beta-badge { display: inline-flex; align-items: center; justify-content: center; padding: 2px 7px; border-radius: 999px; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); line-height: 1.2; }
 
-/* splash: Muriel's star draws itself, then the app fades in (app.js; desktop only, skipped in performance mode) */
+/* splash: Piverxy's star draws itself, then the app fades in (app.js; desktop only, skipped in performance mode) */
 #splash { position: fixed; inset: 0; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden; z-index: 999999; transition: opacity .45s cubic-bezier(0.2, 0, 0, 1); animation: splashGiveUp .45s 2.6s forwards; }
 #splash.hide { opacity: 0; pointer-events: none; }
 #splash-logo { width: 22vmin; height: 22vmin; will-change: transform; }
@@ -8829,9 +8829,9 @@ body.theme-light .playbar-bg-visualizer { opacity: calc(var(--bar-viz-opacity, 0
 body.bar-viz-behind:not(.mini):not(.perf):not(.bar-wave-off) .playbar-bg-visualizer { display: block; }
 body.bar-viz-behind #visualizer-container { display: none !important; }
 
-/* share the song that is playing (as a one-song Muriel link) */
-.muriel-share-action-btn { color: var(--md-sys-color-on-surface-variant); }
-.muriel-share-action-btn:hover { color: var(--md-sys-color-primary); }
+/* share the song that is playing (as a one-song Piverxy link) */
+.piverxy-share-action-btn { color: var(--md-sys-color-on-surface-variant); }
+.piverxy-share-action-btn:hover { color: var(--md-sys-color-primary); }
 body.mini #btn-playbar-share { display: none !important; }
 
 /* lyrics under the mini player (the layout is in the body.mini block) */
@@ -8873,7 +8873,7 @@ html.force-reduced-motion .tvk-liquid-layer { animation-play-state: paused !impo
 .dl-mode-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 4px; border-radius: 999px; background: var(--md-sys-color-surface-container); margin-bottom: 14px; }
 .dl-mode-tab { height: 36px; border: none; border-radius: 999px; background: transparent; color: var(--md-sys-color-on-surface-variant); font-size: calc(13px * var(--font-scale, 1)); font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: background-color 160ms ease, color 160ms ease; }
 .dl-mode-tab.active { background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); }
-.dl-mode-tab.active .muriel-beta-badge { background: var(--md-sys-color-on-primary); color: var(--md-sys-color-primary); }
+.dl-mode-tab.active .piverxy-beta-badge { background: var(--md-sys-color-on-primary); color: var(--md-sys-color-primary); }
 #download-modal.batch-mode .dl-mode-tabs { display: none; }
 /* the dialog card lays its parts out as a column with gaps; the download pane keeps that for its own parts */
 #dl-pane-download:not(.hidden) { display: flex; flex-direction: column; gap: 16px; }

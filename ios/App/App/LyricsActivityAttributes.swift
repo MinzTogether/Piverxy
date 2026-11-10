@@ -3,11 +3,11 @@ import Foundation
 import ActivityKit
 
 // The lyrics Live Activity (lock screen and Dynamic Island). Compiled into both the app, which updates
-// it (LyricsLiveActivity.swift), and the MurielWidgets extension, which draws it.
+// it (LyricsLiveActivity.swift), and the PiverxyWidgets extension, which draws it.
 // A Live Activity can only be started while the app is open, so one activity follows the whole
 // listening session and everything that changes per song lives in the content state.
 @available(iOS 16.1, *)
-struct MurielLyricsAttributes: ActivityAttributes {
+struct PiverxyLyricsAttributes: ActivityAttributes {
     public struct ContentState: Codable, Hashable {
         var title: String
         var artist: String
@@ -34,8 +34,8 @@ import AppIntents
 /// The buttons in the Dynamic Island (iOS 17+): iOS runs this inside the app, which hands it to the page
 /// (LyricsLiveActivity.swift → mobile/live-activity.js).
 @available(iOS 17.0, *)
-struct MurielPlayerIntent: LiveActivityIntent {
-    static let title: LocalizedStringResource = "Control Muriel"
+struct PiverxyPlayerIntent: LiveActivityIntent {
+    static let title: LocalizedStringResource = "Control Piverxy"
     static var isDiscoverable: Bool { false }
 
     @Parameter(title: "Action") var action: String
@@ -44,7 +44,7 @@ struct MurielPlayerIntent: LiveActivityIntent {
     init(action: String) { self.action = action }
 
     func perform() async throws -> some IntentResult {
-        NotificationCenter.default.post(name: Notification.Name("MurielPlayerAction"), object: nil, userInfo: ["action": action])
+        NotificationCenter.default.post(name: Notification.Name("PiverxyPlayerAction"), object: nil, userInfo: ["action": action])
         return .result()
     }
 }

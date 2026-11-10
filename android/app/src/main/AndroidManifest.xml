@@ -25,14 +25,14 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- muriel://link?code=… from the QR code in Settings → Sync (opens the app and links it) -->
+            <!-- piverxy://link?code=… from the QR code in Settings → Sync (opens the app and links it) -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="muriel" android:host="link" />
-                <!-- muriel://playlist?p=… from a shared playlist link (adds the playlist) -->
-                <data android:scheme="muriel" android:host="playlist" />
+                <data android:scheme="piverxy" android:host="link" />
+                <!-- piverxy://playlist?p=… from a shared playlist link (adds the playlist) -->
+                <data android:scheme="piverxy" android:host="playlist" />
             </intent-filter>
 
         </activity>
@@ -67,7 +67,7 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- the "Play in the background" switch: asks to be left out of battery optimization -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
-    <!-- Android 10 and older: downloaded songs are saved to Music/Muriel Mod on the phone's storage (mobile/shims/store.js;
+    <!-- Android 10 and older: downloaded songs are saved to Music/Piverxy on the phone's storage (mobile/shims/store.js;
          asked for on the first download). Android 11+ needs no permission for the files the app saves there.
          requestLegacyExternalStorage above makes such paths writable on Android 10; newer versions ignore it. -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />

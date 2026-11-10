@@ -3,7 +3,7 @@ const path = require('path');
 const { DATA_DIR } = require('./platform');
 
 const LOG_DIR = path.join(DATA_DIR, 'logs');
-const LOG_PATH = path.join(LOG_DIR, 'muriel.log');
+const LOG_PATH = path.join(LOG_DIR, 'piverxy.log');
 const MAX_BYTES = 1024 * 1024;
 
 function rotate() {

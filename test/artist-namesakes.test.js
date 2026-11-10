@@ -111,9 +111,9 @@ test('namesakes, credits and shared releases', () => {
 });
 
 // ---- the server, against a fake YouTube Music and iTunes ----
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'muriel-namesakes-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'piverxy-namesakes-'));
 for (const key of ['HOME', 'USERPROFILE', 'LOCALAPPDATA', 'XDG_CONFIG_HOME']) process.env[key] = tmp;
-process.env.MURIEL_DATA_DIR = path.join(tmp, 'data');
+process.env.PIVERXY_DATA_DIR = path.join(tmp, 'data');
 
 const json = (res, data, status = 200) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(data)); };
 const itunesArtist = (artistId, artistName) => ({ wrapperType: 'artist', artistId, artistName });
@@ -172,7 +172,7 @@ after(async () => {
 });
 
 const call = (route) => new Promise((resolve, reject) => {
-  http.get({ host: '127.0.0.1', port, path: route, headers: { 'x-muriel-token': getServerToken() } }, (res) => {
+  http.get({ host: '127.0.0.1', port, path: route, headers: { 'x-piverxy-token': getServerToken() } }, (res) => {
     let b = '';
     res.on('data', (c) => { b += c; });
     res.on('end', () => resolve(JSON.parse(b)));

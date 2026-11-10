@@ -51,9 +51,9 @@ async function fastYouTubeStream(trackUrl, id) {
   }
 }
 
-// MURIEL_DEBUG_YTDLP=1 logs every yt-dlp run with its reason and arguments
-const YTDLP_DEBUG = !!process.env.MURIEL_DEBUG_YTDLP;
-const AUDIO_PROXY_DEBUG = YTDLP_DEBUG || process.env.MURIEL_DEBUG === '1';
+// PIVERXY_DEBUG_YTDLP=1 logs every yt-dlp run with its reason and arguments
+const YTDLP_DEBUG = !!process.env.PIVERXY_DEBUG_YTDLP;
+const AUDIO_PROXY_DEBUG = YTDLP_DEBUG || process.env.PIVERXY_DEBUG === '1';
 
 const MAX_BODY_BYTES = 2 * 1024 * 1024;
 const SAFE_MEDIA_URL = /^https?:\/\//i;
@@ -296,13 +296,13 @@ function saveLibraryIndex() {
 }
 
 // Where a library song's file is. Imported songs are copies in LIBRARY_DIR (item.file); on phones a song can also be
-// linked in place (item.path, under LOCAL_LINK_DIR): the file stays where the user keeps it and is never deleted by Muriel.
+// linked in place (item.path, under LOCAL_LINK_DIR): the file stays where the user keeps it and is never deleted by Piverxy.
 function isLinkedPath(p) {
   return !!LOCAL_LINK_DIR && typeof p === 'string' && p.startsWith(LOCAL_LINK_DIR + '/') && !p.split('/').includes('..');
 }
 
-// Phones (Android 11+): a linked song lives in shared storage, which Muriel can read only while it may read music and audio.
-// When that permission is taken back (Settings -> Apps -> Muriel -> Permissions) the songs are LOCKED: still in the library
+// Phones (Android 11+): a linked song lives in shared storage, which Piverxy can read only while it may read music and audio.
+// When that permission is taken back (Settings -> Apps -> Piverxy -> Permissions) the songs are LOCKED: still in the library
 // and in every playlist, never unlinked or deleted for it, but not served. A request for one is answered with the error
 // below, which the page turns into "allow access" instead of a song that fails to load. Computers and iPhones have no such
 // hook (platform.linkedAccessLocked), so nothing there is ever locked. Asked on every use: it changes while the server runs.
@@ -321,7 +321,7 @@ function sendMediaPermissionRequired(res) {
     success: false,
     error: MEDIA_PERMISSION_REQUIRED,
     code: MEDIA_PERMISSION_REQUIRED,
-    message: 'Muriel needs permission to read music and audio to play songs from your folders. Nothing was removed.'
+    message: 'Piverxy needs permission to read music and audio to play songs from your folders. Nothing was removed.'
   }));
 }
 function libraryFilePath(item) {
@@ -758,7 +758,7 @@ async function httpGetJson(url, timeoutMs = 6000) {
     try {
       const parsed = new URL(url);
       const mod = parsed.protocol === 'http:' ? http : https;
-      const req = mod.get(url, { headers: { 'User-Agent': 'Muriel' }, timeout: timeoutMs }, (res) => {
+      const req = mod.get(url, { headers: { 'User-Agent': 'Piverxy' }, timeout: timeoutMs }, (res) => {
         if (res.statusCode < 200 || res.statusCode >= 300) {
           res.resume();
           return resolve(null);
@@ -995,7 +995,7 @@ async function ytmRadioTracks(seed) {
   return lookup;
 }
 
-// Last.fm's similar songs (track.getSimilar), with the key Muriel scrobbles with; when Last.fm knows none for the
+// Last.fm's similar songs (track.getSimilar), with the key Piverxy scrobbles with; when Last.fm knows none for the
 // song, the top songs of the artists most like this one (artist.getSimilar). Found on YouTube when picked.
 const lastfmSimilarCache = new Map();
 function lastfmGet(params) {
@@ -1606,7 +1606,7 @@ function executeYtDlp(args, timeoutMs = 25000, opts = {}) {
   return ytdlpQueue.run(() => {
     const startedAt = Date.now();
     const run = runYtDlpNow(args, timeoutMs, opts, priority);
-    // with MURIEL_DEBUG_YTDLP: how long a run waited for its slot and how long it took (#17)
+    // with PIVERXY_DEBUG_YTDLP: how long a run waited for its slot and how long it took (#17)
     if (YTDLP_DEBUG) run.then(() => 0, () => 1).then((failed) => { try { logger.log('info', `yt-dlp done [${opts.reason || 'unknown'}/${priority}] waited ${startedAt - queuedAt}ms ran ${Date.now() - startedAt}ms${failed ? ' (failed)' : ''}`); } catch (_) {} });
     return run;
   }, { key: opts.key, priority, cacheMs: opts.cacheMs });
@@ -2917,7 +2917,7 @@ async function handleAudioProxy(req, res, targetUrl) {
           fetchHop(next, hops + 1).catch(() => fail(500, 'Proxy failed'));
           return;
         }
-        // what the stream answered, for #17-style reports: refusals always, everything with MURIEL_DEBUG(_YTDLP)
+        // what the stream answered, for #17-style reports: refusals always, everything with PIVERXY_DEBUG(_YTDLP)
         if (status >= 400 || AUDIO_PROXY_DEBUG) {
           try { logger.log(status >= 400 ? 'warn' : 'info', `audio-proxy ${req.method} ${host}${hops ? ` (+${hops} redirect)` : ''} -> HTTP ${status} ${proxyRes.headers['content-type'] || '-'} len=${proxyRes.headers['content-length'] || '-'} range=${headers.range || '-'} ytHeaders=${ytHeaders ? 'yes' : 'no'}`); } catch (_) {}
         }
@@ -3636,7 +3636,7 @@ async function handleEncode(req, res, parsedUrl) {
 }
 
 const { parseForLyrics, pickBest } = require('./lyrics-match');
-const LRCLIB_UA = 'Muriel (https://github.com/cloverscripts/riff-muriel)';
+const LRCLIB_UA = 'Piverxy (https://github.com/MinzTogether/Piverxy)';
 
 function lrclibJson(pathAndQuery) {
   return new Promise((resolve) => {
@@ -4299,7 +4299,7 @@ function fetchHtmlWithRedirects(targetUrl, maxRedirects = 5, timeoutMs = 15000) 
 
 async function handleAppleImport(req, res, inputUrl) {
   // only real Apple Music pages: the playlist branch fetches this URL, and a pattern that matched anywhere
-  // in the string let a link like http://127.0.0.1/...music.apple.com/pl.x make Muriel fetch local addresses
+  // in the string let a link like http://127.0.0.1/...music.apple.com/pl.x make Piverxy fetch local addresses
   let host = '';
   inputUrl = String(inputUrl || '').trim();
   if (inputUrl && !/^[a-z][a-z0-9+.-]*:\/\//i.test(inputUrl)) inputUrl = `https://${inputUrl}`; // pasted without https://
@@ -4769,7 +4769,7 @@ async function getSpotifyAccessToken(forceRefresh = false) {
       spotifyAuthError = '';
       if (typeof result.data.refresh_token === 'string' && result.data.refresh_token) {
         spotifyAuth.refreshToken = result.data.refresh_token;
-        if (!saveSpotifyAuth()) spotifyAuthError = 'Spotify login could not be saved securely; reconnect after restarting Muriel.';
+        if (!saveSpotifyAuth()) spotifyAuthError = 'Spotify login could not be saved securely; reconnect after restarting Piverxy.';
       }
       return spotifyAuth.token;
     })().finally(() => { spotifyRefreshPromise = null; });
@@ -5561,7 +5561,7 @@ async function handleArtistAlbums(req, res, parsedUrl) {
   }
 }
 
-// An album's songs: by its iTunes id (Muriel's albums come from iTunes), by its Deezer id (source=deezer), and by
+// An album's songs: by its iTunes id (Piverxy's albums come from iTunes), by its Deezer id (source=deezer), and by
 // title and artist when the id finds nothing (a saved album synced from a phone in another country, where iTunes
 // gives the album another id). Also at /api/album and /api/album-tracks.
 function itunesAlbumTracks(results, albumItem) {
@@ -5860,9 +5860,9 @@ async function handleHotPicks(req, res, parsedUrl) {
 // custom API key pair if one was entered, stay here and never go back to the page. They are kept like the Spotify
 // login: encrypted with the system keychain on desktop (lastfm-auth.enc); on phones in the app's private WebView
 // storage (bridge.js), not under /data, which the Files app shows. Without a keychain (Linux without a secret
-// service) they last until Muriel closes. The password typed for the direct sign-in goes to Last.fm once and is
+// service) they last until Piverxy closes. The password typed for the direct sign-in goes to Last.fm once and is
 // not kept. Nothing here logs a key, token or password.
-// The default key pair is upstream Riff's Last.fm application (published in its source). Muriel can register its
+// The default key pair is upstream Riff's Last.fm application (published in its source). Piverxy can register its
 // own at last.fm/api/account/create and put it here; people can also enter their own pair in the Last.fm dialog.
 const LASTFM_API_KEY = '4b4f73bda181868353f9b438604adf52';
 const LASTFM_API_SECRET = '716cc0a784bb62835de5bd674e65eb57';
@@ -5874,7 +5874,7 @@ let lastfmStoreError = '';
 const lastfmPending = new Map(); // profileId -> { token, pair, at }: a browser sign-in waiting for approval
 
 function lastfmVault() {
-  if (typeof globalThis.__murielVault === 'function') return globalThis.__murielVault('lastfm');
+  if (typeof globalThis.__piverxyVault === 'function') return globalThis.__piverxyVault('lastfm');
   if (!canStoreSpotifyAuth()) return null;
   return {
     read: () => JSON.parse(spotifySafeStorage.decryptString(fs.readFileSync(lastfmAuthPath))),
@@ -5927,7 +5927,7 @@ function lastfmSave() {
     lastfmStoreError = '';
     return true;
   } catch (e) {
-    lastfmStoreError = 'The Last.fm login could not be saved securely; connect again after restarting Muriel.';
+    lastfmStoreError = 'The Last.fm login could not be saved securely; connect again after restarting Piverxy.';
     return false;
   }
 }
@@ -5954,13 +5954,13 @@ function lastfmCall(params, pair, method = 'POST') {
       hostname: 'ws.audioscrobbler.com',
       path: isGet ? `/2.0/?${body}` : '/2.0/',
       method,
-      headers: isGet ? { 'User-Agent': 'Muriel' } : { 'User-Agent': 'Muriel', 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(body) },
+      headers: isGet ? { 'User-Agent': 'Piverxy' } : { 'User-Agent': 'Piverxy', 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(body) },
       timeout: 10000,
     }, (resp) => {
       let raw = '';
       resp.on('data', (c) => { raw += c; if (raw.length > 1e6) { raw = ''; resp.destroy(); } });
       resp.on('error', () => done({ error: -1, message: "Can't reach Last.fm" }));
-      resp.on('end', () => { try { done(JSON.parse(raw)); } catch (_) { done({ error: -1, message: 'Last.fm sent an answer Muriel could not read' }); } });
+      resp.on('end', () => { try { done(JSON.parse(raw)); } catch (_) { done({ error: -1, message: 'Last.fm sent an answer Piverxy could not read' }); } });
     });
     req.on('error', () => done({ error: -1, message: "Can't reach Last.fm" }));
     req.on('timeout', () => { req.destroy(); done({ error: -1, message: 'Last.fm did not answer in time' }); });
@@ -5990,7 +5990,7 @@ function lastfmConnect(profile, session, pair) {
   if (!account) return null;
   lastfmLoad()[profile] = account;
   const saved = lastfmSave();
-  return { success: true, username: account.user, saved, error: saved ? '' : lastfmStoreError || 'Connected until Muriel closes: this system has no secure place to keep the login.' };
+  return { success: true, username: account.user, saved, error: saved ? '' : lastfmStoreError || 'Connected until Piverxy closes: this system has no secure place to keep the login.' };
 }
 
 // a scrobble or now-playing update: the song as the page cleaned it (lastfm-core.js), checked again here
@@ -6087,7 +6087,7 @@ async function lastfmRoute(route, body) {
     }
     const r = await lastfmCall(params, account.key ? { key: account.key, secret: account.secret } : null, 'POST');
     // 9: the session was revoked on last.fm; signing in again is the only way back
-    if (r && r.error === 9) { delete lastfmLoad()[profile]; lastfmSave(); return { status: 200, data: { success: false, code: 'reauth', error: 'Last.fm signed Muriel out. Connect again.' } }; }
+    if (r && r.error === 9) { delete lastfmLoad()[profile]; lastfmSave(); return { status: 200, data: { success: false, code: 'reauth', error: 'Last.fm signed Piverxy out. Connect again.' } }; }
     if (!r || r.error) return { status: 200, data: { success: false, retry: !r || r.error === -1 || r.error === 11 || r.error === 16 || r.error === 29, error: lastfmMessage(r) } };
     const accepted = isScrobble ? Number(r.scrobbles && r.scrobbles['@attr'] && r.scrobbles['@attr'].accepted) || 0 : 1;
     return { status: 200, data: { success: true, accepted } };
@@ -6319,7 +6319,7 @@ const server = http.createServer(guardHandler(async (req, res) => {
     if (Array.isArray(value)) parsedUrl.query[key] = value[value.length - 1];
   }
 
-  if ((TOKEN_PROTECTED_ROUTES.has(parsedUrl.pathname) || routeNeedsToken(parsedUrl.pathname)) && !tokenMatches(req.headers['x-muriel-token']) && !tokenMatches(parsedUrl.query.t)) {
+  if ((TOKEN_PROTECTED_ROUTES.has(parsedUrl.pathname) || routeNeedsToken(parsedUrl.pathname)) && !tokenMatches(req.headers['x-piverxy-token']) && !tokenMatches(parsedUrl.query.t)) {
     res.writeHead(403, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ success: false, error: 'forbidden' }));
   }
@@ -6501,7 +6501,7 @@ const server = http.createServer(guardHandler(async (req, res) => {
       spotifyAuthError = errParam === 'access_denied' ? 'Spotify authorization was denied.' : 'Spotify login failed. Check the Client ID, allowed account and redirect URI.';
       spotifyAuth.state = '';
       res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8' });
-      return res.end('<!DOCTYPE html><html><body><p>Spotify login failed. Return to Muriel for details.</p></body></html>');
+      return res.end('<!DOCTYPE html><html><body><p>Spotify login failed. Return to Piverxy for details.</p></body></html>');
     }
     const redirectUri = getSpotifyRedirectUri();
     try {
@@ -6509,7 +6509,7 @@ const server = http.createServer(guardHandler(async (req, res) => {
       const tokenResult = await requestSpotifyToken({ grant_type: 'authorization_code', code, redirect_uri: redirectUri, client_id: spotifyAuth.clientId, code_verifier: spotifyAuth.verifier });
       if (spotifyAuth !== session) {
         res.writeHead(409, { 'Content-Type': 'text/html; charset=utf-8' });
-        return res.end('<!DOCTYPE html><html><body><p>Spotify login session changed. Return to Muriel and try again.</p></body></html>');
+        return res.end('<!DOCTYPE html><html><body><p>Spotify login session changed. Return to Piverxy and try again.</p></body></html>');
       }
       spotifyAuth.state = '';
       if (tokenResult.status >= 200 && tokenResult.status < 300 && typeof tokenResult.data?.access_token === 'string' && tokenResult.data.access_token) {
@@ -6517,20 +6517,20 @@ const server = http.createServer(guardHandler(async (req, res) => {
         spotifyAuth.refreshToken = typeof tokenResult.data.refresh_token === 'string' ? tokenResult.data.refresh_token : '';
         spotifyAuth.expiresAt = Date.now() + (Number.isFinite(tokenResult.data.expires_in) && tokenResult.data.expires_in > 0 ? tokenResult.data.expires_in : 3600) * 1000;
         if (!spotifyAuth.refreshToken) spotifyAuthError = 'Spotify did not provide a refresh token; reconnect when this session expires.';
-        else if (!saveSpotifyAuth()) spotifyAuthError = 'Spotify login could not be saved securely; reconnect after restarting Muriel.';
+        else if (!saveSpotifyAuth()) spotifyAuthError = 'Spotify login could not be saved securely; reconnect after restarting Piverxy.';
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-        return res.end('<!DOCTYPE html><html><body><p>Muriel is connected to Spotify. You can close this tab.</p></body></html>');
+        return res.end('<!DOCTYPE html><html><body><p>Piverxy is connected to Spotify. You can close this tab.</p></body></html>');
       } else {
         const reason = tokenResult.data?.error_description || tokenResult.data?.error || `HTTP ${tokenResult.status}`;
         spotifyAuthError = `Spotify token exchange failed: ${reason}`;
         res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8' });
-        return res.end('<!DOCTYPE html><html><body><p>Spotify login failed. Return to Muriel for details.</p></body></html>');
+        return res.end('<!DOCTYPE html><html><body><p>Spotify login failed. Return to Piverxy for details.</p></body></html>');
       }
     } catch (err) {
       spotifyAuth.state = '';
       spotifyAuthError = `Could not reach Spotify: ${err.message}`;
       res.writeHead(500, { 'Content-Type': 'text/html; charset=utf-8' });
-      return res.end('<!DOCTYPE html><html><body><p>Spotify login failed. Return to Muriel for details.</p></body></html>');
+      return res.end('<!DOCTYPE html><html><body><p>Spotify login failed. Return to Piverxy for details.</p></body></html>');
     }
   }
 

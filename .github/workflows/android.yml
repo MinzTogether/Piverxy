@@ -89,4 +89,4 @@ jobs:
             --prerelease \
             --target "$GITHUB_SHA" \
             --title "Piverxy for Android (latest build)" \
-            --notes "Piverxy $ver. Build of ${GITHUB_SHA::7} (run ${{ github.run_number }}). Download Piverxy.apk on your phone and open it to install. Allow installs from your browser/files app if Android asks.<!-- muriel-version: $ver -->"
+            --notes "Piverxy $ver. Build of ${GITHUB_SHA::7} (run ${{ github.run_number }}). Download Piverxy.apk on your phone and open it to install. Allow installs from your browser/files app if Android asks.<!-- piverxy-version: $ver -->"

@@ -260,5 +260,5 @@
 
   const api = { extractGeniusLyrics, pickGeniusHit, parseYrc, pickNetEaseSong, parseEnhancedLrcWords, lineSimilarity, alignWordTimings, timedWords, timedProgress };
   if (typeof module !== 'undefined') module.exports = api;
-  else window.MurielLyricsSources = api;
+  else window.PiverxyLyricsSources = api;
 })();

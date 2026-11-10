@@ -32,7 +32,7 @@ function request(a, b, c) {
     const headers = { ...(opts.headers || {}) };
     delete headers['Content-Length']; delete headers['content-length']; delete headers.host; delete headers.Host;
     const method = (opts.method || 'GET').toUpperCase();
-    globalThis.__murielFetch(url, { method, headers, body: method === 'GET' || method === 'HEAD' ? undefined : body, signal: ctrl.signal })
+    globalThis.__piverxyFetch(url, { method, headers, body: method === 'GET' || method === 'HEAD' ? undefined : body, signal: ctrl.signal })
       .then(async (r) => {
         const text = await r.text();
         clearTimeout(timer);

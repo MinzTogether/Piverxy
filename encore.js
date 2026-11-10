@@ -1,9 +1,9 @@
-// Muriel Encore: counts what you actually listen to (a play counts after 30s, or half of a short song) and
+// Piverxy Encore: counts what you actually listen to (a play counts after 30s, or half of a short song) and
 // plays it back: the "On repeat" top 3 on the home page and a story-style recap you can open any time.
 // Everything stays on the device (localStorage). Listening older than ~13 months is folded into one
-// all-time total per song (compact below), so the data stays small however long Muriel is used.
+// all-time total per song (compact below), so the data stays small however long Piverxy is used.
 (() => {
-  const KEY = 'muriel_listens_v1';
+  const KEY = 'piverxy_listens_v1';
   const COUNT_AFTER = 30;
   const PERIODS = { week: 'This week', month: 'This month', year: 'This year', all: 'All time' };
 
@@ -78,7 +78,7 @@
   // first run: what's already in History counts as one play each, so the home card isn't empty
   function importHistory() {
     if (db.imported) return;
-    const C = window.MurielCore;
+    const C = window.PiverxyCore;
     const hist = (C && C.state && C.state.history) || [];
     hist.forEach((t) => { if (t && t.playedAt) add(remember(t), 1, 0, new Date(t.playedAt)); });
     db.imported = true;
@@ -92,7 +92,7 @@
   }
   function start(track) {
     commit();
-    const audio = window.MurielCore && window.MurielCore.audio;
+    const audio = window.PiverxyCore && window.PiverxyCore.audio;
     cur = track ? { key: remember(track), track, secs: 0, pending: 0, counted: false, last: audio ? audio.currentTime || 0 : 0, ended: false } : null;
   }
   function needed() {
@@ -100,12 +100,12 @@
     return d > 0 ? Math.min(COUNT_AFTER, d * 0.5) : COUNT_AFTER;
   }
   function hook() {
-    const C = window.MurielCore;
+    const C = window.PiverxyCore;
     const audio = C && C.audio;
     if (!audio) return;
     importHistory();
     if (C.state.currentTrack) start(C.state.currentTrack);
-    window.addEventListener('muriel:track', (e) => { if (!cur || cur.ended || keyOf(e.detail) !== cur.key) start(e.detail); });
+    window.addEventListener('piverxy:track', (e) => { if (!cur || cur.ended || keyOf(e.detail) !== cur.key) start(e.detail); });
     audio.addEventListener('timeupdate', () => {
       if (!cur) return;
       const t = audio.currentTime || 0, d = t - cur.last;
@@ -126,7 +126,7 @@
 
   // ---------- stats ----------
   const cleanTitle = (t, a) => {
-    const M = window.MurielLyricsMatch;
+    const M = window.PiverxyLyricsMatch;
     if (!M) return { title: t, artist: a };
     const p = M.parseForLyrics(t, a);
     return { title: p.titles[0] || t, artist: p.artists[0] || a };
@@ -139,7 +139,7 @@
     return new Date(0);
   }
   // this device's listening plus what linked devices sent (sync.js); each device only ever counts its own plays
-  const sources = () => [db, ...((window.MurielSync && window.MurielSync.listenDbs && window.MurielSync.listenDbs()) || [])];
+  const sources = () => [db, ...((window.PiverxySync && window.PiverxySync.listenDbs && window.PiverxySync.listenDbs()) || [])];
   function stats(period) {
     commit();
     const from = dayKey(rangeStart(period));
@@ -188,14 +188,14 @@
   const toTrack = (s) => ({ id: s.raw.id, title: s.raw.t, artist: s.raw.a, thumbnail: s.raw.th, platform: s.raw.p, url: s.raw.u, duration: s.raw.d });
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   // UI language (i18n.js): Th() gives escaped HTML with the {n} slots filled; titles and names only go into slots
-  const I18n = window.MurielI18n || (() => { const f = (s, ...a) => String(s).replace(/\{(\d)\}/g, (_, i) => (a[i] != null ? a[i] : '')); return { T: (s) => s, Tf: f, Tm: f, Th: (s, ...a) => f(esc(s), ...a) }; })();
+  const I18n = window.PiverxyI18n || (() => { const f = (s, ...a) => String(s).replace(/\{(\d)\}/g, (_, i) => (a[i] != null ? a[i] : '')); return { T: (s) => s, Tf: f, Tm: f, Th: (s, ...a) => f(esc(s), ...a) }; })();
   const Th = (s, ...a) => I18n.Th(s, ...a);
   // the word that goes with a number ('plays', 'days'), translated together with the number so it reads as a count
   const unit = (n, one, many) => esc(I18n.Tf(n === 1 ? `{0} ${one}` : `{0} ${many}`, '\u2063').replace('\u2063', '').trim());
-  const thumb = (s) => esc((window.MurielCore && window.MurielCore.thumb ? window.MurielCore.thumb(toTrack(s)) : '') || s.raw.th || '');
+  const thumb = (s) => esc((window.PiverxyCore && window.PiverxyCore.thumb ? window.PiverxyCore.thumb(toTrack(s)) : '') || s.raw.th || '');
 
   // ---------- home: "On repeat" ----------
-  let homePeriod = (() => { try { return localStorage.getItem('muriel_onrepeat_period') || 'month'; } catch (e) { return 'month'; } })();
+  let homePeriod = (() => { try { return localStorage.getItem('piverxy_onrepeat_period') || 'month'; } catch (e) { return 'month'; } })();
   let renderTimer = null;
   function renderHome() {
     clearTimeout(renderTimer);
@@ -220,13 +220,13 @@
           </button>`).join('')}</div>` : `<div class="onrepeat-empty">${Th("Your most played songs show up here once you've listened for a bit.")}</div>`}`;
       box.querySelectorAll('.onrepeat-chip').forEach((b) => b.addEventListener('click', () => {
         homePeriod = b.dataset.p;
-        try { localStorage.setItem('muriel_onrepeat_period', homePeriod); } catch (e) {}
+        try { localStorage.setItem('piverxy_onrepeat_period', homePeriod); } catch (e) {}
         renderHome();
       }));
       box.querySelector('.onrepeat-encore').addEventListener('click', () => open(homePeriod === 'all' ? 'all' : homePeriod));
       box.querySelectorAll('.onrepeat-row').forEach((r) => r.addEventListener('click', () => {
         const list = top.map(toTrack);
-        window.MurielCore.playTrack(list[+r.dataset.i], list, +r.dataset.i);
+        window.PiverxyCore.playTrack(list[+r.dataset.i], list, +r.dataset.i);
       }));
     }, 60);
   }
@@ -257,14 +257,14 @@
     const maxH = Math.max(1, ...st.hours);
     const list = (items, fn) => `<ol class="enc-list">${items.map(fn).join('')}</ol>`;
     return [
-      `<div class="enc-slide enc-center"><p class="enc-kicker">Muriel Encore</p><h1 class="enc-big">${Th('{0}, played back.', esc(label)).replace(`${esc(label)},`, `${esc(label)},<br>`)}</h1>${pickers(st.period)}<button type="button" class="enc-go" data-next>${Th('Start')}</button></div>`,
+      `<div class="enc-slide enc-center"><p class="enc-kicker">Piverxy Encore</p><h1 class="enc-big">${Th('{0}, played back.', esc(label)).replace(`${esc(label)},`, `${esc(label)},<br>`)}</h1>${pickers(st.period)}<button type="button" class="enc-go" data-next>${Th('Start')}</button></div>`,
       `<div class="enc-slide enc-center"><p class="enc-kicker">${Th('You listened for')}</p><h1 class="enc-num" data-count="${st.minutes}">0</h1><p class="enc-big enc-sm">${unit(st.minutes, 'minute', 'minutes')}</p><p class="enc-sub">${Th('{0} plays of {1} different songs', st.plays.toLocaleString(), st.songs.length.toLocaleString())}</p></div>`,
       `<div class="enc-slide enc-center"><p class="enc-kicker">${Th('Your #1 song')}</p><img class="enc-cover" src="${thumb(s1)}" alt=""><h1 class="enc-big enc-title">${esc(s1.title)}</h1><p class="enc-sub">${esc(s1.artist)}</p><p class="enc-pill">${Th(s1.plays === 1 ? '{0} play' : '{0} plays', s1.plays)}</p></div>`,
       `<div class="enc-slide"><p class="enc-kicker">${Th('Your top songs')}</p>${list(st.songs.slice(0, 5), (s, i) => `<li style="--i:${i}"><span class="enc-rank">${i + 1}</span><img src="${thumb(s)}" alt=""><span><b>${esc(s.title)}</b><small>${esc(s.artist)}</small></span><em>${s.plays}</em></li>`)}</div>`,
       a1 ? `<div class="enc-slide enc-center"><p class="enc-kicker">${Th('Your top artist')}</p><img class="enc-cover enc-round" src="${esc(a1.thumb)}" alt=""><h1 class="enc-big enc-title">${esc(a1.name)}</h1><p class="enc-sub">${Th('{0} plays · {1} min', a1.plays, Math.max(1, Math.round(a1.secs / 60)))}</p>${st.artists.length > 1 ? `<p class="enc-also">${Th('Also: {0}', st.artists.slice(1, 4).map((a) => esc(a.name)).join(', '))}</p>` : ''}</div>` : '',
       `<div class="enc-slide enc-center"><p class="enc-kicker">${Th("You're a")}</p><h1 class="enc-big">${esc(pName)}</h1><p class="enc-sub">${esc(pText)}</p><div class="enc-hours">${st.hours.map((n, i) => `<i style="--h:${(n / maxH).toFixed(3)};--i:${i}" title="${i}:00"></i>`).join('')}</div><div class="enc-hours-axis"><span>0</span><span>6</span><span>12</span><span>18</span><span>24</span></div></div>`,
       `<div class="enc-slide enc-center"><p class="enc-kicker">${Th('You listened on')}</p><h1 class="enc-num" data-count="${st.days}">0</h1><p class="enc-big enc-sm">${unit(st.days, 'day', 'days')}</p><p class="enc-sub">${Th(st.streak === 1 ? 'Longest streak: {0} day in a row' : 'Longest streak: {0} days in a row', st.streak)}</p></div>`,
-      `<div class="enc-slide enc-summary"><div class="enc-card"><div class="enc-card-head"><b>Muriel Encore</b><span>${esc(label)}</span></div>
+      `<div class="enc-slide enc-summary"><div class="enc-card"><div class="enc-card-head"><b>Piverxy Encore</b><span>${esc(label)}</span></div>
         <div class="enc-card-cols"><div><small>${Th('Top songs')}</small>${st.songs.slice(0, 5).map((s, i) => `<p>${i + 1}. ${esc(s.title)}</p>`).join('')}</div><div><small>${Th('Top artists')}</small>${st.artists.slice(0, 5).map((a, i) => `<p>${i + 1}. ${esc(a.name)}</p>`).join('')}</div></div>
         <div class="enc-card-foot"><div><small>${Th('Minutes')}</small><b>${st.minutes.toLocaleString()}</b></div><div><small>${Th("You're a")}</small><b>${esc(pName)}</b></div></div></div>
         <div class="enc-actions"><button type="button" class="enc-go" data-play>${Th('Play my top songs')}</button><button type="button" class="enc-ghost" data-share>${Th('Share')}</button></div></div>`,
@@ -305,17 +305,17 @@
   }
 
   function shareText(st) {
-    const lines = [I18n.Tf('My Muriel Encore ({0})', I18n.T(PERIODS[st.period])), I18n.Tf('{0} minutes of music', st.minutes.toLocaleString())];
+    const lines = [I18n.Tf('My Piverxy Encore ({0})', I18n.T(PERIODS[st.period])), I18n.Tf('{0} minutes of music', st.minutes.toLocaleString())];
     st.songs.slice(0, 5).forEach((s, i) => lines.push(`${i + 1}. ${s.title} - ${s.artist}`));
-    lines.push('', `${I18n.T('Muriel: free music app, no ads, no login.')} github.com/cloverscripts/riff-muriel`);
+    lines.push('', `${I18n.T('Piverxy: free music app, no ads, no login.')} github.com/MinzTogether/Piverxy`);
     return lines.join('\n');
   }
   async function share(st) {
     const text = shareText(st);
     const api = window.electronAPI;
-    if (api && api.shareText) { await api.shareText(I18n.T('My Muriel Encore'), text); return; }
-    if (navigator.share) { try { await navigator.share({ title: I18n.T('My Muriel Encore'), text }); return; } catch (e) { if (e && e.name === 'AbortError') return; } }
-    try { await navigator.clipboard.writeText(text); if (window.MurielCore) window.MurielCore.toast(I18n.Tm('Copied your Encore')); } catch (e) {}
+    if (api && api.shareText) { await api.shareText(I18n.T('My Piverxy Encore'), text); return; }
+    if (navigator.share) { try { await navigator.share({ title: I18n.T('My Piverxy Encore'), text }); return; } catch (e) { if (e && e.name === 'AbortError') return; } }
+    try { await navigator.clipboard.writeText(text); if (window.PiverxyCore) window.PiverxyCore.toast(I18n.Tm('Copied your Encore')); } catch (e) {}
   }
 
   function render(period) {
@@ -335,7 +335,7 @@
     overlay.className = 'encore';
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
-    overlay.setAttribute('aria-label', 'Muriel Encore');
+    overlay.setAttribute('aria-label', 'Piverxy Encore');
     overlay.tabIndex = -1;
     returnFocus = document.activeElement;
     document.body.appendChild(overlay);
@@ -349,7 +349,7 @@
       const p = t.closest('[data-period]');
       if (p) return render(p.dataset.period);
       if (t.closest('[data-next]')) return show(1);
-      if (t.closest('[data-play]')) { const list = current.songs.slice(0, 25).map(toTrack); if (list.length) window.MurielCore.playTrack(list[0], list, 0); return close(); }
+      if (t.closest('[data-play]')) { const list = current.songs.slice(0, 25).map(toTrack); if (list.length) window.PiverxyCore.playTrack(list[0], list, 0); return close(); }
       if (t.closest('[data-share]')) return share(current);
       if (t.closest('button, a')) return;
       if (slide === 0) return; // the intro waits for "Start"
@@ -377,14 +377,14 @@
 
   // sync.js: this device's own listening (sent to linked devices), and a redraw when theirs arrives
   const own = () => { commit(); return db; };
-  window.MurielEncore = { open, stats, close, compact, own, refresh: () => renderHome() };
+  window.PiverxyEncore = { open, stats, close, compact, own, refresh: () => renderHome() };
   // another language, or its words just came in: the story too, on the slide it is on
-  window.addEventListener('muriel:i18n', () => {
+  window.addEventListener('piverxy:i18n', () => {
     renderHome();
     if (overlay && current) { const at = slide; render(current.period); show(at); }
   });
   try { compact(); } catch (e) {}
   const histBtn = document.getElementById('btn-open-encore');
   if (histBtn) histBtn.addEventListener('click', () => open('month'));
-  if (window.MurielCore) hook(); else window.addEventListener('muriel:ready', hook, { once: true });
+  if (window.PiverxyCore) hook(); else window.addEventListener('piverxy:ready', hook, { once: true });
 })();

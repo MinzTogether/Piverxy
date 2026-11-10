@@ -25,7 +25,7 @@ function setup({ platform = 'ios', stored = {} } = {}) {
   const state = { currentTrack: null, syncedLyrics: [] };
   global.window = new EventTarget();
   global.localStorage = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } };
-  window.MurielCore = { state, audio, thumb: (t) => t.thumbnail };
+  window.PiverxyCore = { state, audio, thumb: (t) => t.thumbnail };
   try { require(file)(); } finally { Module._load = origLoad; }
   return { calls, audio, state, store, action: (a) => onAction && onAction({ action: a }) };
 }
@@ -33,9 +33,9 @@ function setup({ platform = 'ios', stored = {} } = {}) {
 test('sends the song, its synced lines and playback to the plugin', () => {
   const { calls, audio, state } = setup();
   state.currentTrack = { platform: 'youtube', id: 'abc', title: 'Song', artist: 'Someone', thumbnail: 'https://i.ytimg.com/vi/abc/mqdefault.jpg' };
-  window.dispatchEvent(new Event('muriel:track'));
+  window.dispatchEvent(new Event('piverxy:track'));
   state.syncedLyrics = [{ time: -1, text: 'plain' }, { time: 1.5, text: 'one' }, { time: 4, text: '' }, { time: 6, text: 'two' }];
-  window.dispatchEvent(new Event('muriel:lyrics'));
+  window.dispatchEvent(new Event('piverxy:lyrics'));
   Object.assign(audio, { paused: false, currentTime: 12.5 });
   audio.dispatchEvent(new Event('playing'));
 
@@ -58,14 +58,14 @@ test('the song length and shuffle go along, for the progress bar and the shuffle
   audio.dispatchEvent(new Event('durationchange'));
   assert.strictEqual(calls[1][1].duration, 201.4);
   state.isShuffle = false;
-  window.dispatchEvent(new Event('muriel:modes'));
+  window.dispatchEvent(new Event('piverxy:modes'));
   assert.strictEqual(calls[2][1].shuffle, false);
 });
 
 test('the Dynamic Island buttons drive the player', () => {
   const { action } = setup();
   const did = [];
-  Object.assign(window.MurielCore, { togglePlay: () => did.push('toggle'), next: () => did.push('next'), prev: () => did.push('prev'), toggleShuffle: () => did.push('shuffle') });
+  Object.assign(window.PiverxyCore, { togglePlay: () => did.push('toggle'), next: () => did.push('next'), prev: () => did.push('prev'), toggleShuffle: () => did.push('shuffle') });
   ['toggle', 'next', 'prev', 'shuffle', 'bogus'].forEach(action);
   assert.deepStrictEqual(did, ['toggle', 'next', 'prev', 'shuffle']);
 });
@@ -73,29 +73,29 @@ test('the Dynamic Island buttons drive the player', () => {
 test('artwork that is not https is left out', () => {
   const { calls, state } = setup();
   state.currentTrack = { id: 'x', title: 'Local', artist: '', thumbnail: 'capacitor://localhost/_capacitor_file_/a.jpg' };
-  window.dispatchEvent(new Event('muriel:track'));
+  window.dispatchEvent(new Event('piverxy:track'));
   assert.strictEqual(calls[0][1].artwork, '');
 });
 
 test('switched off: nothing is sent, and switching off ends the activity', () => {
-  const { calls, state, audio, store } = setup({ stored: { muriel_live_activity: '0' } });
+  const { calls, state, audio, store } = setup({ stored: { piverxy_live_activity: '0' } });
   state.currentTrack = { id: 'x', title: 'T' };
-  window.dispatchEvent(new Event('muriel:track'));
+  window.dispatchEvent(new Event('piverxy:track'));
   audio.dispatchEvent(new Event('pause'));
   assert.strictEqual(calls.length, 0);
-  window.MurielLiveActivity.setEnabled(true);
-  assert.strictEqual(store.muriel_live_activity, '1');
+  window.PiverxyLiveActivity.setEnabled(true);
+  assert.strictEqual(store.piverxy_live_activity, '1');
   assert.deepStrictEqual(calls.map((c) => c[0]), ['setTrack', 'setLyrics', 'setPlayback']);
-  window.MurielLiveActivity.setEnabled(false);
+  window.PiverxyLiveActivity.setEnabled(false);
   assert.strictEqual(calls[calls.length - 1][0], 'stop');
 });
 
 test('does nothing outside iOS', () => {
   const { calls, state } = setup({ platform: 'android' });
   state.currentTrack = { id: 'x', title: 'T' };
-  window.dispatchEvent(new Event('muriel:track'));
+  window.dispatchEvent(new Event('piverxy:track'));
   assert.strictEqual(calls.length, 0);
-  assert.strictEqual(window.MurielLiveActivity, undefined);
+  assert.strictEqual(window.PiverxyLiveActivity, undefined);
 });
 
 test.after(() => { delete global.window; delete global.localStorage; });

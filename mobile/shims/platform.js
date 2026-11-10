@@ -12,7 +12,7 @@ const LIBRARY_PATH = path.join(DATA_DIR, 'library.json');
 const DOWNLOADS_DIR = path.join(DATA_DIR, 'Downloads');
 // songs in the folders next to the download folder, linked in place instead of copied (Android; shims/store.js)
 const LOCAL_LINK_DIR = path.join(DATA_DIR, 'LocalMusic');
-// true while Muriel may not read music and audio (Android 11+): the songs linked in place can't be read then, and server.js
+// true while Piverxy may not read music and audio (Android 11+): the songs linked in place can't be read then, and server.js
 // answers MEDIA_PERMISSION_REQUIRED for them instead of a file Android would refuse (shims/store.js holds the state).
 // Looked up when asked, so a change of the permission takes effect at once.
 const linkedAccessLocked = () => { try { return !!require('./store').linkedAccess().locked; } catch (e) { return false; } };

@@ -10,7 +10,7 @@ const byId = (x) => x && x.id;
 const side = (items, prev, now, base) => ({ items, meta: C.stampList(prev, items, byId, now, base) });
 
 test('sha256 matches Node', () => {
-  for (const s of ['', 'abc', 'muriel:' + 'x'.repeat(1000), 'ünïcødé ✓']) {
+  for (const s of ['', 'abc', 'piverxy:' + 'x'.repeat(1000), 'ünïcødé ✓']) {
     assert.strictEqual(C.sha256(s), crypto.createHash('sha256').update(s, 'utf8').digest('hex'));
   }
 });

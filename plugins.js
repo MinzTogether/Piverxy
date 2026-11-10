@@ -8,7 +8,7 @@ const STATE_PATH = path.join(PLUGINS_DIR, 'plugins.json');
 const MAX_BYTES = 1024 * 1024;
 const safeName = (n) => /^[\w.\- ]+\.js$/.test(String(n)) && !String(n).includes('..');
 
-const EXAMPLE = '/**\n * @name Hello plugin\n * @author Muriel\n * @version 1.0.0\n * @description Shows a message when the track changes. Edit or delete this file.\n */\nconst off = Muriel.on(\'trackchange\', (track) => Muriel.toast(\'Now playing: \' + track.title));\nreturn { stop() { off(); } };\n';
+const EXAMPLE = '/**\n * @name Hello plugin\n * @author Piverxy\n * @version 1.0.0\n * @description Shows a message when the track changes. Edit or delete this file.\n */\nconst off = Piverxy.on(\'trackchange\', (track) => Piverxy.toast(\'Now playing: \' + track.title));\nreturn { stop() { off(); } };\n';
 
 function ensureDir() {
   if (fs.existsSync(PLUGINS_DIR)) return;

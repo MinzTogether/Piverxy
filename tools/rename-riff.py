@@ -1,5 +1,5 @@
-"""Applies Muriel's Riff->Muriel rename to a checkout. Used to port upstream Riff changes:
-rename an old and a new upstream snapshot the same way, diff them, apply that diff to Muriel."""
+"""Applies Piverxy's Riff->Piverxy rename to a checkout. Used to port upstream Riff changes:
+rename an old and a new upstream snapshot the same way, diff them, apply that diff to Piverxy."""
 import os, re, sys
 
 FILES = ['app.js', 'index.html', 'welcome.html', 'styles.css', 'main.js', 'preload.js', 'platform.js', 'launcher.js',
@@ -9,16 +9,16 @@ FILES = ['app.js', 'index.html', 'welcome.html', 'styles.css', 'main.js', 'prelo
 
 def rename(s):
     s = s.replace("writeString(0, 'RIFF')", "writeString(0, '\x00WAV\x00')").replace('rIfFileNotExist', '\x00RIFNE\x00')
-    s = s.replace('RiffAudioEngine', 'MurielAudioEngine')
-    s = re.sub(r'\bRIFF_', 'MURIEL_', s)
-    s = re.sub(r'\briff_', 'muriel_', s)
-    s = re.sub(r'\briff-', 'muriel-', s)
-    s = re.sub(r'\briff:', 'muriel:', s)
-    s = s.replace('.rifftutorial', '.murieltutorial').replace("'C:\\Riff\\\\", "'C:\\Muriel\\\\")
-    s = s.replace('riff.desktop', 'muriel.desktop').replace('riff.png', 'muriel.png').replace('riffCustom', 'murielCustom')
-    s = s.replace("defineTheme('riff'", "defineTheme('muriel'").replace("setTheme('riff')", "setTheme('muriel')")
-    s = s.replace('Usage: riff lyrics', 'Usage: muriel lyrics')
-    s = re.sub(r'\bRiff\b', 'Muriel', s)
+    s = s.replace('RiffAudioEngine', 'PiverxyAudioEngine')
+    s = re.sub(r'\bRIFF_', 'PIVERXY_', s)
+    s = re.sub(r'\briff_', 'piverxy_', s)
+    s = re.sub(r'\briff-', 'piverxy-', s)
+    s = re.sub(r'\briff:', 'piverxy:', s)
+    s = s.replace('.rifftutorial', '.piverxytutorial').replace("'C:\\Riff\\\\", "'C:\\Piverxy\\\\")
+    s = s.replace('riff.desktop', 'piverxy.desktop').replace('riff.png', 'piverxy.png').replace('riffCustom', 'piverxyCustom')
+    s = s.replace("defineTheme('riff'", "defineTheme('piverxy'").replace("setTheme('riff')", "setTheme('piverxy')")
+    s = s.replace('Usage: riff lyrics', 'Usage: piverxy lyrics')
+    s = re.sub(r'\bRiff\b', 'Piverxy', s)
     return s.replace('\x00WAV\x00', 'RIFF').replace('\x00RIFNE\x00', 'rIfFileNotExist')
 
 root = sys.argv[1] if len(sys.argv) > 1 else '.'

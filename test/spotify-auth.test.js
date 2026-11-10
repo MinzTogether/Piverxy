@@ -12,7 +12,7 @@ const { PassThrough } = require('node:stream');
 
 function get(port, route, token) {
   return new Promise((resolve, reject) => {
-    http.get({ host: '127.0.0.1', port, path: route, headers: { 'X-Muriel-Token': token } }, (res) => {
+    http.get({ host: '127.0.0.1', port, path: route, headers: { 'X-Piverxy-Token': token } }, (res) => {
       let body = '';
       res.on('data', chunk => body += chunk);
       res.on('end', () => {
@@ -25,8 +25,8 @@ function get(port, route, token) {
 }
 
 test('Spotify login persists securely, refreshes, restores, and rejects partial link imports', async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'muriel-spotify-'));
-  const oldDataDir = process.env.MURIEL_DATA_DIR;
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'piverxy-spotify-'));
+  const oldDataDir = process.env.PIVERXY_DATA_DIR;
   const oldElectronVersion = process.versions.electron;
   const oldLoad = Module._load;
   const oldRequest = https.request;
@@ -58,7 +58,7 @@ test('Spotify login persists securely, refreshes, restores, and rejects partial 
   };
 
   try {
-    process.env.MURIEL_DATA_DIR = dir;
+    process.env.PIVERXY_DATA_DIR = dir;
     process.versions.electron = '41';
     Module._load = function (name, parent, isMain) {
       if (name === 'electron') return { safeStorage };
@@ -180,8 +180,8 @@ test('Spotify login persists securely, refreshes, restores, and rejects partial 
     https.request = oldRequest;
     https.get = oldGet;
     Module._load = oldLoad;
-    if (oldDataDir === undefined) delete process.env.MURIEL_DATA_DIR;
-    else process.env.MURIEL_DATA_DIR = oldDataDir;
+    if (oldDataDir === undefined) delete process.env.PIVERXY_DATA_DIR;
+    else process.env.PIVERXY_DATA_DIR = oldDataDir;
     if (oldElectronVersion === undefined) delete process.versions.electron;
     else process.versions.electron = oldElectronVersion;
     fs.rmSync(dir, { recursive: true, force: true });

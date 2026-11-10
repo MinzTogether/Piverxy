@@ -1,4 +1,4 @@
-// Builds the iOS web bundle into www/: Muriel's desktop frontend + server.js running in-app.
+// Builds the iOS web bundle into www/: Piverxy's desktop frontend + server.js running in-app.
 import { build } from 'esbuild';
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -14,7 +14,7 @@ mkdirSync(out, { recursive: true });
 
 // server.js requires './platform', './tools', './logger' and './audio-output'; on phones those resolve to the shims.
 const swapLocal = {
-  name: 'muriel-ios-swaps',
+  name: 'piverxy-ios-swaps',
   setup(b) {
     b.onResolve({ filter: /^\.\/(platform|tools|logger|audio-output)$/ }, (a) => (a.importer.endsWith('server.js') ? { path: shim(a.path.slice(2)) } : undefined));
   },

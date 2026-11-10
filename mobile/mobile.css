@@ -1,4 +1,4 @@
-/* ---- Muriel iOS layout ----
+/* ---- Piverxy iOS layout ----
    Top: logo + search. Bottom: tab bar (the desktop rail, turned sideways) with a mini player above it.
    Tapping the mini player opens the now-playing sheet (the desktop drawer, full screen) and the
    player bar expands into full transport controls at the bottom of that sheet. */
@@ -484,16 +484,16 @@ html.is-mobile #visualizer-container, html.is-mobile #mini-visualizer { display:
 html.is-mobile .right-panel-header { flex-shrink: 0 !important; min-height: max-content !important; margin-bottom: 0 !important; }
 /* the animated M3 cover is desktop-only (see m3cEnabled in app.js) */
 html.is-mobile .setting-item:has(#toggle-m3-cover) { display: none !important; }
-/* the download folder is fixed on iPhone (Files → Muriel → Downloads); on Android Change opens a sheet to pick it
+/* the download folder is fixed on iPhone (Files → Piverxy → Downloads); on Android Change opens a sheet to pick it
    (mobile/electron-api.js), so only iPhone hides the buttons */
 html.is-mobile:not(.is-android) #btn-change-download-folder, html.is-mobile:not(.is-android) #btn-reset-download-folder { display: none !important; }
 #download-folder-picker .dialog-card { width: min(92vw, 440px); }
-/* mini player cover: Muriel's 48px square inside the bar, not Riff 42.3's 72px one that pokes out above it */
+/* mini player cover: Piverxy's 48px square inside the bar, not Riff 42.3's 72px one that pokes out above it */
 html.is-mobile #playbar-artwork-wrapper, html.is-mobile #m3c-wrap { width: 48px !important; height: 48px !important; margin-top: 0 !important; }
 html.is-mobile #playbar-artwork-wrapper { overflow: hidden !important; border-radius: var(--md-shape-corner-s); }
 /* update banner sits just under the status bar on phones */
 html.is-mobile .update-banner { top: calc(var(--safe-top) + 10px); width: calc(100vw - 24px); }
-/* Muriel Encore: keep the story clear of the notch and the home bar */
+/* Piverxy Encore: keep the story clear of the notch and the home bar */
 html.is-mobile .enc-bar { top: calc(var(--safe-top) + 10px); }
 html.is-mobile .enc-close { top: calc(var(--safe-top) + 2px); }
 html.is-mobile .enc-slide { padding-top: calc(var(--safe-top) + 70px); padding-bottom: calc(var(--safe-bottom) + 40px); }
@@ -559,12 +559,12 @@ html.is-mobile .track-row:nth-child(n+25) { content-visibility: visible; contain
 
 /* phones draw no backdrop blur, so floating toasts and the song menu need a solid background or the list
    underneath shows through their text (also when the UI transparency slider is turned down) */
-html.is-mobile .muriel-toast,
+html.is-mobile .piverxy-toast,
 html.is-mobile .m3-dropdown-menu,
 html.is-mobile .track-context-menu { background: var(--md-sys-color-surface-container-highest-solid) !important; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35); }
 /* a long message wraps instead of being cut off at the screen edge */
-html.is-mobile .muriel-toast { min-width: 0; max-width: 100%; border-radius: 22px; }
-html.is-mobile .muriel-toast .toast-text { white-space: normal; overflow-wrap: anywhere; line-height: 1.35; }
+html.is-mobile .piverxy-toast { min-width: 0; max-width: 100%; border-radius: 22px; }
+html.is-mobile .piverxy-toast .toast-text { white-space: normal; overflow-wrap: anywhere; line-height: 1.35; }
 
 /* phones play through a plain <audio> element (no Web Audio graph, see mobile-ui.js), so the Enhance,
    Effects and EQ tabs had controls that did nothing; Tempo (speed/pitch) and Sleep still work */
@@ -600,7 +600,7 @@ html.is-mobile .app-icon-picker-grid { grid-template-columns: repeat(auto-fill, 
 /* song radio (#28): the queue's "Radio · song" label a little roomier for a finger */
 html.is-mobile .queue-radio-label { margin: 2px 0 10px; padding: 6px 12px 6px 10px; }
 
-/* Android: songs linked from the folders next to the download folder while Muriel may not read music and audio (app.js
+/* Android: songs linked from the folders next to the download folder while Piverxy may not read music and audio (app.js
    isMediaLocked). Still listed, still in every playlist; shown dimmed until the permission is back. Tapping one explains. */
 html.is-mobile .track-row.is-locked { opacity: 0.5; }
 

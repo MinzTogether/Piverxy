@@ -22,23 +22,23 @@ function pickFiles(accept, multiple) {
 
 const ANDROID = Capacitor.getPlatform() === 'android';
 
-// Words of Muriel's own go through the translation system (i18n.js): an element made here carries data-i18n (its text,
+// Words of Piverxy's own go through the translation system (i18n.js): an element made here carries data-i18n (its text,
 // and data-i18n-attr for a placeholder) and is translated when it is added to the page; text set later goes through
-// text(). What is not Muriel's words (folder names, paths) is left out of it: it would be sent to the translator.
-const i18n = () => window.MurielI18n || null;
+// text(). What is not Piverxy's words (folder names, paths) is left out of it: it would be sent to the translator.
+const i18n = () => window.PiverxyI18n || null;
 const Tm = (s) => (i18n() ? i18n().Tm(s) : s);
 const say = (el, s) => { if (i18n() && i18n().text) i18n().text(el, s); else el.textContent = s; };
-const toast = (msg, kind) => { if (window.MurielCore) window.MurielCore.toast(msg, kind); };
+const toast = (msg, kind) => { if (window.PiverxyCore) window.PiverxyCore.toast(msg, kind); };
 
-// Settings → Folders → Download folder → Change (Android): a sheet listing the places Android lets Muriel save songs in,
+// Settings → Folders → Download folder → Change (Android): a sheet listing the places Android lets Piverxy save songs in,
 // one of your own inside Music / Download / Documents, and whether the songs already downloaded go along.
-// Resolves { text, move } (text: the folder as Settings shows it, e.g. Music/Muriel Mod), or null when cancelled.
+// Resolves { text, move } (text: the folder as Settings shows it, e.g. Music/Piverxy), or null when cancelled.
 function chooseDownloadFolder(current) {
   return new Promise((resolve) => {
     const choices = store.downloadChoices();
     const tops = store.sharedTops();
     const known = choices.find((c) => c.shown === current);
-    // mk(tag, css, text, words): words = Muriel's own words (translated); without it the text is a name or a path
+    // mk(tag, css, text, words): words = Piverxy's own words (translated); without it the text is a name or a path
     const mk = (tag, css, text, words) => {
       const n = document.createElement(tag);
       if (css) n.style.cssText = css;
@@ -56,7 +56,7 @@ function chooseDownloadFolder(current) {
 
     const rows = [];
     const sub = 'font-size:12px;color:var(--md-sys-color-outline);word-break:break-all;';
-    // title: a folder name (words false) or Muriel's words; path and hint are optional lines under it
+    // title: a folder name (words false) or Piverxy's words; path and hint are optional lines under it
     const addRow = (value, title, titleIsWords, path, hint, extra) => {
       const label = mk('label', 'display:flex;gap:10px;align-items:flex-start;padding:10px 0;cursor:pointer;');
       const radio = document.createElement('input');
@@ -135,7 +135,7 @@ function chooseDownloadFolder(current) {
 // What a locked song says when it is asked to play (Android): music access is off, nothing was removed, and the way back is the
 // app's page in Settings (a permission turned off there is not asked for again by a system dialog). Resolves 'settings' once
 // that page was opened, or null for "not now". Only one is ever open; `close` shuts it when the permission turns up again.
-const MEDIA_PROMPT_TEXT = "Muriel can't read the songs from your folders because the permission to read music and audio (Files and media on Android 11 and 12) is turned off. Your playlists and files are untouched. Turn it back on in the app settings and the songs play again.";
+const MEDIA_PROMPT_TEXT = "Piverxy can't read the songs from your folders because the permission to read music and audio (Files and media on Android 11 and 12) is turned off. Your playlists and files are untouched. Turn it back on in the app settings and the songs play again.";
 let mediaPrompt = null;
 function askForMediaAccess({ openSettings }) {
   if (mediaPrompt) return mediaPrompt.promise;
@@ -268,8 +268,8 @@ module.exports = function electronAPI({ ready, port, fs, fileUrlFor }) {
   }
 
   // ---- Android: the permission behind the songs linked in place (shims/store.js) ----
-  // The linked songs lock while Muriel may not read music and audio, and unlock when it may again; nothing is removed either
-  // way. The page hears of every change as 'muriel:media-access' ({ locked, canAsk, restored }), and can ask at any time
+  // The linked songs lock while Piverxy may not read music and audio, and unlock when it may again; nothing is removed either
+  // way. The page hears of every change as 'piverxy:media-access' ({ locked, canAsk, restored }), and can ask at any time
   // (getMediaAccess). It is looked at again whenever the app comes back to the front: the person may have been in Settings.
   let lastAccess = null; // what the page was last told
   let looking = null;    // a look at the permission that is going on: asked again meanwhile, it is the same look
@@ -284,7 +284,7 @@ module.exports = function electronAPI({ ready, port, fs, fileUrlFor }) {
     if (!now.locked && mediaPrompt) mediaPrompt.close(null); // given back while the prompt was up
     if (!lastAccess || now.locked !== lastAccess.locked || now.canAsk !== lastAccess.canAsk) {
       lastAccess = now;
-      try { window.dispatchEvent(new CustomEvent('muriel:media-access', { detail: { ...now, restored: r.restored || 0 } })); } catch (e) {}
+      try { window.dispatchEvent(new CustomEvent('piverxy:media-access', { detail: { ...now, restored: r.restored || 0 } })); } catch (e) {}
     }
     return now;
   }
@@ -293,7 +293,7 @@ module.exports = function electronAPI({ ready, port, fs, fileUrlFor }) {
   // the app's page in Settings, where "Permissions" turns it back on (older builds of the plugin: the dialog, or that page when
   // the dialog can't come any more)
   async function openAppSettings() {
-    const media = Capacitor.Plugins && Capacitor.Plugins.MurielMedia;
+    const media = Capacitor.Plugins && Capacitor.Plugins.PiverxyMedia;
     if (!media) return false;
     try { await media.openAppSettings(); return true; } catch (e) {}
     try { await media.allowAudioAccess({ settings: true }); return true; } catch (e) { return false; }
@@ -348,7 +348,7 @@ module.exports = function electronAPI({ ready, port, fs, fileUrlFor }) {
       await ready;
       // lossless files take a while to copy; say so, or the app looks stuck
       const total = files.reduce((n, f) => n + f.size, 0);
-      if (total > 20e6 && window.MurielCore) window.MurielCore.toast(`Adding ${files.length} song${files.length === 1 ? '' : 's'}…`, 'info');
+      if (total > 20e6 && window.PiverxyCore) window.PiverxyCore.toast(`Adding ${files.length} song${files.length === 1 ? '' : 's'}…`, 'info');
       const out = [];
       for (const f of files) {
         const ext = extOf(f.name);
@@ -370,7 +370,7 @@ module.exports = function electronAPI({ ready, port, fs, fileUrlFor }) {
       try { for (const n of fs.readdirSync('/data/tracks')) audio += fs.statSync(`/data/tracks/${n}`).size; } catch (e) {}
       // "Web & App Data": the app cache (mobile/app-cache.js and the home page's saved rows)
       let web = 0;
-      try { if (globalThis.MurielAppCache) web = (await globalThis.MurielAppCache.stats()).bytes || 0; } catch (e) {}
+      try { if (globalThis.PiverxyAppCache) web = (await globalThis.PiverxyAppCache.stats()).bytes || 0; } catch (e) {}
       return { audio, web, total: audio + web };
     },
     // like desktop: delete the cached songs and thumbnails (via the in-app server), then wait for the disk.
@@ -378,16 +378,16 @@ module.exports = function electronAPI({ ready, port, fs, fileUrlFor }) {
     clearCache: async () => {
       await ready;
       try { await fetch('http://127.0.0.1:38472/api/clear-offline-library', { method: 'POST' }); } catch (e) {}
-      try { if (globalThis.MurielAppCache) await globalThis.MurielAppCache.clear(); } catch (e) {} // it rebuilds itself on the next launch
+      try { if (globalThis.PiverxyAppCache) await globalThis.PiverxyAppCache.clear(); } catch (e) {} // it rebuilds itself on the next launch
       await fs._flush();
       return true;
     },
-    getDataDir: async () => ({ dir: 'On this iPhone (Files → Muriel)', defaultDir: '/data', isCustom: false }),
+    getDataDir: async () => ({ dir: 'On this iPhone (Files → Piverxy)', defaultDir: '/data', isCustom: false }),
     pickDataDir: async () => null,
     setDataDir: async () => ({ success: false, error: 'The music folder is fixed on iPhone' }),
-    // iOS: fixed, Files → Muriel → Downloads. Android: Music/Muriel Mod unless changed in Settings (shims/store.js)
+    // iOS: fixed, Files → Piverxy → Downloads. Android: Music/Piverxy unless changed in Settings (shims/store.js)
     async getDownloadDir() {
-      if (!ANDROID) return { dir: 'Files → Muriel → Downloads', isCustom: false };
+      if (!ANDROID) return { dir: 'Files → Piverxy → Downloads', isCustom: false };
       await ready;
       return { dir: store.downloadsFolder() || "Inside the app (other apps can't see it)", isCustom: store.isCustomDownloadDir() };
     },
@@ -420,7 +420,7 @@ module.exports = function electronAPI({ ready, port, fs, fileUrlFor }) {
       promptMediaAccess: () => askForMediaAccess({ openSettings: openAppSettings }),
     } : {}),
     restartApp: () => location.reload(),
-    getAppVersion: async () => { const b = window.MURIEL_BUILD || {}; return b.version ? `${b.version}${b.run ? ` (build ${b.run})` : ''}` : '1.1.2'; },
+    getAppVersion: async () => { const b = window.PIVERXY_BUILD || {}; return b.version ? `${b.version}${b.run ? ` (build ${b.run})` : ''}` : '1.1.2'; },
     getHwAccel: async () => true,
     setHwAccel: noop,
     trimMemory: noop,
@@ -437,7 +437,7 @@ module.exports = function electronAPI({ ready, port, fs, fileUrlFor }) {
     // where "Save to Files" / Drive / Mail take it. In a desktop browser (dev harness) it's a plain download.
     async saveTextFile({ defaultName, content } = {}) {
       if (typeof content !== 'string') return { success: false, error: 'Nothing to save' };
-      const name = String(defaultName || 'muriel.json').replace(/[\\/:*?"<>|\u0000-\u001f]+/g, '_').replace(/^\.+/, '').slice(0, 120) || 'muriel.json';
+      const name = String(defaultName || 'piverxy.json').replace(/[\\/:*?"<>|\u0000-\u001f]+/g, '_').replace(/^\.+/, '').slice(0, 120) || 'piverxy.json';
       if (!Capacitor.isNativePlatform()) {
         const a = document.createElement('a');
         a.href = URL.createObjectURL(new Blob([content], { type: 'application/json' }));

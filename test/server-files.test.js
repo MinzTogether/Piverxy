@@ -11,9 +11,9 @@ const path = require('node:path');
 const http = require('node:http');
 const https = require('node:https');
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'muriel-files-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'piverxy-files-'));
 for (const key of ['HOME', 'USERPROFILE', 'LOCALAPPDATA', 'XDG_CONFIG_HOME']) process.env[key] = tmp;
-process.env.MURIEL_DATA_DIR = path.join(tmp, 'data');
+process.env.PIVERXY_DATA_DIR = path.join(tmp, 'data');
 const dataDir = path.join(tmp, 'data');
 fs.mkdirSync(dataDir, { recursive: true });
 // a library with one track, and a metadata index cut off halfway through a write
@@ -39,7 +39,7 @@ after(async () => {
 
 function call(method, route, { body, token = true } = {}) {
   return new Promise((resolve) => {
-    const headers = token ? { 'x-muriel-token': getServerToken() } : {};
+    const headers = token ? { 'x-piverxy-token': getServerToken() } : {};
     const req = http.request({ host: '127.0.0.1', port, method, path: route, headers }, (res) => {
       const chunks = [];
       res.on('data', (c) => chunks.push(c));

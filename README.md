@@ -134,7 +134,7 @@ Open <code>ios/App/App.xcodeproj</code> in Xcode to build the iOS app. The autom
 
 ## Credits and license
 
-Piverxy is a modified and independently maintained project based on [Muriel](https://github.com/cloverscripts/riff-muriel), which in turn originated from [Riff](https://github.com/rootscripts/riff).
+Piverxy is a modified and independently maintained project based on [Piverxy](https://github.com/MinzTogether/Piverxy), which in turn originated from [Riff](https://github.com/rootscripts/riff).
 
 The upstream MIT license and copyright notice are retained in [LICENSE](LICENSE). Please keep the license and attribution notices with redistributed copies.
 

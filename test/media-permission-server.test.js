@@ -13,10 +13,10 @@ const os = require('node:os');
 const path = require('node:path');
 const http = require('node:http');
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'muriel-perm-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'piverxy-perm-'));
 for (const key of ['HOME', 'USERPROFILE', 'LOCALAPPDATA', 'XDG_CONFIG_HOME']) process.env[key] = tmp;
 const DATA = path.join(tmp, 'data');
-process.env.MURIEL_DATA_DIR = DATA;
+process.env.PIVERXY_DATA_DIR = DATA;
 const LINK = path.join(tmp, 'LocalMusic');
 fs.mkdirSync(path.join(LINK, 'Road trip'), { recursive: true });
 fs.mkdirSync(path.join(DATA, 'library'), { recursive: true });
@@ -45,7 +45,7 @@ after(async () => { await stopServer(); fs.rmSync(tmp, { recursive: true, force:
 function call(method, route, body, headers = {}) {
   return new Promise((resolve, reject) => {
     const data = body === undefined ? null : JSON.stringify(body);
-    const req = http.request({ host: '127.0.0.1', port, path: route, method, headers: { 'x-muriel-token': getServerToken(), ...(data ? { 'Content-Type': 'application/json' } : {}), ...headers } }, (res) => {
+    const req = http.request({ host: '127.0.0.1', port, path: route, method, headers: { 'x-piverxy-token': getServerToken(), ...(data ? { 'Content-Type': 'application/json' } : {}), ...headers } }, (res) => {
       const chunks = [];
       res.on('data', (c) => chunks.push(c));
       res.on('end', () => {

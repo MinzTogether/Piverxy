@@ -38,4 +38,4 @@ createServer(async (req, res) => {
     res.end(body);
   } catch { res.writeHead(404); res.end('not found'); }
 // this machine only: the proxy and the files are not for the rest of the network
-}).listen(port, '127.0.0.1', () => console.log(`muriel mobile dev: http://127.0.0.1:${port}`));
+}).listen(port, '127.0.0.1', () => console.log(`piverxy mobile dev: http://127.0.0.1:${port}`));

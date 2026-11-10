@@ -77,7 +77,7 @@ function createHarness({ isSpotify = false, advWave = true, advJump = true, cach
   };
 
   const window = {
-    MurielAppCache: {
+    PiverxyAppCache: {
       home: {
         readWave: () => cachedData,
         writeWave: (d) => { events.push({ type: 'writeWave', data: d }); return true; },
@@ -85,7 +85,7 @@ function createHarness({ isSpotify = false, advWave = true, advJump = true, cach
         writeForYou: () => {},
       },
     },
-    MurielLog: {
+    PiverxyLog: {
       add: (level, msg) => events.push({ type: 'log', level, msg }),
     },
   };
@@ -173,7 +173,7 @@ function createHarness({ isSpotify = false, advWave = true, advJump = true, cach
   return { ctx, events, marks, domElements, getRenderedCarouselMode: () => renderedCarouselMode, getMadeForYouRenderCount: () => madeForYouRenderCount };
 }
 
-test('restoreCachedWave: renders Muriel carousel immediately when layout is Muriel and mode is wave', () => {
+test('restoreCachedWave: renders Piverxy carousel immediately when layout is Piverxy and mode is wave', () => {
   const cachedData = {
     tracks: [
       { id: '1', title: 'Song 1', artist: 'Artist 1' },
@@ -235,7 +235,7 @@ test('restoreCachedWave: renders Spotify layout when isSpotifyHome is true', () 
   assert.ok(restored);
   assert.equal(getMadeForYouRenderCount(), 1);
   const carouselEvt = events.find((e) => e.type === 'renderHomeCarousel');
-  assert.equal(carouselEvt, undefined, 'Muriel carousel should not be rendered in Spotify layout');
+  assert.equal(carouselEvt, undefined, 'Piverxy carousel should not be rendered in Spotify layout');
   assert.deepEqual(marks, ['wave-cache:read-start', 'wave-cache:read-end', 'wave-cache:rendered']);
 });
 
@@ -468,7 +468,7 @@ test("Piverxy branding and appId (io.github.piverxy) are applied across Capacito
 
   const gradle = fs.readFileSync(path.join(__dirname, "../android/app/build.gradle"), "utf8");
   assert.ok(gradle.includes("applicationId \"io.github.piverxy\""), "build.gradle has applicationId io.github.piverxy");
-  assert.ok(gradle.includes("namespace = \"io.github.cloverscripts.muriel\""), "build.gradle preserves Java namespace");
+  assert.ok(gradle.includes("namespace = \"io.github.piverxy\""), "build.gradle preserves Java namespace");
 
   const stringsXml = fs.readFileSync(path.join(__dirname, "../android/app/src/main/res/values/strings.xml"), "utf8");
   assert.ok(stringsXml.includes("<string name=\"app_name\">Piverxy</string>"));

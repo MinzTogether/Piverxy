@@ -44,7 +44,7 @@ function respond(body, status = 200) {
     arrayBuffer: async () => body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength),
   };
 }
-globalThis.__murielFetch = async (input) => {
+globalThis.__piverxyFetch = async (input) => {
   const url = String(input);
   requested.push(url);
   if (url === 'https://www.youtube.com/') return respond('"VISITOR_DATA":"visitor123"');
@@ -83,7 +83,7 @@ function runDownload() {
 }
 
 const warn = console.warn;
-beforeEach(() => { written.clear(); requested = []; opusSize = (1 << 20) + 5; opusStatus = 200; opusShort = false; globalThis.__murielPlaysOpus = true; console.warn = () => {}; });
+beforeEach(() => { written.clear(); requested = []; opusSize = (1 << 20) + 5; opusStatus = 200; opusShort = false; globalThis.__piverxyPlaysOpus = true; console.warn = () => {}; });
 afterEach(() => { console.warn = warn; });
 
 test('Android gets the whole Opus file, fetched in 1 MiB ranges', async () => {
@@ -111,7 +111,7 @@ test('a cut-off Opus file is not saved', async () => {
 });
 
 test('iPhone keeps the AAC stream and never asks for Opus', async () => {
-  globalThis.__murielPlaysOpus = false;
+  globalThis.__piverxyPlaysOpus = false;
   await runDownload();
   assert.ok(written.has('/data/cache/abc.temp.aac'));
   assert.equal(requested.some((u) => u.startsWith(OPUS)), false);

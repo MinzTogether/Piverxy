@@ -22,7 +22,7 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
-	<!-- muriel://link?code=… from the QR code in Settings → Sync (opens the app and links it) -->
+	<!-- piverxy://link?code=… from the QR code in Settings → Sync (opens the app and links it) -->
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -30,7 +30,7 @@
 			<string>io.github.piverxy</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>muriel</string>
+				<string>piverxy</string>
 			</array>
 		</dict>
 	</array>

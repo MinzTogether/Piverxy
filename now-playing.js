@@ -1,5 +1,5 @@
 // What the system's "now playing" controls are told (lock screen, Control Center, the iPhone widget), and when
-// to start again after another app's sound interrupted Muriel (issue #26). No DOM here: app.js and
+// to start again after another app's sound interrupted Piverxy (issue #26). No DOM here: app.js and
 // mobile/audio-interruption.js use it, test/now-playing.test.js runs it.
 (function () {
   // navigator.mediaSession.setPositionState() for an <audio> element: null when the song has no length yet
@@ -21,7 +21,7 @@
   // usually just before telling the app)
   const INTERRUPT_GRACE_MS = 3000;
 
-  // was Muriel playing when another app took the sound? Not when the listener had paused it themselves.
+  // was Piverxy playing when another app took the sound? Not when the listener had paused it themselves.
   function wasPlayingAtInterruption({ paused, ended, pausedByUser, lastPlayingAt, now }) {
     if (pausedByUser || ended) return false;
     if (!paused) return true;
@@ -36,5 +36,5 @@
 
   const api = { positionState, wasPlayingAtInterruption, resumeAfterInterruption, INTERRUPT_GRACE_MS };
   if (typeof module !== 'undefined') module.exports = api;
-  else window.MurielNowPlaying = api;
+  else window.PiverxyNowPlaying = api;
 })();

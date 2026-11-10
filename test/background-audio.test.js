@@ -23,9 +23,9 @@ function setup(platform = 'ios') {
   audio.paused = true;
   const state = { trackLoading: false };
   global.window = new EventTarget();
-  window.MurielCore = { state, audio };
+  window.PiverxyCore = { state, audio };
   try { require(file)(); } finally { Module._load = origLoad; }
-  const loading = (on) => { state.trackLoading = on; window.dispatchEvent(new Event('muriel:loading')); };
+  const loading = (on) => { state.trackLoading = on; window.dispatchEvent(new Event('piverxy:loading')); };
   const playing = () => { audio.paused = false; audio.dispatchEvent(new Event('play')); audio.dispatchEvent(new Event('playing')); };
   return { silent, audio, loading, playing, silence: () => silent[0] };
 }

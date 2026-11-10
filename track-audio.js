@@ -94,5 +94,5 @@
   const api = { KEYS, DEFAULTS, BUILTIN_PRESETS, clampValue, normalizeEntry, effectiveSettings, setEntry, cleanStore,
     presetValues, makePreset, cleanPresets, presetMatches };
   if (typeof module !== 'undefined') module.exports = api;
-  else window.MurielTrackAudio = api;
+  else window.PiverxyTrackAudio = api;
 })();

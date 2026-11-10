@@ -1,10 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace = "io.github.cloverscripts.muriel"
+    namespace = "io.github.piverxy"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        // the mod installs next to the original Muriel (io.github.cloverscripts.muriel): another package name.
+        // the mod installs next to the original Piverxy (io.github.piverxy): another package name.
         // The Java package (namespace above) stays the same on purpose.
         applicationId "io.github.piverxy"
         minSdkVersion rootProject.ext.minSdkVersion

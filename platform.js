@@ -5,16 +5,16 @@ const path = require('path');
 const IS_WIN = process.platform === 'win32';
 
 const DEFAULT_DATA_DIR = IS_WIN
-  ? path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'Muriel')
+  ? path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'Piverxy')
   : process.platform === 'darwin'
-  ? path.join(os.homedir(), 'Library', 'Application Support', 'Muriel')
-  : path.join(os.homedir(), '.cache', 'muriel');
+  ? path.join(os.homedir(), 'Library', 'Application Support', 'Piverxy')
+  : path.join(os.homedir(), '.cache', 'piverxy');
 
 const CONFIG_DIR = IS_WIN
-  ? path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'Muriel')
+  ? path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'Piverxy')
   : process.platform === 'darwin'
-  ? path.join(os.homedir(), 'Library', 'Application Support', 'Muriel')
-  : path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'), 'muriel');
+  ? path.join(os.homedir(), 'Library', 'Application Support', 'Piverxy')
+  : path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'), 'piverxy');
 const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
 
 function readConfig() {
@@ -27,7 +27,7 @@ function readConfig() {
 }
 
 function resolveDataDir() {
-  const override = process.env.MURIEL_DATA_DIR;
+  const override = process.env.PIVERXY_DATA_DIR;
   if (override && override.trim()) {
     try { return path.resolve(override.trim()); } catch (e) {}
   }
@@ -74,8 +74,8 @@ const METADATA_PATH = path.join(DATA_DIR, 'metadata.json');
 const LIBRARY_DIR = path.join(DATA_DIR, 'library');
 const LIBRARY_PATH = path.join(DATA_DIR, 'library.json');
 const BIN_DIR = path.join(DATA_DIR, 'bin');
-const TUTORIAL_MARKER = IS_WIN ? 'C:\\Muriel\\.murieltutorial' : path.join(os.homedir(), '.murieltutorial');
-const TUTORIAL_MARKER_FALLBACK = path.join(DATA_DIR, '.murieltutorial');
+const TUTORIAL_MARKER = IS_WIN ? 'C:\\Piverxy\\.piverxytutorial' : path.join(os.homedir(), '.piverxytutorial');
+const TUTORIAL_MARKER_FALLBACK = path.join(DATA_DIR, '.piverxytutorial');
 const STARTUP_PATH = path.join(DATA_DIR, 'startup.json');
 function readStartupConfig() { try { return JSON.parse(fs.readFileSync(STARTUP_PATH, 'utf8')) || {}; } catch (e) { return {}; } }
 function writeStartupConfig(patch) {
@@ -93,8 +93,8 @@ function markTutorialDone() {
   return false;
 }
 
-// what Muriel itself keeps in its music folder (moving the folder copies and then deletes only these)
-const MURIEL_DATA_ENTRIES = ['tracks', 'custom-lyrics', 'lyrics', 'thumbnails', 'library', 'bin', 'plugins', 'logs', 'metadata.json', 'library.json', 'startup.json', 'spotify-auth.enc', 'lastfm-auth.enc', '.murieltutorial'];
+// what Piverxy itself keeps in its music folder (moving the folder copies and then deletes only these)
+const PIVERXY_DATA_ENTRIES = ['tracks', 'custom-lyrics', 'lyrics', 'thumbnails', 'library', 'bin', 'plugins', 'logs', 'metadata.json', 'library.json', 'startup.json', 'spotify-auth.enc', 'lastfm-auth.enc', '.piverxytutorial'];
 
 // `only`: names to take at the top level (deeper levels take everything under them)
 async function copyDirContents(fromDir, toDir, skipNames = new Set(['config.json']), only = null) {
@@ -151,7 +151,7 @@ const binaryCache = {};
 function resolveBinary(name) {
   if (name in binaryCache) return binaryCache[name];
   const exe = IS_WIN ? `${name}.exe` : name;
-  const envKey = `MURIEL_${name.replace(/[^a-z0-9]/gi, '').toUpperCase()}`;
+  const envKey = `PIVERXY_${name.replace(/[^a-z0-9]/gi, '').toUpperCase()}`;
   const candidates = [
     process.env[envKey],
     path.join(BIN_DIR, exe),
@@ -191,5 +191,5 @@ module.exports = {
   findInPath, resolveBinary, ytDlpCommand,
   tutorialDone, markTutorialDone,
   readStartupConfig, writeStartupConfig,
-  readConfig, resolveDataDir, setDataDir, resolveDownloadDir, setDownloadDir, copyDirContents, removeDirContents, MURIEL_DATA_ENTRIES
+  readConfig, resolveDataDir, setDataDir, resolveDownloadDir, setDownloadDir, copyDirContents, removeDirContents, PIVERXY_DATA_ENTRIES
 };

@@ -20,7 +20,7 @@ The report's suspect (`listLinked()` restoring from `SIB_KEY` without a permissi
 
 Two **data-integrity defects** sat behind that, both reproduced on the original code by the new tests:
 
-1. **A scan without the permission overwrote what is remembered.** `scanLinked()` saw nothing, treated it as a complete scan, and rewrote `muriel_local_folders` from `{"folders":["Album One"],"loose":true}` to `{"folders":[],"loose":false}` (test `MP-09`). After the permission came back, a restart restored nothing until a manual rescan.
+1. **A scan without the permission overwrote what is remembered.** `scanLinked()` saw nothing, treated it as a complete scan, and rewrote `piverxy_local_folders` from `{"folders":["Album One"],"loose":true}` to `{"folders":[],"loose":false}` (test `MP-09`). After the permission came back, a restart restored nothing until a manual rescan.
 2. **Losing the permission *during* a scan emptied the playlists.** The page received a "complete" scan with no songs and posted `/api/library-unlink {"keep":[]}`, which forgets every linked song and strips them from every playlist (test `MP-14`). The permission check at the top of `scanLocalFolders` made this rare, not impossible.
 
 One latent defect: `bridge.js` `fileUrlFor` cached *rejected* promises forever, so a single refused read poisoned that song until the app restarted (`BR-02`).
@@ -32,7 +32,7 @@ One latent defect: `bridge.js` `fileUrlFor` cached *rejected* promises forever, 
 | `mobile/shims/store.js` | Lock state (`linkedAccess`, `isLinkedLocked`, `refreshLinkedAccess`). `listLinked` does not read the folders while locked and does not touch `SIB_KEY`. `scanLinked` returns `{ locked: true }` without scanning or remembering anything, and re-checks after reading in case the permission went mid-scan. `fileUrl` refuses a locked linked path with `MEDIA_PERMISSION_REQUIRED`. |
 | `mobile/shims/platform.js` | `linkedAccessLocked()`, the hook `server.js` asks. |
 | `server.js` | `/api/library-file` answers `403 {"code":"MEDIA_PERMISSION_REQUIRED"}` for a locked linked song. `/api/library-unlink` with `keep` (a rescan) is refused while locked. `/api/library?locked=1` marks locked songs. The cover worker skips locked songs so an online cover does not permanently hide the embedded one. |
-| `mobile/bridge.js` | A refused file URL is no longer cached, and a locked linked song never gets a URL, even from the cache. The server's `MEDIA_PERMISSION_REQUIRED` reaches the page as the event `muriel:media-permission-required`. |
+| `mobile/bridge.js` | A refused file URL is no longer cached, and a locked linked song never gets a URL, even from the cache. The server's `MEDIA_PERMISSION_REQUIRED` reaches the page as the event `piverxy:media-permission-required`. |
 | `mobile/electron-api.js` | `getMediaAccess()`, `openAppSettings()`, `promptMediaAccess()`. Re-reads the permission at foreground (`visibilitychange` and Capacitor `appStateChange`), after every in-app permission ask, and before every scan. A scan cut short by the permission returns `needsPermission`. |
 | `app.js` | `playTrack` returns at its very first statement for a locked song (no queue, history or audio-engine contact) and shows the prompt. The audio error handler no longer treats a locked song as missing or skips on. Locked rows are dimmed. |
 | `MediaControlsPlugin.java` | New `openAppSettings` (opens the app's page in Settings). |
@@ -46,7 +46,7 @@ A linked song is **locked** when all of these hold: Android, the song lives in s
 - Locked is **computed from the permission as it is now and never stored**. No new storage key, no format change, so there is no migration and nothing that can stay stuck.
 - Locked songs stay in the library and in every playlist, unchanged. Tapping one shows "Music access is off" with **Not now** / **Open app settings**. Nothing plays, nothing is queued, nothing is skipped, nothing is marked missing.
 - Permission back (Settings, then return to the app): the songs are put back in the file index *first*, then unlock. The prompt closes by itself and the rows un-dim. No rescan, no new playlists.
-- **Never locked:** songs imported into the app, songs Muriel downloaded, and everything under the app's own folder.
+- **Never locked:** songs imported into the app, songs Piverxy downloaded, and everything under the app's own folder.
 - Nothing is unlinked, forgotten or deleted because of the permission. `/api/library-unlink` *without* `keep` (what the app sends when you deliberately change the download folder) is unchanged and still allowed.
 
 ## 4. Mandatory regression tests
@@ -59,7 +59,7 @@ A linked song is **locked** when all of these hold: Android, the song lives in s
 | Restored → playback works again | `MP-04`, `MP-04b`, `SRV-06`, `BR-01`, `BR-02` |
 | Revoked while running → state refreshes | `MP-05`, `MP-05b`, `MP-17`, `PG-02`, `PG-03`, `PG-04` |
 | App-private music remains playable | `MP-06`, `SRV-04` |
-| Muriel-downloaded music remains playable | `MP-07` |
+| Piverxy-downloaded music remains playable | `MP-07` |
 | No duplicate playlists after restoration | `MP-08`, `MP-15` |
 | No unlink/delete caused by permission denial | `MP-09`, `MP-09b`, `MP-14`, `SRV-05`, `SRV-07` |
 
@@ -73,9 +73,9 @@ The Filesystem model in `test/android-store.test.js` reproduces the Android 11+ 
 
 ## 6. Device runbook (needed to close the bug)
 
-**Prerequisites.** JDK 21, a debug build (`npm ci && node mobile/build.mjs && npx cap sync android && cd android && ./gradlew assembleDebug`), and at least one phone on Android 13+ and one on Android 11 or 12. Package: `io.github.murielmod`. Permission: `android.permission.READ_MEDIA_AUDIO` (13+) or `android.permission.READ_EXTERNAL_STORAGE` (11–12); below it `$PERM`.
+**Prerequisites.** JDK 21, a debug build (`npm ci && node mobile/build.mjs && npx cap sync android && cd android && ./gradlew assembleDebug`), and at least one phone on Android 13+ and one on Android 11 or 12. Package: `io.github.piverxy`. Permission: `android.permission.READ_MEDIA_AUDIO` (13+) or `android.permission.READ_EXTERNAL_STORAGE` (11–12); below it `$PERM`.
 
-**Test data.** Files pushed with `adb` belong to the shell user, so Muriel cannot see them without the permission, exactly like files from a file manager or a PC:
+**Test data.** Files pushed with `adb` belong to the shell user, so Piverxy cannot see them without the permission, exactly like files from a file manager or a PC:
 
 ```
 adb shell mkdir -p /sdcard/Music/TestAlbum
@@ -85,19 +85,19 @@ adb push loose.mp3 /sdcard/Music/loose.mp3
 adb shell sha256sum /sdcard/Music/TestAlbum/* /sdcard/Music/loose.mp3   # keep this output
 ```
 
-Also have one song **downloaded by Muriel** and one **imported** into the library (My files → **Add files**), made while the permission was granted.
+Also have one song **downloaded by Piverxy** and one **imported** into the library (My files → **Add files**), made while the permission was granted.
 
 | # | Steps | Expected |
 |---|---|---|
 | T0 | Fresh install, never granted. Open **My files** → **Folder playlists** → Allow. | Playlists "Local files" and "TestAlbum" appear with 1 and 2 songs; they play; no error toast. *(MP-01, MP-16)* |
-| T1 | Settings → Apps → Muriel Mod → Permissions → turn the music permission **off**. Reopen Muriel. | Playlists and counts unchanged. The 3 linked songs are dimmed. The downloaded and imported songs are not and still play. |
+| T1 | Settings → Apps → Piverxy → Permissions → turn the music permission **off**. Reopen Piverxy. | Playlists and counts unchanged. The 3 linked songs are dimmed. The downloaded and imported songs are not and still play. |
 | T2 | Tap a dimmed song. | Prompt "Music access is off". No audio, no "File missing" toast, no skipping, queue unchanged. **Not now** closes it; tapping again shows it again. |
-| T3 | Tap **Open app settings**. | Muriel's page in Settings opens. |
-| T4 | Turn the permission on, go back to Muriel. | Prompt gone (if open), rows no longer dimmed, **without restarting**. The song plays. Playlists identical to T0. |
+| T3 | Tap **Open app settings**. | Piverxy's page in Settings opens. |
+| T4 | Turn the permission on, go back to Piverxy. | Prompt gone (if open), rows no longer dimmed, **without restarting**. The song plays. Playlists identical to T0. |
 | T5 | Tap **Folder playlists** twice. | No duplicate playlists; counts as in T0. |
 | T6 | Re-run the `sha256sum` line. | Identical to the saved output: no file touched. |
-| T7 | Debug build: `adb shell run-as io.github.murielmod sha256sum files/Muriel/library.json` before T1 and after T4. | Same hash (expected path `files/Muriel/library.json`; list with `ls files/Muriel` if it differs). |
-| T8 | `adb shell pm revoke io.github.murielmod $PERM`, then reopen. Then `adb shell pm grant io.github.murielmod $PERM`, press Home and return **without** killing the app. | Revoke behaves as T1. After the grant, returning to the app unlocks the songs by itself (the foreground refresh). |
+| T7 | Debug build: `adb shell run-as io.github.piverxy sha256sum files/Piverxy/library.json` before T1 and after T4. | Same hash (expected path `files/Piverxy/library.json`; list with `ls files/Piverxy` if it differs). |
+| T8 | `adb shell pm revoke io.github.piverxy $PERM`, then reopen. Then `adb shell pm grant io.github.piverxy $PERM`, press Home and return **without** killing the app. | Revoke behaves as T1. After the grant, returning to the app unlocks the songs by itself (the foreground refresh). |
 | T9 | First-time user again (clear app data), tap **Folder playlists**, choose **Don't allow**, repeat once more. | Existing instruction toasts; nothing created; the second time Settings opens. |
 | T10 | Optional: remote-debug the WebView and run `JSON.parse(localStorage.devsize_playlists).map(p=>[p.name,p.tracks.length])` before and after. | Identical. |
 
@@ -114,7 +114,7 @@ Everything is additive and persists nothing new, so reverting the change leaves 
 - **Java not compiled against the SDK.** The new `openAppSettings` method was compiled against stubs of the signatures it calls (`openSettings`, `audioState`); its body is the same call `allowAudioAccess` already makes. A real `./gradlew assembleDebug` is the proof.
 - **JS bundle not built here** (no `node_modules`, no network). The new `require('@capacitor/app')` in `electron-api.js` matches existing uses in `bridge.js`.
 - **Revoking in Settings normally kills the app process on Android**, so "revoked while running" is, in practice, a restart. The in-app refresh is unit-tested (`MP-05`) and the grant direction can be observed on device (T8). A revoke without a kill is hard to produce on purpose.
-- **Android 10 and older (existing limit, not changed).** Without the permission the whole shared download folder is unusable (`listDownloads` sets `pub = null`), so even songs Muriel downloaded into `Music/Muriel Mod` cannot play until it returns. The files stay on the device. The requirement that Muriel-downloaded music stays playable holds on Android 11+.
+- **Android 10 and older (existing limit, not changed).** Without the permission the whole shared download folder is unusable (`listDownloads` sets `pub = null`), so even songs Piverxy downloaded into `Music/Piverxy` cannot play until it returns. The files stay on the device. The requirement that Piverxy-downloaded music stays playable holds on Android 11+.
 - **Prompt offers only Not now / Open app settings.** I did not add a button for the system dialog: a permission turned off in Settings is usually not asked for again by it. This is an assumption worth confirming in T1–T3. The existing Folder playlists flow still uses the dialog first.
 - **A queue stops at a locked song** with the prompt instead of skipping to the next playable one. Skipping silently would hide the problem.
 - **`/api/library?locked=1` is opt-in**, because the list is copied whole into playlists and favorites; a mark that is only true for a while must not be saved into them.

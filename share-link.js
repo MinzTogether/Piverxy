@@ -1,6 +1,6 @@
 // Shared playlists: the whole playlist travels inside the link (after the #, so it never reaches a server).
-// https://cloverscripts.github.io/riff-muriel/play/#p=<payload>  — opens the web player
-// muriel://playlist?p=<payload>                                   — opens the app
+// https://minztogether.github.io/Piverxy/play/#p=<payload>  — opens the web player
+// piverxy://playlist?p=<payload>                                   — opens the app
 // payload, when every song is on YouTube (the usual case): "y" + base64url(name length byte, name, then each
 // video id as its 8 bytes). Titles aren't in the link; fillInfo() looks them up from YouTube. That keeps a
 // 10-song link around 170 characters.
@@ -9,7 +9,7 @@
 // (ref = video id), "s" = SoundCloud (ref = track URL), "u" = anything else with a URL. Songs from files on
 // the device can't be shared and are left out. Used by the app (app.js) and tests.
 (function (root) {
-  const WEB = 'https://cloverscripts.github.io/riff-muriel/play/';
+  const WEB = 'https://minztogether.github.io/Piverxy/play/';
   const MAX_TRACKS = 500;
   const clip = (s, n) => String(s == null ? '' : s).slice(0, n);
   const YT_ID = /^[A-Za-z0-9_-]{11}$/;
@@ -20,7 +20,7 @@
     return m ? m[1] : '';
   };
 
-  // a Muriel track -> a compact row, or null when it can't be shared
+  // a Piverxy track -> a compact row, or null when it can't be shared
   function packTrack(t) {
     if (!t || t.platform === 'local' || t.isLocal) return null;
     const meta = [clip(t.title, 140), clip(t.artist, 80), Math.max(0, Math.round(Number(t.duration) || 0))];
@@ -94,7 +94,7 @@
     return { payload, count: rows.length };
   }
 
-  // payload string -> { name, tracks } (throws on anything that isn't a Muriel playlist)
+  // payload string -> { name, tracks } (throws on anything that isn't a Piverxy playlist)
   async function decode(payload) {
     const p = String(payload || '').trim();
     if (p.length < 2 || p.length > 400000) throw new Error('not a playlist link');
@@ -121,7 +121,7 @@
     return { name: clip(data.n, 100) || 'Shared playlist', tracks };
   }
 
-  // the payload in a pasted link: the web player link or muriel://playlist?p=…
+  // the payload in a pasted link: the web player link or piverxy://playlist?p=…
   // (a bare payload isn't taken: "juicewrld" typed into the search bar looked like one)
   function payloadFrom(text) {
     const m = /[#?&]p=([yzj][A-Za-z0-9_-]+)/.exec(String(text || '').trim());
@@ -168,9 +168,9 @@
   }
 
   const webLink = (payload) => `${WEB}#p=${payload}`;
-  const appLink = (payload) => `muriel://playlist?p=${payload}`;
+  const appLink = (payload) => `piverxy://playlist?p=${payload}`;
 
   const api = { encode, decode, payloadFrom, fillInfo, tidy, webLink, appLink, packTrack, unpackTrack, WEB };
   if (typeof module === 'object' && module.exports) module.exports = api;
-  else root.MurielShare = api;
+  else root.PiverxyShare = api;
 })(typeof window !== 'undefined' ? window : globalThis);

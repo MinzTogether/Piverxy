@@ -1,14 +1,14 @@
 // Profiles: several people on one device, each with their own playlists, favorites, history, Encore stats,
 // queue, look, sound and lyrics settings, and their own Sync group. All of that lives in localStorage, so a
 // profile is simply its own set of keys there: the first profile keeps the plain keys it always had (nothing to
-// migrate), every other profile stores its keys as "muriel_p:<id>:<key>". Loaded before every other script, this
+// migrate), every other profile stores its keys as "piverxy_p:<id>:<key>". Loaded before every other script, this
 // file makes localStorage show only the open profile, so the rest of the app never has to know. The few keys in
 // DEVICE belong to the device and are shared by every profile. Switching profiles reloads the page.
 // No DOM: profiles.js draws Settings → Profiles and the switcher, test/profiles-core.test.js runs this in Node.
 (function (root) {
-  const LIST = 'muriel_profiles'; // [{ id, name, color, emoji, created }]
-  const ACTIVE = 'muriel_profile_active';
-  const PREFIX = 'muriel_p:';
+  const LIST = 'piverxy_profiles'; // [{ id, name, color, emoji, created }]
+  const ACTIVE = 'piverxy_profile_active';
+  const PREFIX = 'piverxy_p:';
   const FIRST = 'default'; // the profile with the plain keys
 
   // shared by every profile on this device. Hardware acceleration and the music and download folders aren't in
@@ -16,19 +16,19 @@
   const DEVICE = new Set([
     LIST, ACTIVE,
     // the window, the tray and the keyboard belong to the computer
-    'muriel_tray_on_close', 'muriel_global_media_keys', 'muriel_win_global_media_keys', 'muriel_hide_titlebar',
+    'piverxy_tray_on_close', 'piverxy_global_media_keys', 'piverxy_win_global_media_keys', 'piverxy_hide_titlebar',
     // what this device can handle
-    'muriel_perf_mode', 'muriel_battery_saver', 'muriel_fps_cap', 'muriel_cache_limit_mb', 'muriel_stream_timeout', 'muriel_audio_output_device', 'muriel_app_cache',
+    'piverxy_perf_mode', 'piverxy_battery_saver', 'piverxy_fps_cap', 'piverxy_cache_limit_mb', 'piverxy_stream_timeout', 'piverxy_audio_output_device', 'piverxy_app_cache',
     // asked, shown or done once per device
-    'muriel_update_found', 'muriel_update_last', 'muriel_update_snooze', 'muriel_welcome_done', 'muriel_bg_asked',
-    'muriel_scale_rebased_v2', 'muriel_debug_log',
+    'piverxy_update_found', 'piverxy_update_last', 'piverxy_update_snooze', 'piverxy_welcome_done', 'piverxy_bg_asked',
+    'piverxy_scale_rebased_v2', 'piverxy_debug_log',
     // where this phone saves downloads, and which folders next to it were linked as playlists (shims/store.js)
-    'muriel_download_location', 'muriel_local_folders',
+    'piverxy_download_location', 'piverxy_local_folders',
     // a copy of the open language's translations for a quick start (i18n.js); which language is per profile
-    'muriel_i18n_snap',
+    'piverxy_i18n_snap',
   ]);
   // how a song sounds, worked out once per device; logins the in-app server keeps for every profile (bridge.js)
-  const DEVICE_PREFIXES = ['muriel_audio_analysis_', 'muriel_secret_'];
+  const DEVICE_PREFIXES = ['piverxy_audio_analysis_', 'piverxy_secret_'];
   const isDevice = (k) => DEVICE.has(k) || DEVICE_PREFIXES.some((p) => k.startsWith(p));
 
   const COLORS = ['#D0BCFF', '#A8C7FA', '#7FD8C0', '#C5E1A5', '#FDD663', '#FFB59A', '#F4A7C6', '#B8C4D0'];
@@ -160,7 +160,7 @@
   // Later patches of Storage.prototype (app.js for a full storage, sync.js to notice changes) wrap these, so they
   // see the keys as the app writes them.
   function install(win) {
-    if (win.MurielProfiles) return win.MurielProfiles;
+    if (win.PiverxyProfiles) return win.PiverxyProfiles;
     let ls;
     try { ls = win.localStorage; } catch (e) { return null; } // storage switched off: nothing to keep apart
     const P = win.Storage && win.Storage.prototype;
@@ -217,7 +217,7 @@
       isDevice,
       COLORS,
     };
-    win.MurielProfiles = api;
+    win.PiverxyProfiles = api;
     return api;
   }
 

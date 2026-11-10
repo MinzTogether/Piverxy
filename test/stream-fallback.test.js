@@ -12,9 +12,9 @@ const http = require('node:http');
 const https = require('node:https');
 const { PassThrough } = require('node:stream');
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'muriel-fallback-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'piverxy-fallback-'));
 for (const key of ['HOME', 'USERPROFILE', 'LOCALAPPDATA', 'XDG_CONFIG_HOME']) process.env[key] = tmp;
-process.env.MURIEL_DATA_DIR = path.join(tmp, 'data');
+process.env.PIVERXY_DATA_DIR = path.join(tmp, 'data');
 
 // fake yt-dlp: the original upload is blocked, the other upload of the same song works, SoundCloud has nothing
 const calls = path.join(tmp, 'yt-dlp-calls.txt');
@@ -29,8 +29,8 @@ case "$last" in
 esac
 `);
 fs.chmodSync(fake, 0o755);
-process.env.MURIEL_YTDLP = fake;
-process.env.MURIEL_FFMPEG = fake;
+process.env.PIVERXY_YTDLP = fake;
+process.env.PIVERXY_FFMPEG = fake;
 
 // YouTube search for "Daft Punk Get Lucky": the blocked upload itself, a 10-minute extended mix, the other upload
 const video = (id, title, length) => ({ videoRenderer: { videoId: id, title: { runs: [{ text: title }] }, ownerText: { runs: [{ text: 'Daft Punk' }] }, lengthText: { simpleText: length } } });
@@ -60,7 +60,7 @@ after(async () => {
 
 function get(route) {
   return new Promise((resolve) => {
-    http.get({ host: '127.0.0.1', port, path: route, headers: { 'x-muriel-token': getServerToken() } }, (res) => {
+    http.get({ host: '127.0.0.1', port, path: route, headers: { 'x-piverxy-token': getServerToken() } }, (res) => {
       let body = '';
       res.on('data', (c) => { body += c; });
       res.on('end', () => resolve({ status: res.statusCode, body }));

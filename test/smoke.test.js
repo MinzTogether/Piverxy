@@ -41,7 +41,7 @@ test('server responds and rejects untrusted routes', async () => {
     const guarded = await request(port, '/api/tools-status');
     assert.strictEqual(guarded.statusCode, 403, 'token-protected route must reject requests without a token');
 
-    const authorized = await request(port, '/api/tools-status', { 'x-muriel-token': getServerToken() });
+    const authorized = await request(port, '/api/tools-status', { 'x-piverxy-token': getServerToken() });
     assert.strictEqual(authorized.statusCode, 200);
     assert.doesNotThrow(() => JSON.parse(authorized.body));
   } finally {
@@ -66,7 +66,7 @@ test('Spotify login reports callback errors and protects account routes', async 
       const denied = await request(port, route);
       assert.strictEqual(denied.statusCode, 403, route);
     }
-    const headers = { 'x-muriel-token': getServerToken() };
+    const headers = { 'x-piverxy-token': getServerToken() };
     const start = await request(port, '/api/spotify-auth-start?clientId=' + 'a'.repeat(32), headers);
     const auth = JSON.parse(start.body);
     assert.strictEqual(start.statusCode, 200);
@@ -124,7 +124,7 @@ test('Spotify library reports skipped playlists and rejects malformed pages', as
   try {
     const port = await startServer(0);
     try {
-      const headers = { 'x-muriel-token': getServerToken() };
+      const headers = { 'x-piverxy-token': getServerToken() };
       const auth = JSON.parse((await request(port, '/api/spotify-auth-start?clientId=' + 'a'.repeat(32), headers)).body);
       const state = new URL(auth.url).searchParams.get('state');
       assert.strictEqual((await request(port, `/api/spotify-callback?state=${state}&code=mock`)).statusCode, 200);
@@ -187,11 +187,11 @@ test('renderer requires consent before importing a partial Spotify library', asy
     spChkLikes2: { checked: true }, spChkPlaylists2: { checked: true },
     spotifyStatus: { textContent: '', style: {}, classList: { remove() {} } },
     btnConfirmSpotifyImport: { disabled: false }, btnCancelSpotifyImport: { disabled: false },
-    state: { serverPort: 1234 }, spotifyHeaders: { 'X-Muriel-Token': 'secret' },
+    state: { serverPort: 1234 }, spotifyHeaders: { 'X-Piverxy-Token': 'secret' },
     window: { confirm(message) { prompt = message; return approved; } },
     fetch: async (url, options) => {
       assert.match(url, /\/api\/spotify-library\?/);
-      assert.strictEqual(options.headers['X-Muriel-Token'], 'secret');
+      assert.strictEqual(options.headers['X-Piverxy-Token'], 'secret');
       return { json: async () => ({ success: true, partial: true, likes: [{ title: 'Saved' }], playlists: [], skippedPlaylists: [{ name: 'Blocked', error: 'HTTP 403' }] }) };
     },
     runSpotifyImport: async data => { imported = data; }

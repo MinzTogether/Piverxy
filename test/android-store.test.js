@@ -146,7 +146,7 @@ beforeEach(() => {
   compared = [];
   compareFails = false;
   // the native side (MediaControlsPlugin.audioAccess / allowAudioAccess / sameFile)
-  capacitor.Plugins.MurielMedia = {
+  capacitor.Plugins.PiverxyMedia = {
     // the plugin reads both files and compares every byte; it rejects when one can't be read
     sameFile: async ({ a, b }) => {
       compared.push({ a, b });
@@ -175,8 +175,8 @@ beforeEach(() => {
   ls = new Map();
   global.localStorage = { getItem: (k) => (ls.has(k) ? ls.get(k) : null), setItem: (k, v) => ls.set(k, String(v)), removeItem: (k) => ls.delete(k) };
   // what a phone with some songs looks like
-  put('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3', 'AAAA');
-  put('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Opus.mka', 'BBBB');
+  put('EXTERNAL_STORAGE', 'Music/Piverxy/Artist - Song.mp3', 'AAAA');
+  put('EXTERNAL_STORAGE', 'Music/Piverxy/Artist - Opus.mka', 'BBBB');
   put('EXTERNAL_STORAGE', 'Music/Album One/01 First.mp3');
   put('EXTERNAL_STORAGE', 'Music/Album One/Disc 2/02 Second.flac');
   put('EXTERNAL_STORAGE', 'Music/loose song.mp3');
@@ -185,13 +185,13 @@ beforeEach(() => {
   put('EXTERNAL', 'music/mine.mp3');
 });
 
-test('the default download folder is Music/Muriel Mod, and what was downloaded shows up as /data/Downloads', async () => {
+test('the default download folder is Music/Piverxy, and what was downloaded shows up as /data/Downloads', async () => {
   const store = launch();
   const entries = await store.list();
   const vpaths = entries.map((e) => e.vpath).sort();
   assert.ok(vpaths.includes('/data/Downloads/Artist - Song.mp3'));
   assert.ok(vpaths.includes('/data/Downloads/Artist - Opus.webm'), 'an .mka in Music/ is the .webm song inside the app');
-  assert.equal(store.downloadsFolder(), 'Music/Muriel Mod');
+  assert.equal(store.downloadsFolder(), 'Music/Piverxy');
   assert.equal(store.isCustomDownloadDir(), false);
 });
 
@@ -218,7 +218,7 @@ test('a launch after a scan puts the linked songs back in the file index, and th
   assert.equal(await store.fileUrl('/data/LocalMusic/Album One/01 First.mp3'), `file://${ROOTS.EXTERNAL_STORAGE}/Music/Album One/01 First.mp3`);
 });
 
-test('Muriel never deletes a linked song', async () => {
+test('Piverxy never deletes a linked song', async () => {
   const store = launch();
   await store.list();
   await store.scanLinked();
@@ -237,8 +237,8 @@ test('choosing the app folder moves the songs there (.mka back to .webm), and th
   assert.equal(res.failed, 0);
   assert.equal(has('EXTERNAL', 'download/Artist - Song.mp3'), true);
   assert.equal(has('EXTERNAL', 'download/Artist - Opus.webm'), true);
-  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3'), false);
-  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Opus.mka'), false);
+  assert.equal(has('EXTERNAL_STORAGE', 'Music/Piverxy/Artist - Song.mp3'), false);
+  assert.equal(has('EXTERNAL_STORAGE', 'Music/Piverxy/Artist - Opus.mka'), false);
 
   const next = launch(); // the restart
   const vpaths = (await next.list()).map((e) => e.vpath);
@@ -266,17 +266,17 @@ test('with the app folder as download folder, its neighbours are the ones that b
 test('without moving, the songs stay in the old folder', async () => {
   const store = launch();
   await store.list();
-  const res = await store.setDownloadDir('Download/Muriel songs', { move: false });
+  const res = await store.setDownloadDir('Download/Piverxy songs', { move: false });
   assert.equal(res.ok, true);
   assert.equal(res.moved, 0);
-  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3'), true);
-  assert.equal(has('EXTERNAL_STORAGE', 'Download/Muriel songs/.muriel-write-test.mp3'), false, 'the test file is cleaned up');
+  assert.equal(has('EXTERNAL_STORAGE', 'Music/Piverxy/Artist - Song.mp3'), true);
+  assert.equal(has('EXTERNAL_STORAGE', 'Download/Piverxy songs/.piverxy-write-test.mp3'), false, 'the test file is cleaned up');
 });
 
-test('folders Muriel cannot use are refused with nothing saved', async () => {
+test('folders Piverxy cannot use are refused with nothing saved', async () => {
   const store = launch();
   await store.list();
-  for (const bad of ['', 'Music', '../Music/x', 'Music/../../x', 'Pictures/Muriel', 'Music/.hidden', 'Music/a:b', `Android/data/${APP}/files`, 'Android/data/other.app/files/download', '/sdcard/Music/x']) {
+  for (const bad of ['', 'Music', '../Music/x', 'Music/../../x', 'Pictures/Piverxy', 'Music/.hidden', 'Music/a:b', `Android/data/${APP}/files`, 'Android/data/other.app/files/download', '/sdcard/Music/x']) {
     const res = await store.setDownloadDir(bad);
     assert.equal(res.ok, false, bad);
   }
@@ -291,12 +291,12 @@ test('folders Muriel cannot use are refused with nothing saved', async () => {
 test('a typed path is read the way the sheet shows it (full path, odd slashes, any capitals in the first folder)', async () => {
   const store = launch();
   assert.equal(store.showDownloadDir('/storage/emulated/0/music//My songs/'), 'Music/My songs');
-  assert.equal(store.showDownloadDir('Download\\Muriel'), 'Download/Muriel');
-  assert.equal(store.downloadChoices().find((c) => c.text === 'Music/Muriel Mod').full, '/storage/emulated/0/Music/Muriel Mod');
+  assert.equal(store.showDownloadDir('Download\\Piverxy'), 'Download/Piverxy');
+  assert.equal(store.downloadChoices().find((c) => c.text === 'Music/Piverxy').full, '/storage/emulated/0/Music/Piverxy');
   assert.equal(store.showDownloadDir('Music'), null);
 });
 
-test('reset puts the songs back in Music/Muriel Mod and forgets the choice', async () => {
+test('reset puts the songs back in Music/Piverxy and forgets the choice', async () => {
   let store = launch();
   await store.list();
   await store.setDownloadDir(`Android/data/${APP}/files/download`, { move: true });
@@ -305,26 +305,26 @@ test('reset puts the songs back in Music/Muriel Mod and forgets the choice', asy
   const res = await store.resetDownloadDir({ move: true });
   assert.equal(res.ok, true);
   assert.equal(res.moved, 2);
-  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3'), true);
-  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Opus.mka'), true, 'a WebM song is an .mka in Music/');
+  assert.equal(has('EXTERNAL_STORAGE', 'Music/Piverxy/Artist - Song.mp3'), true);
+  assert.equal(has('EXTERNAL_STORAGE', 'Music/Piverxy/Artist - Opus.mka'), true, 'a WebM song is an .mka in Music/');
   assert.equal(has('EXTERNAL', 'download/Artist - Song.mp3'), false);
   assert.equal(launch().isCustomDownloadDir(), false);
 });
 
-test('a chosen folder that stops working falls back to Music/Muriel Mod instead of losing the downloads', async () => {
+test('a chosen folder that stops working falls back to Music/Piverxy instead of losing the downloads', async () => {
   let store = launch();
   await store.list();
-  await store.setDownloadDir('Download/Muriel songs', { move: false });
+  await store.setDownloadDir('Download/Piverxy songs', { move: false });
   // the folder disappears (storage cleaned, SD card out)
-  for (const d of [...dirs]) if (d.startsWith(`${ROOTS.EXTERNAL_STORAGE}/Download/Muriel songs`)) dirs.delete(d);
-  denied.push(`${ROOTS.EXTERNAL_STORAGE}/Download/Muriel songs`);
+  for (const d of [...dirs]) if (d.startsWith(`${ROOTS.EXTERNAL_STORAGE}/Download/Piverxy songs`)) dirs.delete(d);
+  denied.push(`${ROOTS.EXTERNAL_STORAGE}/Download/Piverxy songs`);
   store = launch();
   await store.list();
-  assert.equal(store.downloadsFolder(), 'Music/Muriel Mod');
+  assert.equal(store.downloadsFolder(), 'Music/Piverxy');
 });
 
 test('a rebuilt app with another package name gets its own app folder (not the original app\'s)', async () => {
-  appId = 'com.example.mymuriel';
+  appId = 'com.example.mypiverxy';
   const own = `/storage/emulated/0/Android/data/${appId}/files`;
   ROOTS.EXTERNAL = own; // where the plugin puts Directory.External for that package
   try {
@@ -348,11 +348,11 @@ test('a rebuilt app with another package name gets its own app folder (not the o
 const THIRD = 'Artist - Third.mp3';
 const APPFOLDER = `Android/data/${APP}/files/download`;
 const where = (url) => url.replace('file://', '');
-const journal = () => JSON.parse(ls.get('muriel_download_move') || 'null');
+const journal = () => JSON.parse(ls.get('piverxy_download_move') || 'null');
 
 // the app is killed during the second song: a copy that never finishes stands for a process that is gone
 async function killedMove(stage) {
-  put('EXTERNAL_STORAGE', `Music/Muriel Mod/${THIRD}`, 'CCCC');
+  put('EXTERNAL_STORAGE', `Music/Piverxy/${THIRD}`, 'CCCC');
   const store = launch();
   await store.list();
   let n = 0;
@@ -381,8 +381,8 @@ for (const stage of ['before-copy', 'after-copy']) {
 
     await next.resumeMove();
     for (const [dir, rel] of [['EXTERNAL', 'download/Artist - Song.mp3'], ['EXTERNAL', 'download/Artist - Opus.webm'], ['EXTERNAL', `download/${THIRD}`]]) assert.equal(has(dir, rel), true, rel);
-    for (const rel of ['Artist - Song.mp3', 'Artist - Opus.mka', THIRD]) assert.equal(has('EXTERNAL_STORAGE', `Music/Muriel Mod/${rel}`), false, rel);
-    assert.equal([...files.keys()].some((f) => f.includes('.muriel-part-')), false, 'no half song is left');
+    for (const rel of ['Artist - Song.mp3', 'Artist - Opus.mka', THIRD]) assert.equal(has('EXTERNAL_STORAGE', `Music/Piverxy/${rel}`), false, rel);
+    assert.equal([...files.keys()].some((f) => f.includes('.piverxy-part-')), false, 'no half song is left');
     assert.equal(journal(), null, 'finished: the journal is gone');
     assert.equal(overwrites, 0);
     assert.equal(files.get(`${ROOTS.EXTERNAL}/download/Artist - Song.mp3`), 'AAAA');
@@ -400,15 +400,15 @@ test('a different file with the same name in the new folder is left alone, toget
   assert.equal(res.moved, 1);
   assert.equal(res.failed, 0);
   assert.equal(files.get(`${ROOTS.EXTERNAL}/download/Artist - Song.mp3`), 'SOMETHING ELSE ENTIRELY', 'the file that was there is untouched');
-  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3'), true, 'and so is the song that could not go');
-  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Opus.mka'), false, 'the copy that was already there counts as moved');
+  assert.equal(has('EXTERNAL_STORAGE', 'Music/Piverxy/Artist - Song.mp3'), true, 'and so is the song that could not go');
+  assert.equal(has('EXTERNAL_STORAGE', 'Music/Piverxy/Artist - Opus.mka'), false, 'the copy that was already there counts as moved');
   assert.equal(overwrites, 0, 'nothing is ever copied onto an existing file, so what the plugin does then does not matter');
-  // MUR-STORE-003: a conflict is not "done". The journal stays, so the song is not forgotten, however often the app starts.
+  // PIV-STORE-003: a conflict is not "done". The journal stays, so the song is not forgotten, however often the app starts.
   assert.ok(journal(), 'the journal stays while a conflict is open');
   assert.equal(journal().last.conflicts, 1);
 });
 
-// ---- MUR-STORE-001 (P0): the same name and the same size are not proof that it is the same song ----
+// ---- PIV-STORE-001 (P0): the same name and the same size are not proof that it is the same song ----
 test('RT-01: same name, same size, other bytes: nothing is deleted or replaced, it is a conflict', async () => {
   put('EXTERNAL', 'download/Artist - Song.mp3', 'BBBB'); // the old Song.mp3 is 'AAAA': 4 bytes as well
   const store = launch();
@@ -417,9 +417,9 @@ test('RT-01: same name, same size, other bytes: nothing is deleted or replaced, 
   assert.equal(res.conflicts, 1);
   assert.equal(res.moved, 1, 'the other song (Opus) has no namesake and moves');
   assert.equal(files.get(`${ROOTS.EXTERNAL}/download/Artist - Song.mp3`), 'BBBB', 'the file in the new folder is not replaced');
-  assert.equal(files.get(`${ROOTS.EXTERNAL_STORAGE}/Music/Muriel Mod/Artist - Song.mp3`), 'AAAA', 'the song in the old folder is still there');
+  assert.equal(files.get(`${ROOTS.EXTERNAL_STORAGE}/Music/Piverxy/Artist - Song.mp3`), 'AAAA', 'the song in the old folder is still there');
   assert.equal(compared.length, 1, 'the bytes were compared; the size alone was not trusted');
-  assert.equal(deleted.some((f) => f.endsWith('Music/Muriel Mod/Artist - Song.mp3')), false, 'no delete was even tried on it');
+  assert.equal(deleted.some((f) => f.endsWith('Music/Piverxy/Artist - Song.mp3')), false, 'no delete was even tried on it');
   assert.equal(overwrites, 0);
   assert.equal(journal().last.conflicts, 1);
 });
@@ -431,17 +431,17 @@ test('RT-01: when the bytes cannot be compared the song is not guessed at: both 
   await store.list();
   const res = await store.setDownloadDir(APPFOLDER, { move: true });
   assert.equal(res.conflicts, 1);
-  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3'), true);
+  assert.equal(has('EXTERNAL_STORAGE', 'Music/Piverxy/Artist - Song.mp3'), true);
   assert.equal(has('EXTERNAL', 'download/Artist - Song.mp3'), true);
-  assert.equal(deleted.some((f) => f.endsWith('Music/Muriel Mod/Artist - Song.mp3')), false);
+  assert.equal(deleted.some((f) => f.endsWith('Music/Piverxy/Artist - Song.mp3')), false);
   assert.ok(journal());
   // with no plugin at all (an old build) it is the same
-  delete capacitor.Plugins.MurielMedia.sameFile;
+  delete capacitor.Plugins.PiverxyMedia.sameFile;
   const next = launch();
   await next.list();
   const again = await next.resumeMove();
   assert.equal(again.conflicts, 1);
-  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3'), true);
+  assert.equal(has('EXTERNAL_STORAGE', 'Music/Piverxy/Artist - Song.mp3'), true);
 });
 
 test('RT-02: the same bytes in the new folder after a move that was cut short: it finishes, no third copy appears', async () => {
@@ -451,13 +451,13 @@ test('RT-02: the same bytes in the new folder after a move that was cut short: i
   const res = await store.setDownloadDir(APPFOLDER, { move: true });
   assert.equal(res.moved, 2);
   assert.equal(res.conflicts, 0);
-  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3'), false, 'the old copy is gone');
+  assert.equal(has('EXTERNAL_STORAGE', 'Music/Piverxy/Artist - Song.mp3'), false, 'the old copy is gone');
   assert.equal([...files.keys()].filter((f) => /Artist - Song/.test(f)).length, 1, 'one copy, not two or three');
   assert.equal(overwrites, 0);
   assert.equal(journal(), null);
 });
 
-// ---- MUR-STORE-003: a conflict stays listed and playable after a restart ----
+// ---- PIV-STORE-003: a conflict stays listed and playable after a restart ----
 test('RT-05: a conflict, then the app restarts: the old song is still listed and plays', async () => {
   put('EXTERNAL', 'download/Artist - Song.mp3', 'BBBB');
   const store = launch();
@@ -471,7 +471,7 @@ test('RT-05: a conflict, then the app restarts: the old song is still listed and
     assert.equal(files.get(where(await next.fileUrl('/data/Downloads/Artist - Song.mp3'))), 'BBBB');
     assert.equal(files.get(where(await next.fileUrl('/data/Downloads/Artist - Song (old).mp3'))), 'AAAA', 'it plays from where it is');
     await next.resumeMove(); // still a conflict
-    assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3'), true);
+    assert.equal(has('EXTERNAL_STORAGE', 'Music/Piverxy/Artist - Song.mp3'), true);
     assert.ok(journal(), 'and the journal is still there');
   }
 });
@@ -489,22 +489,22 @@ test('a conflict is settled by the person (removing one of the files); then Retr
   const again = await store.retryMove();
   assert.equal(again.ran, true);
   assert.equal(store.moveStatus().conflicts, 1, 'nothing was resolved by itself');
-  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3'), true);
+  assert.equal(has('EXTERNAL_STORAGE', 'Music/Piverxy/Artist - Song.mp3'), true);
 
   files.delete(`${ROOTS.EXTERNAL}/download/Artist - Song.mp3`); // the person got rid of the namesake
   const done = await store.retryMove();
   assert.equal(done.ran, true);
   assert.equal(done.pending, false);
   assert.equal(files.get(`${ROOTS.EXTERNAL}/download/Artist - Song.mp3`), 'AAAA');
-  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3'), false);
+  assert.equal(has('EXTERNAL_STORAGE', 'Music/Piverxy/Artist - Song.mp3'), false);
   assert.equal(journal(), null);
 });
 
-// ---- MUR-STORE-002: an old folder that cannot be read is not an old folder that is gone ----
+// ---- PIV-STORE-002: an old folder that cannot be read is not an old folder that is gone ----
 test('RT-03: an old folder that will not be read (permission, I/O): the journal stays, a later try finishes it', async () => {
   const store = launch();
   await store.list();
-  readFail.push(`${ROOTS.EXTERNAL_STORAGE}/Music/Muriel Mod`);
+  readFail.push(`${ROOTS.EXTERNAL_STORAGE}/Music/Piverxy`);
   const res = await store.setDownloadDir(APPFOLDER, { move: true });
   assert.equal(res.unreadable, 1);
   assert.equal(res.missing, 0, 'not told apart from a folder that is gone: it is not');
@@ -512,7 +512,7 @@ test('RT-03: an old folder that will not be read (permission, I/O): the journal 
   assert.ok(journal(), 'the journal stays');
   assert.equal(journal().last.unreadable, 1);
   assert.equal(files.get(where(await store.fileUrl('/data/Downloads/Artist - Song.mp3'))), 'AAAA', 'the song still plays from where it is');
-  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3'), true);
+  assert.equal(has('EXTERNAL_STORAGE', 'Music/Piverxy/Artist - Song.mp3'), true);
 
   readFail = []; // whatever it was is over
   const next = launch();
@@ -526,7 +526,7 @@ test('RT-03: an old folder that will not be read (permission, I/O): the journal 
 });
 
 test('RT-04: an old folder that is really gone (not there) is marked as missing, and is not mistaken for a read error', async () => {
-  ls.set('muriel_download_move', JSON.stringify({ to: APPFOLDER, from: ['Music/Gone Folder'], tries: 1 }));
+  ls.set('piverxy_download_move', JSON.stringify({ to: APPFOLDER, from: ['Music/Gone Folder'], tries: 1 }));
   const store = launch();
   await store.list();
   const r = await store.resumeMove();
@@ -536,7 +536,7 @@ test('RT-04: an old folder that is really gone (not there) is marked as missing,
   // the same folder, but now it is there and cannot be read: that is not "gone"
   mkdirs(`${ROOTS.EXTERNAL_STORAGE}/Music/Locked Folder`);
   readFail.push(`${ROOTS.EXTERNAL_STORAGE}/Music/Locked Folder`);
-  ls.set('muriel_download_move', JSON.stringify({ to: APPFOLDER, from: ['Music/Locked Folder'], tries: 1 }));
+  ls.set('piverxy_download_move', JSON.stringify({ to: APPFOLDER, from: ['Music/Locked Folder'], tries: 1 }));
   const next = launch();
   await next.list();
   const locked = await next.resumeMove();
@@ -545,7 +545,7 @@ test('RT-04: an old folder that is really gone (not there) is marked as missing,
   assert.ok(journal());
 });
 
-// ---- MUR-STORE-004: a move is never dropped because it was tried often ----
+// ---- PIV-STORE-004: a move is never dropped because it was tried often ----
 test('RT-06: songs that fail to copy stay where they are, stay listed, and the move stays pending after 3, 10 or more runs', async () => {
   const store = launch();
   await store.list();
@@ -553,9 +553,9 @@ test('RT-06: songs that fail to copy stay where they are, stay listed, and the m
   const res = await store.setDownloadDir(APPFOLDER, { move: true });
   assert.equal(res.failed, 2);
   assert.equal(res.moved, 0);
-  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3'), true);
+  assert.equal(has('EXTERNAL_STORAGE', 'Music/Piverxy/Artist - Song.mp3'), true);
   assert.equal(journal().tries, 1);
-  assert.equal([...files.keys()].some((f) => f.includes('.muriel-part-')), false);
+  assert.equal([...files.keys()].some((f) => f.includes('.piverxy-part-')), false);
 
   for (let tries = 2; tries <= 12; tries++) {
     const next = launch(); // a restart
@@ -563,7 +563,7 @@ test('RT-06: songs that fail to copy stay where they are, stay listed, and the m
     assert.ok(vpaths.includes('/data/Downloads/Artist - Song.mp3'), `still listed at run ${tries}`);
     assert.equal(files.get(where(await next.fileUrl('/data/Downloads/Artist - Song.mp3'))), 'AAAA', 'and it plays');
     await next.resumeMove(); // still failing
-    assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3'), true);
+    assert.equal(has('EXTERNAL_STORAGE', 'Music/Piverxy/Artist - Song.mp3'), true);
     assert.ok(journal(), `the journal is still there after run ${tries}`);
     assert.equal(journal().tries, tries);
     assert.deepEqual({ pending: next.moveStatus().pending, left: next.moveStatus().left, failed: next.moveStatus().failed }, { pending: true, left: 2, failed: 2 });
@@ -574,13 +574,13 @@ test('RT-06: songs that fail to copy stay where they are, stay listed, and the m
   await last.list();
   await last.resumeMove();
   assert.equal(has('EXTERNAL', 'download/Artist - Song.mp3'), true);
-  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3'), false);
+  assert.equal(has('EXTERNAL_STORAGE', 'Music/Piverxy/Artist - Song.mp3'), false);
   assert.equal(journal(), null);
 });
 
-// ---- MUR-STORE-005: a song counts as moved only when the old copy is really gone ----
+// ---- PIV-STORE-005: a song counts as moved only when the old copy is really gone ----
 test('RT-10: copied, but the old copy would not delete: the new copy plays, the old one is not forced, cleanup is pending', async () => {
-  deleteFails.push('Music/Muriel Mod/Artist - Song.mp3');
+  deleteFails.push('Music/Piverxy/Artist - Song.mp3');
   const store = launch();
   await store.list();
   const res = await store.setDownloadDir(APPFOLDER, { move: true });
@@ -588,7 +588,7 @@ test('RT-10: copied, but the old copy would not delete: the new copy plays, the 
   assert.equal(res.moved, 1, 'Opus: fully moved');
   assert.equal(res.failed, 0);
   assert.equal(files.get(`${ROOTS.EXTERNAL}/download/Artist - Song.mp3`), 'AAAA', 'the new copy is whole');
-  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3'), true, 'the old copy is left alone (no forcing)');
+  assert.equal(has('EXTERNAL_STORAGE', 'Music/Piverxy/Artist - Song.mp3'), true, 'the old copy is left alone (no forcing)');
   assert.equal(journal().last.cleanup, 1);
   assert.equal(journal().last.left, 1);
 
@@ -602,13 +602,13 @@ test('RT-10: copied, but the old copy would not delete: the new copy plays, the 
   const r = await next.resumeMove();
   assert.equal(r.moved, 1);
   assert.equal(r.cleanup, 0);
-  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3'), false);
+  assert.equal(has('EXTERNAL_STORAGE', 'Music/Piverxy/Artist - Song.mp3'), false);
   assert.equal(journal(), null);
 });
 
 // ---- Android 11+ hides songs the app did not make until it may read music and audio ----
 test('RT-12: with the permission taken back, an old folder looks empty: that is not "nothing to move"', async () => {
-  audioGranted = false; // the foreign songs in Music/Muriel Mod are hidden now
+  audioGranted = false; // the foreign songs in Music/Piverxy are hidden now
   const store = launch();
   await store.list();
   const res = await store.setDownloadDir(APPFOLDER, { move: true });
@@ -616,7 +616,7 @@ test('RT-12: with the permission taken back, an old folder looks empty: that is 
   assert.equal(res.moved, 0);
   assert.ok(journal(), 'kept: there may be songs behind the permission');
   assert.equal(store.moveStatus().permission, true);
-  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3'), true, 'nothing was unlinked or deleted');
+  assert.equal(has('EXTERNAL_STORAGE', 'Music/Piverxy/Artist - Song.mp3'), true, 'nothing was unlinked or deleted');
 
   audioGranted = true; // allowed in Settings
   const next = launch();
@@ -629,11 +629,11 @@ test('RT-12: with the permission taken back, an old folder looks empty: that is 
 });
 
 test('a move whose new folder is not in use right now cannot run, and keeps what it knows', async () => {
-  ls.set('muriel_download_move', JSON.stringify({ to: 'Download/Muriel songs', from: ['Music/Muriel Mod'], tries: 1 }));
-  denied.push(`${ROOTS.EXTERNAL_STORAGE}/Download/Muriel songs`); // the new folder can't be opened
+  ls.set('piverxy_download_move', JSON.stringify({ to: 'Download/Piverxy songs', from: ['Music/Piverxy'], tries: 1 }));
+  denied.push(`${ROOTS.EXTERNAL_STORAGE}/Download/Piverxy songs`); // the new folder can't be opened
   const store = launch();
   const vpaths = (await store.list()).map((e) => e.vpath);
-  assert.equal(store.downloadsFolder(), 'Music/Muriel Mod', 'the app falls back to the default folder');
+  assert.equal(store.downloadsFolder(), 'Music/Piverxy', 'the app falls back to the default folder');
   assert.ok(vpaths.includes('/data/Downloads/Artist - Song.mp3'));
   const r = await store.retryMove();
   assert.equal(r.ok, false);
@@ -651,7 +651,7 @@ test('a journal that is still there finishes once the cause is gone', async () =
   await next.list();
   await next.resumeMove();
   assert.equal(has('EXTERNAL', 'download/Artist - Song.mp3'), true);
-  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3'), false);
+  assert.equal(has('EXTERNAL_STORAGE', 'Music/Piverxy/Artist - Song.mp3'), false);
   assert.equal(journal(), null);
 });
 
@@ -659,14 +659,14 @@ test('changing the folder again before a move finished brings along the songs of
   const store = launch();
   await store.list();
   copyHook = async () => { throw new Error('no space left'); };
-  await store.setDownloadDir(APPFOLDER, { move: true }); // nothing moved: the songs are all in Music/Muriel Mod
+  await store.setDownloadDir(APPFOLDER, { move: true }); // nothing moved: the songs are all in Music/Piverxy
   put('EXTERNAL', 'download/Artist - Later.mp3', 'LLLL'); // and one arrived in the app folder meanwhile
   copyHook = null;
   const next = launch();
   await next.list();
-  const res = await next.setDownloadDir('Download/Muriel Mod', { move: true });
+  const res = await next.setDownloadDir('Download/Piverxy', { move: true });
   assert.equal(res.moved, 3);
-  for (const rel of ['Artist - Song.mp3', 'Artist - Opus.mka', 'Artist - Later.mp3']) assert.equal(has('EXTERNAL_STORAGE', `Download/Muriel Mod/${rel}`), true, rel);
+  for (const rel of ['Artist - Song.mp3', 'Artist - Opus.mka', 'Artist - Later.mp3']) assert.equal(has('EXTERNAL_STORAGE', `Download/Piverxy/${rel}`), true, rel);
   assert.equal(has('EXTERNAL', 'download/Artist - Later.mp3'), false);
   assert.equal(journal(), null);
 });
@@ -686,8 +686,8 @@ test('a scan that could not read everything says so (the caller must not take mi
   assert.deepEqual(await store.scanLinked(), { failed: true });
 });
 
-// ---- MUR-LIB-001: a scan that saw only part must not make the app forget a folder ----
-const sibKey = () => JSON.parse(ls.get('muriel_local_folders') || 'null');
+// ---- PIV-LIB-001: a scan that saw only part must not make the app forget a folder ----
+const sibKey = () => JSON.parse(ls.get('piverxy_local_folders') || 'null');
 
 test('RT-07: a partial scan does not take a linked folder out of what is remembered', async () => {
   const store = launch();
@@ -742,7 +742,7 @@ test('RT-08: after a partial scan and a restart the earlier folder is back in th
   assert.equal(await store.fileUrl('/data/LocalMusic/Album One/01 First.mp3'), `file://${ROOTS.EXTERNAL_STORAGE}/Music/Album One/01 First.mp3`);
 });
 
-// ---- MUR-LIB-002: the limit is for the whole scan, not for one folder ----
+// ---- PIV-LIB-002: the limit is for the whole scan, not for one folder ----
 function songs(folder, count) { for (let i = 0; i < count; i++) put('EXTERNAL_STORAGE', `Music/${folder}/song ${i}.mp3`); }
 
 test('RT-09: many folders, each under the limit, together over it: the scan stops at the limit and says it is partial', async () => {
@@ -808,7 +808,7 @@ test('without the permission songs the app did not save are hidden; once it is g
   const fresh = (await store.rescanDownloads()).map((e) => e.vpath).sort();
   assert.deepEqual(fresh, ['/data/Downloads/Artist - Opus.webm', '/data/Downloads/Artist - Song.mp3']);
   assert.deepEqual(await store.rescanDownloads(), [], 'each song turns up once');
-  assert.equal(await store.fileUrl('/data/Downloads/Artist - Song.mp3'), `file://${ROOTS.EXTERNAL_STORAGE}/Music/Muriel Mod/Artist - Song.mp3`);
+  assert.equal(await store.fileUrl('/data/Downloads/Artist - Song.mp3'), `file://${ROOTS.EXTERNAL_STORAGE}/Music/Piverxy/Artist - Song.mp3`);
   assert.equal((await store.scanLinked()).groups.length, 2);
 });
 
@@ -870,7 +870,7 @@ test('the app\'s own folder needs no permission: its neighbours are scanned with
 
 test('an older build of the plugin without these methods does not block the scan', async () => {
   audioGranted = false;
-  capacitor.Plugins.MurielMedia = { audioAccess: async () => { throw new Error('UNIMPLEMENTED'); }, allowAudioAccess: async () => { throw new Error('UNIMPLEMENTED'); } };
+  capacitor.Plugins.PiverxyMedia = { audioAccess: async () => { throw new Error('UNIMPLEMENTED'); }, allowAudioAccess: async () => { throw new Error('UNIMPLEMENTED'); } };
   const store = launch();
   await store.list();
   assert.deepEqual(await store.readAccess(), { granted: true, canAsk: false });
@@ -890,7 +890,7 @@ test('the API: with nothing pending, the status says so and Retry does nothing',
 
 test('the API: the status tells what is left and why; Retry runs the move again', async () => {
   put('EXTERNAL', 'download/Artist - Song.mp3', 'BBBB'); // same name, same size, other bytes
-  deleteFails.push('Music/Muriel Mod/Artist - Opus.mka');
+  deleteFails.push('Music/Piverxy/Artist - Opus.mka');
   let store = launch();
   await store.list();
   await store.setDownloadDir(APPFOLDER, { move: true });
@@ -947,11 +947,11 @@ test('the API: Retry without the permission says so, moves nothing and keeps the
   assert.equal(res.ok, false);
   assert.equal(res.needsPermission, true);
   assert.equal(res.settingsOpened, false);
-  assert.equal(has('EXTERNAL_STORAGE', 'Music/Muriel Mod/Artist - Song.mp3'), true);
+  assert.equal(has('EXTERNAL_STORAGE', 'Music/Piverxy/Artist - Song.mp3'), true);
   assert.ok(journal());
 });
 
-// ---- The music permission taken back (Settings -> Apps -> Muriel Mod -> Permissions) ----
+// ---- The music permission taken back (Settings -> Apps -> Piverxy -> Permissions) ----
 // The songs linked in place (the folders next to the download folder) stay in the library and in every playlist, but Android
 // refuses to read them: they are LOCKED until the permission is given again. Locked is a state worked out from the permission as
 // it is now; nothing is written down for it, and nothing is unlinked, forgotten or deleted because of it.
@@ -960,7 +960,7 @@ const vm = require('node:vm');
 
 const FIRST = '/data/LocalMusic/Album One/01 First.mp3';
 const LOOSE = '/data/LocalMusic/loose song.mp3';
-const SIB = 'muriel_local_folders';
+const SIB = 'piverxy_local_folders';
 
 // a launch of the app: the storage shim and the API the page talks to, with the events the page would hear
 function launchLive() {
@@ -979,7 +979,7 @@ function launchLive() {
   const foreground = async () => { for (const fn of listeners.visibilitychange || []) fn(); await settle(); };
   return { store, api: electron, registered, events, foreground, settle };
 }
-const accessEvents = (events) => events.filter((e) => e.type === 'muriel:media-access').map((e) => e.detail);
+const accessEvents = (events) => events.filter((e) => e.type === 'piverxy:media-access').map((e) => e.detail);
 const linkedIn = (entries) => entries.map((e) => e.vpath).filter((v) => v.startsWith('/data/LocalMusic/'));
 const refused = (e) => e && e.code === 'MEDIA_PERMISSION_REQUIRED';
 
@@ -1089,7 +1089,7 @@ test('MP-05: the permission taken back while the app is running: coming back to 
   assert.deepEqual(await live.api.getMediaAccess(), { locked: false, canAsk: false });
   const remembered = ls.get(SIB);
 
-  audioGranted = false; // turned off while Muriel is in the background
+  audioGranted = false; // turned off while Piverxy is in the background
   await live.foreground();
   assert.deepEqual(live.store.linkedAccess(), { locked: true, canAsk: true });
   assert.deepEqual(accessEvents(live.events).map((d) => d.locked), [false, true], 'the page is told');
@@ -1112,8 +1112,8 @@ test('MP-05b: two looks at the permission at once are one look (a burst of foreg
   const live = launchLive();
   await live.store.list();
   let reads = 0;
-  const real = capacitor.Plugins.MurielMedia.audioAccess;
-  capacitor.Plugins.MurielMedia.audioAccess = async () => { reads++; return real(); };
+  const real = capacitor.Plugins.PiverxyMedia.audioAccess;
+  capacitor.Plugins.PiverxyMedia.audioAccess = async () => { reads++; return real(); };
   const [a, b, c] = await Promise.all([live.api.getMediaAccess(), live.api.getMediaAccess(), live.api.getMediaAccess()]);
   assert.deepEqual([a, b, c], [{ locked: false, canAsk: false }, { locked: false, canAsk: false }, { locked: false, canAsk: false }]);
   assert.equal(reads, 1);
@@ -1131,10 +1131,10 @@ test('MP-06: songs kept inside the app (imported into the library) stay playable
   assert.ok(entries.some((e) => e.vpath === '/data/library.json'));
   assert.equal(live.store.linkedAccess().locked, true, 'while the linked ones are locked');
   assert.equal(live.store.isLinkedLocked('/data/library/local_aaaaaaaaaaaa.mp3'), false);
-  assert.match(await live.store.fileUrl('/data/library/local_aaaaaaaaaaaa.mp3'), /^file:\/\/.*\/Muriel\/library\/local_aaaaaaaaaaaa\.mp3$/);
+  assert.match(await live.store.fileUrl('/data/library/local_aaaaaaaaaaaa.mp3'), /^file:\/\/.*\/Piverxy\/library\/local_aaaaaaaaaaaa\.mp3$/);
 });
 
-test('MP-07: songs Muriel downloaded itself stay listed and playable while the permission is off', async () => {
+test('MP-07: songs Piverxy downloaded itself stay listed and playable while the permission is off', async () => {
   let live = launchLive();
   await live.store.list();
   await live.store.writeBytes('/data/Downloads/Mine - Downloaded.mp3', new Uint8Array([9, 9, 9]));
@@ -1143,7 +1143,7 @@ test('MP-07: songs Muriel downloaded itself stay listed and playable while the p
   const entries = await live.store.list();
   assert.ok(entries.some((e) => e.vpath === '/data/Downloads/Mine - Downloaded.mp3'), 'a file the app made is not hidden from it');
   assert.equal(live.store.isLinkedLocked('/data/Downloads/Mine - Downloaded.mp3'), false);
-  assert.equal(await live.store.fileUrl('/data/Downloads/Mine - Downloaded.mp3'), `file://${ROOTS.EXTERNAL_STORAGE}/Music/Muriel Mod/Mine - Downloaded.mp3`);
+  assert.equal(await live.store.fileUrl('/data/Downloads/Mine - Downloaded.mp3'), `file://${ROOTS.EXTERNAL_STORAGE}/Music/Piverxy/Mine - Downloaded.mp3`);
   assert.equal(entries.some((e) => e.vpath === '/data/Downloads/Artist - Song.mp3'), false, 'one a file manager put there is hidden by Android (as before)');
 });
 
@@ -1216,7 +1216,7 @@ test('MP-11: an older build of the plugin (no audioAccess) locks nothing: the so
   await live.store.list();
   await live.api.scanLocalFolders();
   audioGranted = false;
-  capacitor.Plugins.MurielMedia = { audioAccess: async () => { throw new Error('UNIMPLEMENTED'); } };
+  capacitor.Plugins.PiverxyMedia = { audioAccess: async () => { throw new Error('UNIMPLEMENTED'); } };
   live = launchLive();
   await live.store.list();
   assert.equal(live.store.linkedAccess().locked, false);
@@ -1234,7 +1234,7 @@ test('MP-12: Android 10 and older, storage permission taken back: the linked son
   try {
     live = launchLive();
     await live.store.list();
-    assert.equal(live.store.downloadsFolder(), 'Music/Muriel Mod', 'asked for when the first song is saved');
+    assert.equal(live.store.downloadsFolder(), 'Music/Piverxy', 'asked for when the first song is saved');
     assert.equal(live.store.needsReadAccess(), false, 'no shared folder in use');
     assert.deepEqual(live.store.linkedAccess(), { locked: true, canAsk: true });
     assert.equal(await live.store.scanLinked(), null, 'unchanged: nothing next to a download folder that is inside the app');
@@ -1252,7 +1252,7 @@ test('MP-13: Settings opens the app\'s page, whatever the dialog would do', asyn
   assert.equal(opened, 1);
   assert.deepEqual(asked, [], 'no dialog: a permission turned off in Settings is usually not asked for again');
   // an older build of the plugin has no openAppSettings: the dialog method that falls back to the page is used
-  const media = capacitor.Plugins.MurielMedia;
+  const media = capacitor.Plugins.PiverxyMedia;
   delete media.openAppSettings;
   assert.equal(await live.api.openAppSettings(), true);
   assert.deepEqual(asked, [{ settings: true }]);
@@ -1409,7 +1409,7 @@ test('MP-17: Retry of a move that waited for the permission: allowed in the dial
   answer = 'allow';
   let live = launchLive();
   await live.store.list();
-  await live.store.setDownloadDir('Download/Muriel songs', { move: true });
+  await live.store.setDownloadDir('Download/Piverxy songs', { move: true });
   assert.equal(journal().last.permission, true, 'the other apps\' songs in the old folder are hidden: the move waits for the permission');
   live = launchLive();
   await live.store.list();

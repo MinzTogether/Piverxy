@@ -1,24 +1,24 @@
-// Muriel sync (free, no account): link your devices with a code or a QR code, and playlists,
+// Piverxy sync (free, no account): link your devices with a code or a QR code, and playlists,
 // favorites, history, Encore stats, the look of the app and what you're listening to stay the same on all of
-// them. There is no Muriel server and no account: every device keeps its own data, and linked devices talk to
+// them. There is no Piverxy server and no account: every device keeps its own data, and linked devices talk to
 // each other directly (WebRTC, encrypted) whenever they're open at the same time. A public PeerJS server only
 // introduces them to each other; it never sees the data. Merging (who wins when both changed) is in sync-core.js.
 (() => {
-  const Core = window.MurielSyncCore;
+  const Core = window.PiverxySyncCore;
   if (!Core || !window.localStorage) return;
   // UI language (i18n.js); without it everything stays English
-  const I18n = window.MurielI18n || (() => { const f = (s, ...a) => String(s).replace(/\{(\d)\}/g, (_, i) => (a[i] != null ? a[i] : '')); return { T: (s) => s, Tf: f, Tm: f, Th: f, text: (el, s, ...a) => { if (el) el.textContent = f(s, ...a); } }; })();
+  const I18n = window.PiverxyI18n || (() => { const f = (s, ...a) => String(s).replace(/\{(\d)\}/g, (_, i) => (a[i] != null ? a[i] : '')); return { T: (s) => s, Tf: f, Tm: f, Th: f, text: (el, s, ...a) => { if (el) el.textContent = f(s, ...a); } }; })();
 
-  const LINK_PAGE = 'https://cloverscripts.github.io/riff-muriel/link.html';
+  const LINK_PAGE = 'https://minztogether.github.io/Piverxy/link.html';
   const DAY = 864e5;
   const LINK_TTL = 5 * 60e3;
   const KEEP_TOMBSTONES = 120 * DAY;
   const CONTINUE_WITHIN = 12 * 3600e3;
 
   const K = {
-    device: 'muriel_sync_device', group: 'muriel_sync_group', members: 'muriel_sync_members', meta: 'muriel_sync_meta',
-    listens: 'muriel_sync_listens', np: 'muriel_sync_np', cats: 'muriel_sync_cats', seen: 'muriel_sync_seen',
-    dismissed: 'muriel_sync_np_dismissed', invite: 'muriel_sync_invite',
+    device: 'piverxy_sync_device', group: 'piverxy_sync_group', members: 'piverxy_sync_members', meta: 'piverxy_sync_meta',
+    listens: 'piverxy_sync_listens', np: 'piverxy_sync_np', cats: 'piverxy_sync_cats', seen: 'piverxy_sync_seen',
+    dismissed: 'piverxy_sync_np_dismissed', invite: 'piverxy_sync_invite',
   };
 
   // ---------- storage ----------
@@ -68,19 +68,19 @@
   const LISTS = {
     playlists: { key: 'devsize_playlists', cat: 'library', id: (p) => (p && p.id ? String(p.id) : '') },
     favorites: { key: 'devsize_favorites', cat: 'library', id: trackKey },
-    albums: { key: 'muriel_saved_albums', cat: 'library', id: (a) => (a && a.id ? String(a.id) : '') },
-    artists: { key: 'muriel_followed_artists', cat: 'library', id: artistKey },
+    albums: { key: 'piverxy_saved_albums', cat: 'library', id: (a) => (a && a.id ? String(a.id) : '') },
+    artists: { key: 'piverxy_followed_artists', cat: 'library', id: artistKey },
     history: { key: 'devsize_history', cat: 'history', id: (t) => (trackKey(t) ? `${trackKey(t)}@${t.playedAt || 0}` : ''), sort: (a, b) => (b.playedAt || 0) - (a.playedAt || 0), cap: 100 },
   };
   // the look of the app; sizes, volume, folders and anything else that belongs to one device stay local
-  const SETTINGS = ['muriel_theme_mode', 'muriel_theme_accent', 'muriel_theme_intensity', 'muriel_theme_brightness', 'muriel_palette_style',
-    'muriel_mesh_brightness', 'muriel_mesh_cfg', 'muriel_font', 'muriel_corner_radius', 'muriel_glass_blur', 'muriel_ui_alpha', 'muriel_text_alpha',
-    'muriel_cover_bg_brightness', 'devsize_vfx', 'muriel_lyrics_word_style', 'muriel_lyrics_ease', 'muriel_lyrics_speed',
-    'muriel_lyrics_gradient_tightness', 'muriel_gradient_tight', 'muriel_wavy_progress', 'muriel_progress_knob', 'muriel_progress_bg',
-    'muriel_highlight_buttons', 'muriel_track_art', 'muriel_tr_enabled', 'muriel_tr_lang', 'muriel_tr_auto', 'muriel_crossfade',
-    'muriel_icon_pack', 'muriel_adv_intensity_bg', 'muriel_lyrics_source', 'muriel_word_source', 'muriel_track_trims',
-    'muriel_blocked_artists', 'muriel_blocked_tracks'];
-  const LISTENS_KEY = 'muriel_listens_v1';
+  const SETTINGS = ['piverxy_theme_mode', 'piverxy_theme_accent', 'piverxy_theme_intensity', 'piverxy_theme_brightness', 'piverxy_palette_style',
+    'piverxy_mesh_brightness', 'piverxy_mesh_cfg', 'piverxy_font', 'piverxy_corner_radius', 'piverxy_glass_blur', 'piverxy_ui_alpha', 'piverxy_text_alpha',
+    'piverxy_cover_bg_brightness', 'devsize_vfx', 'piverxy_lyrics_word_style', 'piverxy_lyrics_ease', 'piverxy_lyrics_speed',
+    'piverxy_lyrics_gradient_tightness', 'piverxy_gradient_tight', 'piverxy_wavy_progress', 'piverxy_progress_knob', 'piverxy_progress_bg',
+    'piverxy_highlight_buttons', 'piverxy_track_art', 'piverxy_tr_enabled', 'piverxy_tr_lang', 'piverxy_tr_auto', 'piverxy_crossfade',
+    'piverxy_icon_pack', 'piverxy_adv_intensity_bg', 'piverxy_lyrics_source', 'piverxy_word_source', 'piverxy_track_trims',
+    'piverxy_blocked_artists', 'piverxy_blocked_tracks'];
+  const LISTENS_KEY = 'piverxy_listens_v1';
   const WATCH = new Map([...Object.entries(LISTS).map(([n, l]) => [l.key, n]), ...SETTINGS.map((k) => [k, 'settings']), [LISTENS_KEY, 'listens']]);
 
   const listItems = (name) => { const v = read(LISTS[name].key, []); return Array.isArray(v) ? v : []; };
@@ -95,7 +95,7 @@
   const saveMeta = () => write(K.meta, meta);
 
   function ownListens() {
-    const E = window.MurielEncore;
+    const E = window.PiverxyEncore;
     const db = E && E.own ? E.own() : read(LISTENS_KEY);
     return db ? { t: meta.listensT || 1, name: device.name, db } : null;
   }
@@ -148,7 +148,7 @@
         listens = res.value;
         write(K.listens, listens);
         any = true;
-        try { window.MurielEncore && window.MurielEncore.refresh && window.MurielEncore.refresh(); } catch (e) {}
+        try { window.PiverxyEncore && window.PiverxyEncore.refresh && window.PiverxyEncore.refresh(); } catch (e) {}
       }
     }
     if (r.np && cats.continue) {
@@ -158,7 +158,7 @@
     saveMeta();
     if (changedKeys.length) {
       any = true;
-      try { window.MurielCore && window.MurielCore.reloadFromStorage(changedKeys); } catch (e) { console.warn('[sync] reload', e); }
+      try { window.PiverxyCore && window.PiverxyCore.reloadFromStorage(changedKeys); } catch (e) { console.warn('[sync] reload', e); }
     }
     if (any) render();
     return any || changedKeys.length > 0;
@@ -194,8 +194,8 @@
   // ---------- connections ----------
   // Peer ids on the public PeerJS server. Only the device with the smaller id dials, so two devices never
   // open two connections to each other.
-  const peerId = (id) => `muriel-${id}`;
-  const serverOpts = () => ({ debug: 0, ...(read('muriel_sync_server') || {}) });
+  const peerId = (id) => `piverxy-${id}`;
+  const serverOpts = () => ({ debug: 0, ...(read('piverxy_sync_server') || {}) });
   let peer = null, peerRetry = null, dialTimer = null;
   const conns = new Map(); // deviceId -> { conn, ok }
 
@@ -286,7 +286,7 @@
       } else if (msg.t === 'np') {
         if (applyRemote({ np: msg.np })) broadcast({ np }, st.id);
       } else if (msg.t === 'handoff') {
-        const C = window.MurielCore;
+        const C = window.PiverxyCore;
         if (C && C.state.isPlaying) { C.togglePlay(); if (C.toast) C.toast(I18n.Tm('Now playing on another device'), 'info'); }
       }
     });
@@ -322,7 +322,7 @@
     ensureGroup();
     startPeer();
     const code = newCode();
-    const lp = new window.Peer(`muriel-link-${code.toLowerCase()}`, serverOpts());
+    const lp = new window.Peer(`piverxy-link-${code.toLowerCase()}`, serverOpts());
     linking = { code, peer: lp, until: Date.now() + LINK_TTL, timer: setTimeout(stopLinking, LINK_TTL), error: '' };
     lp.on('error', (err) => {
       if (!linking || linking.peer !== lp) return;
@@ -358,12 +358,12 @@
     if (typeof window.Peer !== 'function') return;
     joining = { code, busy: true };
     render();
-    const tp = new window.Peer(`muriel-j-${hex(12)}`, serverOpts());
+    const tp = new window.Peer(`piverxy-j-${hex(12)}`, serverOpts());
     const done = (error) => { clearTimeout(timer); try { tp.destroy(); } catch (e) {} joining = error ? { code, error } : null; render(); };
-    const timer = setTimeout(() => done("No device answered. Check the code, and that Muriel shows it on the other device."), 20000);
+    const timer = setTimeout(() => done("No device answered. Check the code, and that Piverxy shows it on the other device."), 20000);
     tp.on('error', (err) => done(err && err.type === 'peer-unavailable' ? 'No device is showing that code right now.' : "Couldn't reach the link service. Check your internet connection."));
     tp.on('open', () => {
-      const conn = tp.connect(`muriel-link-${code.toLowerCase()}`, { reliable: true });
+      const conn = tp.connect(`piverxy-link-${code.toLowerCase()}`, { reliable: true });
       conn.on('open', () => conn.send({ t: 'join', id: device.id, name: device.name, kind, v: 1 }));
       conn.on('data', (msg) => {
         if (!msg || msg.t !== 'welcome' || !msg.group || !msg.group.secret) return;
@@ -406,7 +406,7 @@
     stopPeer();
     group = null; members = {}; meta = {}; listens = {}; np = {};
     [K.group, K.members, K.meta, K.listens, K.np, K.seen].forEach((k) => { try { rawRemove.call(localStorage, k); } catch (e) {} });
-    try { window.MurielEncore && window.MurielEncore.refresh && window.MurielEncore.refresh(); } catch (e) {}
+    try { window.PiverxyEncore && window.PiverxyEncore.refresh && window.PiverxyEncore.refresh(); } catch (e) {}
     updateContinue();
     if (msg) toast(I18n.Tm(msg));
     render();
@@ -416,7 +416,7 @@
   const trackInfo = (t) => (t ? { id: t.id, title: t.title, artist: t.artist, album: t.album, thumbnail: t.thumbnail, platform: t.platform, url: t.url, duration: t.duration } : null);
   let npTimer = null, lastNpSent = 0;
   function publishNp(force) {
-    const C = window.MurielCore;
+    const C = window.PiverxyCore;
     if (!group || !catsOn().continue || !C || !C.state.currentTrack) return;
     const now = Date.now();
     if (!force && now - lastNpSent < 15000) return;
@@ -435,7 +435,7 @@
   const isDismissed = (d, e) => !!d && (d === e.t || (typeof d === 'object' && (Date.now() < d.until || d.key === songKey(e.track))));
   function dismiss(id, e) { write(K.dismissed, { ...read(K.dismissed, {}), [id]: { key: songKey(e.track), until: Date.now() + DISMISS_FOR } }); }
   function candidate() {
-    const C = window.MurielCore;
+    const C = window.PiverxyCore;
     if (!group || !catsOn().continue || !C || C.state.isPlaying) return null;
     const mine = np[device.id];
     const dismissed = read(K.dismissed, {});
@@ -469,7 +469,7 @@
     banner.querySelector('span').textContent = `${e.track.title || I18n.T('Unknown')}${e.track.artist ? ` · ${e.track.artist}` : ''} · ${fmt(e.pos || 0)}`;
     banner.querySelector('.update-banner-later').onclick = () => { dismiss(id, e); updateContinue(); };
     banner.querySelector('.update-banner-go').onclick = () => {
-      const C = window.MurielCore;
+      const C = window.PiverxyCore;
       const at = (e.pos || 0) + (live ? (Date.now() - e.t) / 1000 : 0);
       dismiss(id, e);
       if (live) sendTo(id, { t: 'handoff' });
@@ -482,8 +482,8 @@
 
   // ---------- Settings → Sync ----------
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const toast = (m) => { try { window.MurielCore && window.MurielCore.toast(m, 'info'); } catch (e) {} };
-  // UI language (i18n.js): data-i18n marks Muriel's own words in the HTML below; names only ever go into {0} slots
+  const toast = (m) => { try { window.PiverxyCore && window.PiverxyCore.toast(m, 'info'); } catch (e) {} };
+  // UI language (i18n.js): data-i18n marks Piverxy's own words in the HTML below; names only ever go into {0} slots
   // phones hand outside links to the browser; the desktop app opens https links in the default browser
   const openUrl = (u) => { if (platform === 'ios' || platform === 'android') location.href = u; else window.open(u, '_blank'); };
   const qrSvg = (text) => {
@@ -552,7 +552,7 @@
     const cats = catsOn();
     const parts = [`<span class="settings-section-title" data-i18n>Sync <span class="sync-badge" data-i18n>New</span></span>`];
     // every profile on this device has its own group (its keys, device id included, are its own: profiles-core.js)
-    const prof = window.MurielProfiles;
+    const prof = window.PiverxyProfiles;
     const profNote = prof && prof.list().length > 1
       ? `<span>${I18n.Th('This links the profile “{0}”; every profile on this device links its own devices. Open the same profile on the other device before you link.', esc(prof.current().name))}</span>` : '';
     parts.push(`<div class="m3-group"><div class="setting-item"><div class="sync-intro">
@@ -651,16 +651,16 @@
     }
   }
 
-  // ---------- links from the QR code (muriel://link?code=…) ----------
+  // ---------- links from the QR code (piverxy://link?code=…) ----------
   function handleLink(url) {
-    const m = /^muriel:\/\/link\/?\?(?:.*&)?code=([0-9A-Za-z-]+)/.exec(String(url || ''));
+    const m = /^piverxy:\/\/link\/?\?(?:.*&)?code=([0-9A-Za-z-]+)/.exec(String(url || ''));
     if (!m) return;
     if (window.showSettingsCategory) { const nav = document.getElementById('nav-settings'); if (nav) nav.click(); window.showSettingsCategory('sync'); }
     joinWithCode(m[1]);
   }
-  window.addEventListener('muriel:deeplink', (e) => handleLink(e.detail));
+  window.addEventListener('piverxy:deeplink', (e) => handleLink(e.detail));
   // another language, or its words just came in: the sentences with names in them are built here
-  window.addEventListener('muriel:i18n', () => { if (section || document.getElementById('section-sync-invite')) render(); });
+  window.addEventListener('piverxy:i18n', () => { if (section || document.getElementById('section-sync-invite')) render(); });
 
   // ---------- start ----------
   function wake() {
@@ -678,9 +678,9 @@
   }, 1000);
 
   function hook() {
-    const C = window.MurielCore;
+    const C = window.PiverxyCore;
     if (C && C.audio) {
-      window.addEventListener('muriel:track', () => publishNp(true));
+      window.addEventListener('piverxy:track', () => publishNp(true));
       C.audio.addEventListener('playing', () => { publishNp(true); updateContinue(); });
       C.audio.addEventListener('pause', () => publishNp(true));
       C.audio.addEventListener('timeupdate', () => publishNp(false));
@@ -690,9 +690,9 @@
     if (active()) startPeer();
     updateContinue();
   }
-  if (window.MurielCore) hook(); else window.addEventListener('muriel:ready', hook, { once: true });
+  if (window.PiverxyCore) hook(); else window.addEventListener('piverxy:ready', hook, { once: true });
 
-  window.MurielSync = {
+  window.PiverxySync = {
     // other devices' Encore data, for encore.js
     listenDbs: () => (catsOn().history ? Object.entries(listens).filter(([id]) => id !== device.id && members[id] && !members[id].del).map(([, e]) => e.db).filter(Boolean) : []),
     status: () => ({ device, group: !!group, members, connected: [...conns].filter(([, s]) => s.ok).map(([id]) => id) }),

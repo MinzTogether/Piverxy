@@ -52,7 +52,7 @@ test('non-play callers still share a failure', async () => {
 });
 
 // ---- the stream lookup on the server, with a fake yt-dlp ----
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'muriel-retry-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'piverxy-retry-'));
 const plan = path.join(tmp, 'plan');
 const count = path.join(tmp, 'count');
 const fake = path.join(tmp, 'yt-dlp');
@@ -62,7 +62,7 @@ let token;
 
 before(async () => {
   for (const key of ['HOME', 'USERPROFILE', 'LOCALAPPDATA', 'XDG_CONFIG_HOME']) process.env[key] = tmp;
-  process.env.MURIEL_DATA_DIR = path.join(tmp, 'data');
+  process.env.PIVERXY_DATA_DIR = path.join(tmp, 'data');
   // each call: the next word of the plan, "fail" or "ok"; slow enough for a second request to join it
   fs.writeFileSync(fake, `#!/bin/sh
 n=$(( $(cat "${count}" 2>/dev/null || echo 0) + 1 )); echo $n > "${count}"
@@ -72,8 +72,8 @@ sleep 0.4
 echo "https://rr1.googlevideo.com/videoplayback?n=$n"
 `);
   fs.chmodSync(fake, 0o755);
-  process.env.MURIEL_YTDLP = fake;
-  process.env.MURIEL_FFMPEG = fake;
+  process.env.PIVERXY_YTDLP = fake;
+  process.env.PIVERXY_FFMPEG = fake;
   server = require('../server.js');
   port = await server.startServer(0);
   token = server.getServerToken();
@@ -82,7 +82,7 @@ echo "https://rr1.googlevideo.com/videoplayback?n=$n"
 after(() => { try { server.stopServer(); } catch (_) {} });
 
 const get = (p) => new Promise((resolve, reject) => {
-  http.get({ host: '127.0.0.1', port, path: p, headers: { 'x-muriel-token': token } }, (res) => {
+  http.get({ host: '127.0.0.1', port, path: p, headers: { 'x-piverxy-token': token } }, (res) => {
     let body = ''; res.on('data', (c) => { body += c; }); res.on('end', () => resolve({ status: res.statusCode, body: JSON.parse(body) }));
   }).on('error', reject);
 });

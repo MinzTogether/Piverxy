@@ -99,5 +99,5 @@
 
   const api = { runDownloadBatch, classifyError, backoffMs };
   if (typeof module !== 'undefined') module.exports = api;
-  else window.MurielDownloadBatch = api;
+  else window.PiverxyDownloadBatch = api;
 })();

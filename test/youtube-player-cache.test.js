@@ -9,7 +9,7 @@ const setStorage = (value) => Object.defineProperty(globalThis, 'localStorage', 
 
 let playerId = 'abcd1234';
 let requests = [];
-globalThis.__murielFetch = async (input) => {
+globalThis.__piverxyFetch = async (input) => {
   const url = typeof input === 'string' ? input : input.url || String(input);
   requests.push(url.replace('https://www.youtube.com', ''));
   if (url.includes('/youtubei/v1/config')) return new Response(JSON.stringify({ responseContext: { visitorData: 'V' }, configData: 'cfg' }), { status: 200, headers: { 'content-type': 'application/json' } });
@@ -53,7 +53,7 @@ test('player cache: a new YouTube player is picked up and downloaded once', asyn
 });
 
 test('player cache: switched off, the player is downloaded at every start, as before', async () => {
-  const off = { getItem: (k) => (k === 'muriel_app_cache' ? '0' : null), setItem() {}, removeItem() {} };
+  const off = { getItem: (k) => (k === 'piverxy_app_cache' ? '0' : null), setItem() {}, removeItem() {} };
   setStorage(off);
   playerId = '12345678';
   assert.equal((await launch()).players.length, 1);

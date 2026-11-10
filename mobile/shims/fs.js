@@ -10,14 +10,14 @@ const TEXT_EXT = /\.(json|lrc|txt)$/i;
 // it may still be written to, and size + time would then not tell the copies apart.
 const SETTLE_MS = 2000;
 let cacheSaved = Promise.resolve(); // the app cache's last background save (tests wait on it)
-const note = (msg) => { try { if (globalThis.MurielLog) globalThis.MurielLog.add('info', msg); } catch (_) {} };
+const note = (msg) => { try { if (globalThis.PiverxyLog) globalThis.PiverxyLog.add('info', msg); } catch (_) {} };
 const nodes = new Map(); // vpath -> { isDir, size, mtimeMs, text? }
 let chain = Promise.resolve();
 // a failed write (storage full) used to look saved until the next launch: log it and tell the app
 const persist = (fn) => {
   chain = chain.then(fn).catch((e) => {
     console.warn('[fs] persist failed', e);
-    try { window.dispatchEvent(new CustomEvent('muriel:storage-error', { detail: String((e && e.message) || e) })); } catch (_) {}
+    try { window.dispatchEvent(new CustomEvent('piverxy:storage-error', { detail: String((e && e.message) || e) })); } catch (_) {}
   });
   return chain;
 };

@@ -40,7 +40,7 @@ beforeEach(() => {
   global.document = { body, createElement: (t) => new El(t) };
   global.Option = Option;
   global.requestAnimationFrame = (fn) => fn();
-  global.window = { MurielI18n: { Tm: (s) => ({ i18n: s }), text: (el, s) => { said.push(s); el.textContent = s; } } };
+  global.window = { PiverxyI18n: { Tm: (s) => ({ i18n: s }), text: (el, s) => { said.push(s); el.textContent = s; } } };
 });
 
 const open = (current) => {
@@ -62,23 +62,23 @@ const open = (current) => {
 const pick = (ui, value) => { for (const r of ui.radios) r.checked = r.value === value; };
 
 test('the current folder is preselected; "Use this folder" returns it, with the move answer', async () => {
-  const ui = open('Download/Muriel Mod');
-  assert.equal(ui.radios.find((r) => r.checked).value, 'Download/Muriel Mod');
+  const ui = open('Download/Piverxy');
+  assert.equal(ui.radios.find((r) => r.checked).value, 'Download/Piverxy');
   ui.move.checked = false;
   ui.save.click();
-  assert.deepEqual(await ui.p, { text: 'Download/Muriel Mod', move: false });
+  assert.deepEqual(await ui.p, { text: 'Download/Piverxy', move: false });
   assert.equal(ui.sheet.classes.has('visible'), false);
 });
 
 test('the app folder and a folder of your own inside Music, Download, ... are returned as Settings shows them', async () => {
-  let ui = open('Music/Muriel Mod');
+  let ui = open('Music/Piverxy');
   pick(ui, ui.radios.find((r) => r.value.startsWith('Android/data/')).value);
   ui.save.click();
   const app = await ui.p;
   assert.match(app.text, /^Android\/data\/[^/]+\/files\/download$/);
   assert.equal(app.move, true);
 
-  ui = open('Music/Muriel Mod');
+  ui = open('Music/Piverxy');
   pick(ui, '__custom');
   ui.select.value = 'Podcasts';
   ui.name.value = '  Road trip ';
@@ -94,7 +94,7 @@ test('a folder of your own that is already the current one opens preselected wit
 });
 
 test('a folder name that cannot be used is refused with a message (translated), and Cancel still works', async () => {
-  const ui = open('Music/Muriel Mod');
+  const ui = open('Music/Piverxy');
   pick(ui, '__custom');
   for (const bad of ['', 'a:b', '../x', '.hidden', 'a/../b']) {
     ui.name.value = bad;
@@ -111,8 +111,8 @@ test('a folder name that cannot be used is refused with a message (translated), 
   assert.equal(await ui.p, null);
 });
 
-test('Muriel\'s own words are marked for translation; folder names and paths are not', () => {
-  const ui = open('Music/Muriel Mod');
+test('Piverxy\'s own words are marked for translation; folder names and paths are not', () => {
+  const ui = open('Music/Piverxy');
   const words = ui.els.filter((e) => e.hasAttribute('data-i18n')).map((e) => e.textContent).sort();
   assert.deepEqual(words, [
     'Another folder', 'App folder', 'Cancel', 'Download folder',
@@ -121,7 +121,7 @@ test('Muriel\'s own words are marked for translation; folder names and paths are
   ].sort());
   for (const e of ui.els) {
     if (!e.textContent) continue;
-    if (/\/|Muriel Mod|^(Music|Download|Documents|Podcasts|Audiobooks)$/.test(e.textContent)) {
+    if (/\/|Piverxy|^(Music|Download|Documents|Podcasts|Audiobooks)$/.test(e.textContent)) {
       assert.equal(e.hasAttribute('data-i18n'), false, `"${e.textContent}" would be sent to the translator`);
     }
   }
@@ -130,5 +130,5 @@ test('Muriel\'s own words are marked for translation; folder names and paths are
 });
 
 test('the Android back button can close the sheet (its Cancel button id starts with btn-cancel)', () => {
-  assert.match(open('Music/Muriel Mod').cancel.id, /^btn-cancel/);
+  assert.match(open('Music/Piverxy').cancel.id, /^btn-cancel/);
 });

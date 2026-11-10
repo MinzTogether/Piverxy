@@ -13,10 +13,10 @@ const https = require('node:https');
 
 const I18n = require('../i18n');
 
-test('only Muriel\'s own words are worth translating', () => {
+test('only Piverxy\'s own words are worth translating', () => {
   for (const s of ['Play next', 'Add to queue', 'No playlists yet. Create one first.', '{0} songs']) assert.equal(I18n.translatable(s), true, s);
   for (const s of ['', ' ', 'x', '100%', '0:00', '1.25x', '-6 dB', '44.1 kHz', 'FLAC', 'HQ', 'v1.2.9', 'https://example.com/a', 'Ctrl+K',
-    'Muriel', 'YouTube Music', 'SoundCloud', 'me@example.com', 'a'.repeat(501)]) assert.equal(I18n.translatable(s), false, s);
+    'Piverxy', 'YouTube Music', 'SoundCloud', 'me@example.com', 'a'.repeat(501)]) assert.equal(I18n.translatable(s), false, s);
 });
 
 test('a translation must keep every placeholder', () => {
@@ -66,9 +66,9 @@ test('language codes and right-to-left languages', () => {
 });
 
 // ---------- the server ----------
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'muriel-i18n-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'piverxy-i18n-'));
 for (const key of ['HOME', 'USERPROFILE', 'LOCALAPPDATA', 'XDG_CONFIG_HOME']) process.env[key] = tmp;
-process.env.MURIEL_DATA_DIR = path.join(tmp, 'data');
+process.env.PIVERXY_DATA_DIR = path.join(tmp, 'data');
 
 // the translate service: upper-cases each line and puts the language in front; `mode` breaks it on purpose
 let mode = 'ok';
@@ -107,7 +107,7 @@ after(async () => {
 
 function call(method, route, body, token = getServerToken()) {
   return new Promise((resolve, reject) => {
-    const req = http.request({ host: '127.0.0.1', port, method, path: route, headers: { 'Content-Type': 'application/json', ...(token ? { 'x-muriel-token': token } : {}) } }, (res) => {
+    const req = http.request({ host: '127.0.0.1', port, method, path: route, headers: { 'Content-Type': 'application/json', ...(token ? { 'x-piverxy-token': token } : {}) } }, (res) => {
       let b = '';
       res.on('data', (c) => (b += c));
       res.on('end', () => { let json = null; try { json = JSON.parse(b); } catch (e) {} resolve({ status: res.statusCode, json }); });
@@ -117,7 +117,7 @@ function call(method, route, body, token = getServerToken()) {
   });
 }
 const batch = (target, texts) => call('POST', '/api/i18n-batch', { target, texts });
-const saved = (lang) => { try { return JSON.parse(fs.readFileSync(path.join(process.env.MURIEL_DATA_DIR, 'i18n', `${lang}.json`), 'utf8')); } catch (e) { return null; } };
+const saved = (lang) => { try { return JSON.parse(fs.readFileSync(path.join(process.env.PIVERXY_DATA_DIR, 'i18n', `${lang}.json`), 'utf8')); } catch (e) { return null; } };
 
 test('English costs nothing', async () => {
   const before = asked.length;
@@ -134,7 +134,7 @@ test('needs the token and a real language code', async () => {
     const r = await batch(target, ['Play']);
     assert.equal(r.status, 400, target);
   }
-  assert.equal(fs.existsSync(path.join(process.env.MURIEL_DATA_DIR, 'x.json')), false);
+  assert.equal(fs.existsSync(path.join(process.env.PIVERXY_DATA_DIR, 'x.json')), false);
 });
 
 test('translates many strings in one request and keeps them on disk', async () => {
@@ -205,7 +205,7 @@ test('a translation keeps placeholders and is never HTML', async () => {
   assert.equal(I18n.pick('{0} songs', r.json.translations[0]), 'pt:{0} SONGS');
 });
 
-test('MurielI18n.lang follows setLang (it used to stay at the startup language, so picking English again did nothing, #20)', async () => {
+test('PiverxyI18n.lang follows setLang (it used to stay at the startup language, so picking English again did nothing, #20)', async () => {
   const vm = require('node:vm');
   const store = new Map();
   const ctx = { localStorage: { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)) },
@@ -213,7 +213,7 @@ test('MurielI18n.lang follows setLang (it used to stay at the startup language, 
   ctx.window = ctx;
   vm.createContext(ctx);
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'i18n.js'), 'utf8').replace(/typeof window !== 'undefined' \? window : globalThis/, 'window'), ctx);
-  const api = ctx.MurielI18n;
+  const api = ctx.PiverxyI18n;
   assert.equal(api.lang, 'en');
   api.setLang('de');
   assert.equal(api.lang, 'de');

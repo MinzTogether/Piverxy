@@ -68,7 +68,7 @@ function concat(pieces) {
 
 // Fetches every segment of an HLS media playlist and joins them into one file.
 async function downloadHls(playlistUrl, headers, signal, container) {
-  const m3u = await (await globalThis.__murielFetch(playlistUrl, { headers, signal })).text();
+  const m3u = await (await globalThis.__piverxyFetch(playlistUrl, { headers, signal })).text();
   const lines = m3u.split('\n').map((l) => l.trim());
   const key = lines.find((l) => l.startsWith('#EXT-X-KEY') && !/METHOD=NONE/.test(l));
   if (key) throw new Error('this song is only available encrypted (DRM)');
@@ -94,7 +94,7 @@ async function fetchAll(urls, headers, signal) {
       // a flaky segment shouldn't sink the whole song: retry it a couple of times with a short backoff
       for (let attempt = 0; ; attempt++) {
         try {
-          const r = await globalThis.__murielFetch(urls[i], { headers, signal });
+          const r = await globalThis.__piverxyFetch(urls[i], { headers, signal });
           if (!r.ok) throw Object.assign(new Error(`segment ${i} failed: ${r.status}`), { status: r.status });
           parts[i] = new Uint8Array(await r.arrayBuffer());
           break;
@@ -122,7 +122,7 @@ async function downloadRanges(url, headers, signal, size) {
 }
 
 // Android plays Opus (WebM) natively; set by bridge.js. iOS keeps the AAC stream.
-const playsOpus = () => !!globalThis.__murielPlaysOpus;
+const playsOpus = () => !!globalThis.__piverxyPlaysOpus;
 
 async function download(args, target, signal) {
   const audio = await ex.resolveAudio(target);
@@ -135,7 +135,7 @@ async function download(args, target, signal) {
   // full-quality Opus when the extractor found it; any failure falls back to the stream below
   const opus = audio.opus && playsOpus() ? await downloadRanges(audio.opus.url, audio.headers, signal, audio.opus.size).catch((e) => {
     if (signal && signal.aborted) throw e;
-    console.warn('[muriel] Opus download failed, using AAC', e && e.message);
+    console.warn('[piverxy] Opus download failed, using AAC', e && e.message);
     return null;
   }) : null;
   if (opus) {

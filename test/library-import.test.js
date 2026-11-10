@@ -8,7 +8,7 @@ const http = require('node:http');
 
 function get(port, route, token) {
   return new Promise((resolve, reject) => {
-    http.get({ host: '127.0.0.1', port, path: route, headers: token ? { 'X-Muriel-Token': token } : {} }, (res) => {
+    http.get({ host: '127.0.0.1', port, path: route, headers: token ? { 'X-Piverxy-Token': token } : {} }, (res) => {
       let raw = '';
       res.on('data', (c) => { raw += c; });
       res.on('end', () => { let data; try { data = JSON.parse(raw); } catch (_) { data = raw; } resolve({ status: res.statusCode, data }); });

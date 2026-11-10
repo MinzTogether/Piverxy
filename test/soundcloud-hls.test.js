@@ -44,7 +44,7 @@ function respond(body, status = 200) {
     arrayBuffer: async () => body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength),
   };
 }
-globalThis.__murielFetch = async (input) => {
+globalThis.__piverxyFetch = async (input) => {
   const url = String(input);
   if (url === 'https://soundcloud.com/') return respond('<script crossorigin src="https://a-v2.sndcdn.com/assets/app.js"></script>');
   if (url === 'https://a-v2.sndcdn.com/assets/app.js') return respond('x={client_id:"abcdefghijklmnopqrstuvwxyz123456"}');

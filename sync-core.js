@@ -1,4 +1,4 @@
-// Muriel sync, the part that decides what wins: every synced thing (a playlist, a favorite, a history entry,
+// Piverxy sync, the part that decides what wins: every synced thing (a playlist, a favorite, a history entry,
 // a setting) carries the time it last changed on any device, and when two devices meet the newer version
 // wins item by item. Removing something leaves a dated "tombstone" so the removal spreads too. No network,
 // no DOM: sync.js runs it in the app, test/sync-core.test.js in Node.
@@ -157,5 +157,5 @@
 
   const api = { hash, fingerprint, sha256, stampList, mergeList, stampMap, mergeMap, mergeById, pruneMeta, isGone };
   if (typeof module === 'object' && module.exports) module.exports = api;
-  else root.MurielSyncCore = api;
+  else root.PiverxySyncCore = api;
 })(typeof window !== 'undefined' ? window : globalThis);

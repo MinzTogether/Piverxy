@@ -35,7 +35,7 @@ function ffmpegAsset() {
 // refuses to start again while it says that. 60s without a single byte counts as failed.
 function get(url, redirects = 6) {
   return new Promise((resolve, reject) => {
-    const req = https.get(url, { headers: { 'User-Agent': 'Muriel' }, timeout: 60000 }, (res) => {
+    const req = https.get(url, { headers: { 'User-Agent': 'Piverxy' }, timeout: 60000 }, (res) => {
       if ([301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location && redirects > 0) {
         res.resume();
         return resolve(get(new URL(res.headers.location, url).toString(), redirects - 1));
@@ -180,9 +180,9 @@ async function installFfmpeg() {
   if (!want) throw new Error(`No checksum published for ${asset.name}`);
   // a private folder (0700) instead of a fixed name in the shared temp dir, which another local user could
   // create or swap before tar reads it; the hash is checked again on what is actually on disk
-  const dlDir = fs.mkdtempSync(path.join(os.tmpdir(), 'muriel-ffmpeg-dl-'));
+  const dlDir = fs.mkdtempSync(path.join(os.tmpdir(), 'piverxy-ffmpeg-dl-'));
   const archive = path.join(dlDir, asset.name);
-  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'muriel-ffmpeg-'));
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'piverxy-ffmpeg-'));
   try {
     const got = await downloadFile(`${base}/${asset.name}`, archive);
     if (got !== want || await sha256OfFile(archive) !== want) throw new Error('ffmpeg checksum mismatch');

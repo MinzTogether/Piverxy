@@ -29,7 +29,7 @@ test('songs from files on the device are left out', async () => {
 
 test('the payload is found in every way a link gets pasted', async () => {
   const { payload } = await share.encode({ name: 'a', tracks: [yt('nac6B__nFl0', 'Illegal', 'P', 150)] });
-  for (const s of [share.webLink(payload), share.appLink(payload), `  ${share.webLink(payload)}\n`, `Night drive on Muriel 🎧 ${share.webLink(payload)}`]) assert.strictEqual(share.payloadFrom(s), payload);
+  for (const s of [share.webLink(payload), share.appLink(payload), `  ${share.webLink(payload)}\n`, `Night drive on Piverxy 🎧 ${share.webLink(payload)}`]) assert.strictEqual(share.payloadFrom(s), payload);
   assert.strictEqual(share.payloadFrom('https://www.youtube.com/playlist?list=PL123'), '');
   // searches that happen to look like a payload stay searches
   for (const q of ['juicewrld', 'justinbieber', 'zaralarsson', 'yungblud123']) assert.strictEqual(share.payloadFrom(q), '');
@@ -37,12 +37,12 @@ test('the payload is found in every way a link gets pasted', async () => {
 
 test('an all-YouTube playlist makes a short link, and titles are looked up afterwards', async () => {
   const ids = ['4NRXx6U8ABQ', 'fJ9rUzIMcZQ', 'hT_nvWreIhg', 'OPf0YbXqDm0', '60ItHLz5WEA', 'JGwWNGJdvx8', '09R8_2nJtjg', 'YQHsXMglC9A', 'nac6B__nFl0', '51zjlMhdSTE'];
-  const { payload, count } = await share.encode({ name: 'Muriel Hits', tracks: ids.map((id) => yt(id, 'some title', 'someone', 200)) });
+  const { payload, count } = await share.encode({ name: 'Piverxy Hits', tracks: ids.map((id) => yt(id, 'some title', 'someone', 200)) });
   assert.strictEqual(count, 10);
   assert.strictEqual(payload[0], 'y');
   assert.ok(share.webLink(payload).length < 180, `link ${share.webLink(payload).length} chars`);
   const back = await share.decode(payload);
-  assert.strictEqual(back.name, 'Muriel Hits');
+  assert.strictEqual(back.name, 'Piverxy Hits');
   assert.deepStrictEqual(back.tracks.map((t) => t.id), ids);
   assert.ok(back.tracks.every((t) => t.needsInfo && t.title === 'YouTube video' && t.platform === 'youtube'));
 

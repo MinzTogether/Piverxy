@@ -109,5 +109,5 @@
 
   const api = { MIN_LENGTH, MAX_WAIT, scrobbleAfter, createTracker, cleanMeta, trackKey };
   if (typeof module === 'object' && module.exports) module.exports = api;
-  else root.MurielLastfm = api;
+  else root.PiverxyLastfm = api;
 })(typeof window !== 'undefined' ? window : globalThis);

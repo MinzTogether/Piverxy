@@ -1,6 +1,6 @@
 name: Windows build
 
-# Builds a portable Muriel.exe (no installer, runs from anywhere) and publishes it to the
+# Builds a portable Piverxy.exe (no installer, runs from anywhere) and publishes it to the
 # rolling "windows-latest" release.
 on:
   push:
@@ -37,14 +37,14 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: |
           node tools/build-info.mjs build-info.js windows
-          npx electron-builder --win portable --x64 --publish never -c.artifactName='Muriel.${ext}'
+          npx electron-builder --win portable --x64 --publish never -c.artifactName='Piverxy.${ext}'
           ls -la dist
-          cp dist/Muriel.exe Muriel.exe
+          cp dist/Piverxy.exe Piverxy.exe
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Muriel-exe
-          path: Muriel.exe
+          name: Piverxy-exe
+          path: Piverxy.exe
 
       - name: Publish to the windows-latest release
         if: github.ref == 'refs/heads/main'
@@ -59,8 +59,8 @@ jobs:
           # website adds this to the new file's count). 6 = downloads counted before this existed
           ver="$(node -p "require('./package.json').version")"
           gh release delete windows-latest --cleanup-tag --yes 2>/dev/null || true
-          gh release create windows-latest Muriel.exe \
+          gh release create windows-latest Piverxy.exe \
             --prerelease \
             --target "$GITHUB_SHA" \
-            --title "Muriel for Windows (latest build)" \
-            --notes "Muriel $ver. Portable build of ${GITHUB_SHA::7} (run ${{ github.run_number }}). No install needed: download Muriel.exe and run it. Windows SmartScreen may warn because the exe is unsigned: More info -> Run anyway.<!-- muriel-version: $ver -->"
+            --title "Piverxy for Windows (latest build)" \
+            --notes "Piverxy $ver. Portable build of ${GITHUB_SHA::7} (run ${{ github.run_number }}). No install needed: download Piverxy.exe and run it. Windows SmartScreen may warn because the exe is unsigned: More info -> Run anyway.<!-- piverxy-version: $ver -->"

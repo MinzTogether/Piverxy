@@ -13,9 +13,9 @@ const http = require('node:http');
 const https = require('node:https');
 const dns = require('node:dns');
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'muriel-stability-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'piverxy-stability-'));
 for (const key of ['HOME', 'USERPROFILE', 'LOCALAPPDATA', 'XDG_CONFIG_HOME']) process.env[key] = tmp;
-process.env.MURIEL_DATA_DIR = path.join(tmp, 'data');
+process.env.PIVERXY_DATA_DIR = path.join(tmp, 'data');
 // the library index is read when server.js loads: one entry whose cover can't be read
 fs.mkdirSync(path.join(tmp, 'data', 'thumbnails', 'localcover_local_000000000001.jpg'), { recursive: true });
 fs.writeFileSync(path.join(tmp, 'data', 'library.json'), JSON.stringify({
@@ -72,7 +72,7 @@ after(async () => {
 // resolves { status, headers, body }, { error } or { timedOut } - never hangs the test
 function call(method, route, { body, headers = {}, timeout = 5000 } = {}) {
   return new Promise((resolve) => {
-    const req = http.request({ host: '127.0.0.1', port, method, path: route, headers: { 'x-muriel-token': getServerToken(), ...headers } }, (res) => {
+    const req = http.request({ host: '127.0.0.1', port, method, path: route, headers: { 'x-piverxy-token': getServerToken(), ...headers } }, (res) => {
       const chunks = [];
       res.on('data', (c) => chunks.push(c));
       res.on('end', () => { clearTimeout(timer); resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks) }); });
@@ -231,7 +231,7 @@ test('aborting a proxied stream closes the upstream connection', async () => {
   try {
     for (let i = 0; i < 3; i++) {
       await new Promise((resolve) => {
-        const req = http.get({ host: '127.0.0.1', port, path: `/api/audio-proxy?url=${encodeURIComponent('http://stream.test/song.mp3')}`, headers: { 'x-muriel-token': getServerToken() } }, (res) => {
+        const req = http.get({ host: '127.0.0.1', port, path: `/api/audio-proxy?url=${encodeURIComponent('http://stream.test/song.mp3')}`, headers: { 'x-piverxy-token': getServerToken() } }, (res) => {
           let got = 0;
           res.on('data', (c) => { got += c.length; if (got > 40000) { req.destroy(); resolve(); } });
         });
@@ -264,7 +264,7 @@ test('a stalled tool download ends in an error instead of "downloading" forever'
 });
 
 test('phone shims implement the stream methods server.js calls', async () => {
-  globalThis.__murielFetch = async () => new Response('{}', { status: 404 });
+  globalThis.__piverxyFetch = async () => new Response('{}', { status: 404 });
   try {
     const shimHttps = require('../mobile/shims/https');
     const res = await new Promise((resolve, reject) => shimHttps.get('https://example.test/', { timeout: 1000 }, resolve).on('error', reject));
@@ -283,7 +283,7 @@ test('phone shims implement the stream methods server.js calls', async () => {
     await settle();
     assert.deepEqual(crashes, []);
   } finally {
-    delete globalThis.__murielFetch;
+    delete globalThis.__piverxyFetch;
   }
 });
 

@@ -1,6 +1,6 @@
-// iPhone: keeps Muriel running in the background between two songs.
+// iPhone: keeps Piverxy running in the background between two songs.
 // iOS lets an app run in the background only while it plays something. Between two songs nothing does:
-// the next one is still downloading, or one that can't play is being skipped. iOS then suspended Muriel
+// the next one is still downloading, or one that can't play is being skipped. iOS then suspended Piverxy
 // within seconds, and the next song didn't start until the app was opened again. So while a song is on
 // its way (app.js `state.trackLoading`), a second <audio> element loops a second of silence.
 const { Capacitor } = require('@capacitor/core');
@@ -22,7 +22,7 @@ function silentWav(rate = 8000) {
 
 module.exports = function backgroundAudio() {
   if (Capacitor.getPlatform() !== 'ios') return;
-  const core = () => window.MurielCore;
+  const core = () => window.PiverxyCore;
   let silence = null;
   let capTimer = null;
 
@@ -53,8 +53,8 @@ module.exports = function backgroundAudio() {
   function hook() {
     const c = core();
     if (!c || !c.audio) return;
-    window.addEventListener('muriel:loading', sync);
+    window.addEventListener('piverxy:loading', sync);
     ['play', 'playing', 'pause'].forEach((ev) => c.audio.addEventListener(ev, sync));
   }
-  if (window.MurielCore) hook(); else window.addEventListener('muriel:ready', hook, { once: true });
+  if (window.PiverxyCore) hook(); else window.addEventListener('piverxy:ready', hook, { once: true });
 };

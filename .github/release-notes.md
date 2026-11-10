@@ -1,9 +1,9 @@
-## Muriel 1.3.10
+## Piverxy 1.3.10
 
 **Downloads**
-- **iPhone:** [ios-latest](https://github.com/cloverscripts/riff-muriel/releases/tag/ios-latest) (`Muriel.ipa`, install with SideStore, AltStore or Sideloadly). Needs iOS 16.2 or newer
-- **Android:** [android-latest](https://github.com/cloverscripts/riff-muriel/releases/tag/android-latest) (`Muriel.apk`)
-- **Windows:** installer below, or the portable exe on [windows-latest](https://github.com/cloverscripts/riff-muriel/releases/tag/windows-latest)
+- **iPhone:** [ios-latest](https://github.com/MinzTogether/Piverxy/releases/tag/ios-latest) (`Piverxy.ipa`, install with SideStore, AltStore or Sideloadly). Needs iOS 16.2 or newer
+- **Android:** [android-latest](https://github.com/MinzTogether/Piverxy/releases/tag/android-latest) (`Piverxy.apk`)
+- **Windows:** installer below, or the portable exe on [windows-latest](https://github.com/MinzTogether/Piverxy/releases/tag/windows-latest)
 - **macOS:** `.dmg` / `.zip` below, for Apple Silicon and Intel. The app is unsigned: if macOS blocks it, open System Settings → Privacy & Security → Open Anyway.
 - **Linux:** `.AppImage` below (needs FUSE 2: `fuse2` / `libfuse2`)
 
@@ -16,21 +16,21 @@
 
 **New in 1.3.9**
 - **Download a whole album** from its page, with progress; songs you already have are skipped. Thanks to Dandeleah!
-- **Sorting:** Albums (recent, title, artist, year), Playlists (custom, name, most songs) and Artists (recent, name, most played). Muriel remembers your choice.
+- **Sorting:** Albums (recent, title, artist, year), Playlists (custom, name, most songs) and Artists (recent, name, most played). Piverxy remembers your choice.
 - **Better recommendations:** My Wave and the Daily Mixes now use YouTube Music radio and Last.fm similar songs, skip what you just heard, and tidy up video titles.
 - **Block artists and songs** from a song's menu or the artist page; they're skipped and kept out of mixes. Unblock in Settings → Tracks. Syncs between devices.
 - **Search filters:** All, Songs, Artists, Albums.
 - **Choose the sound output device** (computers, Settings → Tracks).
 - **Add a whole folder** of local music (computers).
 - **Yandex Music:** album and single-song links import now.
-- **Mac:** native window buttons, the Dock icon reopens Muriel, and songs start much faster.
+- **Mac:** native window buttons, the Dock icon reopens Piverxy, and songs start much faster.
 - Covers that won't load fall back to Apple Music artwork (computers).
 
 **Fixed in 1.3.9**
 - **iPhone:** music resumes after another app's sound ends, and the lock screen / Control Center shows the right play state, progress and speed. (#26)
-- **Android:** the play/pause notification shows on Android 13 and newer; Muriel asks for notification permission once. (#25)
+- **Android:** the play/pause notification shows on Android 13 and newer; Piverxy asks for notification permission once. (#25)
 - **Phones:** pressing play from outside the app after a pause works again. (#24)
-- **Windows taskbar:** the pinned icon opens Muriel, no duplicate icon, and the pin survives updates. Unpin the old icon once and pin Muriel again after updating. (#23)
+- **Windows taskbar:** the pinned icon opens Piverxy, no duplicate icon, and the pin survives updates. Unpin the old icon once and pin Piverxy again after updating. (#23)
 - **Songs cutting off early:** with Crossfade on, the song now fades out and plays to its end instead of skipping ahead. (#22)
 - **Android seek bar:** dragging with a finger works. (#21)
 - **Switching the app language back to English** works again. (#20)
@@ -38,7 +38,7 @@
 - Reduce motion follows your system setting, and the accent color picker saves properly.
 
 **Fixed in 1.3.8**
-- **"Failed, retry or skip" when Retry would have worked:** a song you click no longer inherits a failed lookup of the next-song preparation, and an expired stream link isn't reused. Muriel also quietly tries once more with a fresh lookup before asking.
+- **"Failed, retry or skip" when Retry would have worked:** a song you click no longer inherits a failed lookup of the next-song preparation, and an expired stream link isn't reused. Piverxy also quietly tries once more with a fresh lookup before asking.
 - **Player bar visualizer ("Behind bar"):** the bars sit inside the player bar again instead of in a strip over the page, as a quiet backdrop that keeps the times and buttons readable. Turn it off under Settings → Interface → Visualizer.
 
 **New in 1.3.7**
@@ -56,7 +56,7 @@
 - **Settings, sorted:** every category has headings, and 30 settings moved to where you'd look for them. Settings that used to hide behind a fold-out in Advanced now show up in search too.
 
 **Fixed in 1.3.6**
-- **High CPU on computers:** Muriel ran many YouTube lookups at once (each can start a deno process), even when you just moved the mouse over songs. Now at most 2 run at a time at lower priority, nothing runs on hover, and only the next song is prepared near the end of the current one.
+- **High CPU on computers:** Piverxy ran many YouTube lookups at once (each can start a deno process), even when you just moved the mouse over songs. Now at most 2 run at a time at lower priority, nothing runs on hover, and only the next song is prepared near the end of the current one.
 - **Settings on phones:** tapping a category no longer adds a second arrow.
 
 **New in 1.3.5**
@@ -76,7 +76,7 @@
 - **Favorites:** the same song can't end up in favorites twice any more; existing duplicates are cleaned up.
 - **Home rows:** the mouse wheel scrolls the artists and playlists rows instead of the whole page.
 - **Copy diagnostics and the logs button** work again, on phones too.
-- **Google login:** when Google refuses the sign-in, Muriel now says why and suggests importing playlists by link.
+- **Google login:** when Google refuses the sign-in, Piverxy now says why and suggests importing playlists by link.
 
 **Fixed in 1.3.3**
 - **Settings on phones:** the page sat shifted to the right and was cut off at the edge. It fits the screen again, at any font size.
@@ -89,7 +89,7 @@
 - **Last.fm:** connecting is now just a login, so you no longer need your own API key
 
 **New in 1.3** (everything new in Riff 43)
-- **Muriel in your language:** Settings → Interface → Language. Song titles, artists and playlist names are never sent for translation.
+- **Piverxy in your language:** Settings → Interface → Language. Song titles, artists and playlist names are never sent for translation.
 - **Last.fm scrobbling:** each profile has its own login
 - **Import and back up:**
   - **YouTube library (desktop):** sign in with Google and import your liked songs and playlists from YouTube and YouTube Music.
@@ -118,4 +118,4 @@
 - **Artist lookups:** searching by name now finds the exact artist (for example "Queen"), and disambiguation pages are no longer shown as a bio.
 - **Stuck songs:** a song that loads nothing for 12 seconds is skipped (adjustable in Settings).
 
-Everything from 1.2.9 is included too: profiles, songs that wouldn't play trying YouTube, downloads in Music/Muriel on Android, and the right artist when several share a name.
+Everything from 1.2.9 is included too: profiles, songs that wouldn't play trying YouTube, downloads in Music/Piverxy on Android, and the right artist when several share a name.

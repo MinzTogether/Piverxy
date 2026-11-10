@@ -108,7 +108,7 @@ test("the phone's MD5 matches Node's (Last.fm signatures are MD5)", () => {
 function post(port, route, body, token) {
   return new Promise((resolve, reject) => {
     const data = JSON.stringify(body);
-    const req = http.request({ host: '127.0.0.1', port, path: route, method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data), ...(token ? { 'X-Muriel-Token': token } : {}) } }, (res) => {
+    const req = http.request({ host: '127.0.0.1', port, path: route, method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data), ...(token ? { 'X-Piverxy-Token': token } : {}) } }, (res) => {
       let raw = '';
       res.on('data', (c) => { raw += c; });
       res.on('end', () => { let json; try { json = JSON.parse(raw); } catch (_) { json = raw; } resolve({ status: res.statusCode, data: json, raw }); });
@@ -119,8 +119,8 @@ function post(port, route, body, token) {
 }
 
 test('server: Last.fm logins are per profile, kept encrypted, and never handed to the page', async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'muriel-lastfm-'));
-  const oldDataDir = process.env.MURIEL_DATA_DIR;
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'piverxy-lastfm-'));
+  const oldDataDir = process.env.PIVERXY_DATA_DIR;
   const oldElectron = process.versions.electron;
   const oldLoad = Module._load;
   const oldRequest = https.request;
@@ -135,7 +135,7 @@ test('server: Last.fm logins are per profile, kept encrypted, and never handed t
   const SK = 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6';
   const CUSTOM = { key: 'c'.repeat(32), secret: 'd'.repeat(32) };
   try {
-    process.env.MURIEL_DATA_DIR = dir;
+    process.env.PIVERXY_DATA_DIR = dir;
     process.versions.electron = '41';
     Module._load = function (name, parent, isMain) {
       if (name === 'electron') return { safeStorage };
@@ -253,19 +253,19 @@ test('server: Last.fm logins are per profile, kept encrypted, and never handed t
     delete require.cache[require.resolve('../server')];
     https.request = oldRequest;
     Module._load = oldLoad;
-    if (oldDataDir === undefined) delete process.env.MURIEL_DATA_DIR; else process.env.MURIEL_DATA_DIR = oldDataDir;
+    if (oldDataDir === undefined) delete process.env.PIVERXY_DATA_DIR; else process.env.PIVERXY_DATA_DIR = oldDataDir;
     if (oldElectron === undefined) delete process.versions.electron; else process.versions.electron = oldElectron;
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test('server: without a keychain the login lasts until Muriel closes, and says so', async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'muriel-lastfm-'));
-  const oldDataDir = process.env.MURIEL_DATA_DIR;
+test('server: without a keychain the login lasts until Piverxy closes, and says so', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'piverxy-lastfm-'));
+  const oldDataDir = process.env.PIVERXY_DATA_DIR;
   const oldRequest = https.request;
   let server;
   try {
-    process.env.MURIEL_DATA_DIR = dir;
+    process.env.PIVERXY_DATA_DIR = dir;
     https.request = (opts, callback) => {
       const req = new PassThrough();
       req.write = () => true;
@@ -280,13 +280,13 @@ test('server: without a keychain the login lasts until Muriel closes, and says s
     const r = await post(port, '/api/lastfm/mobile-session', { profile: 'default', username: 'u', password: 'p' }, token);
     assert.equal(r.data.success, true);
     assert.equal(r.data.saved, false);
-    assert.match(r.data.error, /until Muriel closes|saved securely/);
+    assert.match(r.data.error, /until Piverxy closes|saved securely/);
     assert.ok(!fs.existsSync(path.join(dir, 'lastfm-auth.enc')));
   } finally {
     if (server) await server.stopServer();
     delete require.cache[require.resolve('../server')];
     https.request = oldRequest;
-    if (oldDataDir === undefined) delete process.env.MURIEL_DATA_DIR; else process.env.MURIEL_DATA_DIR = oldDataDir;
+    if (oldDataDir === undefined) delete process.env.PIVERXY_DATA_DIR; else process.env.PIVERXY_DATA_DIR = oldDataDir;
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });

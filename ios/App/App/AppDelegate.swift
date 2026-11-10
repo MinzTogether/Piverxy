@@ -11,7 +11,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Music app: keep playing with the screen locked or the app in the background,
         // and ignore the silent switch. The session is not activated here: that would stop other
-        // apps' audio the moment Muriel opens; WebKit activates it when a song starts.
+        // apps' audio the moment Piverxy opens; WebKit activates it when a song starts.
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [])
         return true
     }
@@ -52,10 +52,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 }
 
 
-// Muriel's web view. WebKit has a (private) preference that mutes a page's audio while the page
+// Piverxy's web view. WebKit has a (private) preference that mutes a page's audio while the page
 // is hidden: playback keeps "running" and shows on the lock screen, but nothing is audible once the
 // app is backgrounded or the phone is locked. Turn it off, if this iOS version has it.
-class MurielBridgeViewController: CAPBridgeViewController {
+class PiverxyBridgeViewController: CAPBridgeViewController {
     override open func webViewConfiguration(for instanceConfiguration: InstanceConfiguration) -> WKWebViewConfiguration {
         let config = super.webViewConfiguration(for: instanceConfiguration)
         config.allowsInlineMediaPlayback = true
@@ -68,20 +68,20 @@ class MurielBridgeViewController: CAPBridgeViewController {
 
     // plugins that live in the app itself (not in an npm package) are registered by hand
     override open func capacitorDidLoad() {
-        bridge?.registerPluginInstance(MurielLiveActivityPlugin())
-        bridge?.registerPluginInstance(MurielAudioSessionPlugin())
+        bridge?.registerPluginInstance(PiverxyLiveActivityPlugin())
+        bridge?.registerPluginInstance(PiverxyAudioSessionPlugin())
     }
 }
 
-// Another app's sound (a call, Siri, a video) interrupting Muriel: the page (mobile/audio-interruption.js) is
+// Another app's sound (a call, Siri, a video) interrupting Piverxy: the page (mobile/audio-interruption.js) is
 // told when it starts and when it ends, and whether iOS says to play again, so a song that was playing starts
 // again like it does in Spotify (#26). Paused in the background the app is suspended soon after; iOS wakes it
 // for the end of the interruption, and a short background task keeps it awake until the page has asked the
 // song to play again (or a lock screen play has arrived).
-@objc(MurielAudioSessionPlugin)
-public class MurielAudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
-    public let identifier = "MurielAudioSessionPlugin"
-    public let jsName = "MurielAudioSession"
+@objc(PiverxyAudioSessionPlugin)
+public class PiverxyAudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
+    public let identifier = "PiverxyAudioSessionPlugin"
+    public let jsName = "PiverxyAudioSession"
     public let pluginMethods: [CAPPluginMethod] = []
     private var awake: UIBackgroundTaskIdentifier = .invalid
     private var awakeEnd: DispatchWorkItem?
@@ -107,7 +107,7 @@ public class MurielAudioSessionPlugin: CAPPlugin, CAPBridgedPlugin {
     // once the song plays again iOS keeps the app running by itself; this only bridges the moment until then
     private func stayAwake(seconds: Double) {
         if awake == .invalid {
-            awake = UIApplication.shared.beginBackgroundTask(withName: "MurielInterruptionEnd") { [weak self] in self?.endAwake() }
+            awake = UIApplication.shared.beginBackgroundTask(withName: "PiverxyInterruptionEnd") { [weak self] in self?.endAwake() }
         }
         awakeEnd?.cancel()
         let work = DispatchWorkItem { [weak self] in self?.endAwake() }

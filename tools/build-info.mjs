@@ -9,13 +9,13 @@ export function buildInfo(channel = '') {
     sha: process.env.GITHUB_SHA || 'dev',
     version: pkgVersion(),
     run: Number(process.env.GITHUB_RUN_NUMBER) || 0,
-    repo: process.env.GITHUB_REPOSITORY || 'cloverscripts/riff-muriel',
+    repo: process.env.GITHUB_REPOSITORY || 'MinzTogether/Piverxy',
     builtAt: new Date().toISOString(),
     channel,
   };
 }
 
-export const buildInfoScript = (channel) => `window.MURIEL_BUILD = ${JSON.stringify(buildInfo(channel))};\n`;
+export const buildInfoScript = (channel) => `window.PIVERXY_BUILD = ${JSON.stringify(buildInfo(channel))};\n`;
 
 if (process.argv[1] && process.argv[1].endsWith('build-info.mjs')) {
   const [out = 'build-info.js', channel = ''] = process.argv.slice(2);
